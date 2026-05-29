@@ -3,704 +3,140 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Lịch trực nhật</title>
+  <title>Lịch trực nhật dùng chung</title>
   <style>
-    :root {
-      --bg: #f4f7fb;
-      --card: #ffffff;
-      --text: #111827;
-      --muted: #6b7280;
-      --line: #e5e7eb;
-      --primary: #2563eb;
-      --primary-soft: #eff6ff;
-      --green: #16a34a;
-      --green-soft: #ecfdf5;
-      --red: #dc2626;
-      --red-soft: #fef2f2;
-      --amber: #d97706;
-      --amber-soft: #fffbeb;
-      --purple-soft: #f5f3ff;
-      --purple: #7c3aed;
-      --shadow: 0 16px 40px rgba(15, 23, 42, 0.08);
-      --radius: 22px;
-    }
-
-    * { box-sizing: border-box; }
-
-    body {
-      margin: 0;
-      min-height: 100vh;
-      font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-      background:
-        radial-gradient(circle at top left, rgba(37, 99, 235, 0.13), transparent 32%),
-        radial-gradient(circle at bottom right, rgba(124, 58, 237, 0.11), transparent 32%),
-        var(--bg);
-      color: var(--text);
-    }
-
-    .app {
-      width: min(1180px, calc(100% - 28px));
-      margin: 0 auto;
-      padding: 24px 0 42px;
-    }
-
-    .topbar {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      gap: 16px;
-      margin-bottom: 18px;
-      padding: 18px 20px;
-      border: 1px solid var(--line);
-      border-radius: var(--radius);
-      background: rgba(255, 255, 255, 0.86);
-      backdrop-filter: blur(16px);
-      box-shadow: var(--shadow);
-    }
-
-    .brand {
-      display: flex;
-      align-items: center;
-      gap: 13px;
-    }
-
-    .logo {
-      width: 44px;
-      height: 44px;
-      display: grid;
-      place-items: center;
-      border-radius: 16px;
-      color: white;
-      background: linear-gradient(135deg, #2563eb, #7c3aed);
-      font-size: 22px;
-      box-shadow: 0 10px 22px rgba(37, 99, 235, 0.28);
-    }
-
-    h1 {
-      margin: 0;
-      font-size: 25px;
-      letter-spacing: -0.6px;
-    }
-
-    .brand p {
-      margin: 3px 0 0;
-      color: var(--muted);
-      font-size: 13px;
-    }
-
-    .stats {
-      display: flex;
-      gap: 10px;
-      flex-wrap: wrap;
-      justify-content: flex-end;
-    }
-
-    .stat {
-      min-width: 96px;
-      padding: 10px 12px;
-      border: 1px solid var(--line);
-      border-radius: 16px;
-      background: #fff;
-      text-align: center;
-    }
-
-    .stat strong {
-      display: block;
-      font-size: 20px;
-    }
-
-    .stat span {
-      color: var(--muted);
-      font-size: 12px;
-      font-weight: 700;
-    }
-
-    .layout {
-      display: grid;
-      grid-template-columns: 340px 1fr;
-      gap: 18px;
-      align-items: start;
-    }
-
-    .card {
-      border: 1px solid var(--line);
-      border-radius: var(--radius);
-      background: rgba(255, 255, 255, 0.9);
-      backdrop-filter: blur(16px);
-      box-shadow: var(--shadow);
-      overflow: hidden;
-    }
-
-    .card-head {
-      padding: 18px 20px;
-      border-bottom: 1px solid var(--line);
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      gap: 12px;
-    }
-
-    .card-head h2 {
-      margin: 0;
-      font-size: 18px;
-      letter-spacing: -0.35px;
-    }
-
-    .card-body {
-      padding: 18px 20px 20px;
-    }
-
-    .row {
-      display: flex;
-      gap: 10px;
-      flex-wrap: wrap;
-    }
-
-    .row > * { flex: 1; }
-
-    input, select, button {
-      font: inherit;
-    }
-
-    input[type="text"],
-    input[type="date"],
-    select {
-      width: 100%;
-      border: 1px solid var(--line);
-      border-radius: 14px;
-      padding: 12px 13px;
-      outline: none;
-      color: var(--text);
-      background: white;
-      transition: 0.16s;
-    }
-
-    input:focus, select:focus {
-      border-color: rgba(37, 99, 235, 0.55);
-      box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.09);
-    }
-
-    button {
-      border: 0;
-      border-radius: 14px;
-      padding: 12px 14px;
-      cursor: pointer;
-      font-weight: 800;
-      white-space: nowrap;
-      transition: 0.16s;
-    }
-
-    button:hover {
-      transform: translateY(-1px);
-      filter: brightness(1.02);
-    }
-
-    button:active { transform: translateY(1px); }
-
-    .btn-primary {
-      color: white;
-      background: linear-gradient(135deg, #2563eb, #7c3aed);
-    }
-
-    .btn-blue {
-      color: #1d4ed8;
-      background: var(--primary-soft);
-    }
-
-    .btn-green {
-      color: #15803d;
-      background: var(--green-soft);
-    }
-
-    .btn-red {
-      color: #b91c1c;
-      background: var(--red-soft);
-    }
-
-    .btn-amber {
-      color: #92400e;
-      background: var(--amber-soft);
-    }
-
-    .btn-purple {
-      color: var(--purple);
-      background: var(--purple-soft);
-    }
-
-    .member-list {
-      display: grid;
-      gap: 10px;
-      margin-top: 14px;
-    }
-
-    .member {
-      display: grid;
-      grid-template-columns: auto 1fr auto;
-      gap: 11px;
-      align-items: center;
-      padding: 12px;
-      border: 1px solid var(--line);
-      border-radius: 16px;
-      background: #fff;
-    }
-
-    .member strong {
-      display: block;
-      font-size: 15px;
-    }
-
-    .member small {
-      display: block;
-      margin-top: 3px;
-      color: var(--muted);
-      font-size: 12px;
-      line-height: 1.4;
-    }
-
-    .member button {
-      padding: 8px 10px;
-      border-radius: 12px;
-      font-size: 12px;
-    }
-
-    .switch {
-      position: relative;
-      width: 46px;
-      height: 26px;
-      flex: unset;
-    }
-
-    .switch input { display: none; }
-
-    .slider {
-      position: absolute;
-      inset: 0;
-      border-radius: 999px;
-      background: rgba(22, 163, 74, 0.22);
-      border: 1px solid rgba(22, 163, 74, 0.3);
-      cursor: pointer;
-    }
-
-    .slider::before {
-      content: "";
-      position: absolute;
-      width: 20px;
-      height: 20px;
-      left: 3px;
-      top: 2px;
-      border-radius: 50%;
-      background: white;
-      box-shadow: 0 4px 10px rgba(15, 23, 42, 0.18);
-      transition: 0.18s;
-    }
-
-    .switch input:not(:checked) + .slider {
-      background: rgba(220, 38, 38, 0.14);
-      border-color: rgba(220, 38, 38, 0.2);
-    }
-
-    .switch input:not(:checked) + .slider::before {
-      transform: translateX(19px);
-    }
-
-    .toolbar {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 10px;
-      margin-top: 14px;
-    }
-
-    .toolbar button,
-    .toolbar input {
-      flex: unset;
-    }
-
-    .week-tools {
-      display: grid;
-      grid-template-columns: 1fr auto auto;
-      gap: 10px;
-      margin-bottom: 14px;
-    }
-
-    .mini-help {
-      margin: -4px 0 14px;
-      color: var(--muted);
-      font-size: 12px;
-    }
-
-    .schedule {
-      border: 1px solid var(--line);
-      border-radius: 20px;
-      background: #fff;
-      overflow: hidden;
-    }
-
-    .schedule-title {
-      padding: 18px 20px;
-      border-bottom: 1px solid var(--line);
-      display: flex;
-      justify-content: space-between;
-      gap: 12px;
-      align-items: flex-start;
-      background: linear-gradient(135deg, #ffffff, #f8fafc);
-    }
-
-    .schedule-title h3 {
-      margin: 0;
-      font-size: 22px;
-      letter-spacing: -0.4px;
-    }
-
-    .schedule-title p {
-      margin: 5px 0 0;
-      color: var(--muted);
-      font-size: 13px;
-      line-height: 1.45;
-    }
-
-    .schedule-actions {
-      display: flex;
-      gap: 8px;
-      align-items: center;
-      flex-wrap: wrap;
-      justify-content: flex-end;
-    }
-
-    .tag {
-      display: inline-flex;
-      align-items: center;
-      padding: 7px 10px;
-      border-radius: 999px;
-      color: #1d4ed8;
-      background: var(--primary-soft);
-      font-size: 12px;
-      font-weight: 850;
-    }
-
-    table {
-      width: 100%;
-      border-collapse: collapse;
-    }
-
-    th, td {
-      padding: 15px 20px;
-      border-bottom: 1px solid var(--line);
-      text-align: left;
-      vertical-align: top;
-    }
-
-    tr:last-child td { border-bottom: 0; }
-
-    th {
-      color: var(--muted);
-      background: #f8fafc;
-      font-size: 12px;
-      text-transform: uppercase;
-      letter-spacing: 0.45px;
-    }
-
-    td:nth-child(2) { font-weight: 900; }
-
-    .note {
-      margin-top: 5px;
-      color: var(--muted);
-      font-size: 12px;
-      font-weight: 500;
-      line-height: 1.45;
-    }
-
-    .cut td:nth-child(2) { color: var(--red); }
-
-    .empty {
-      padding: 24px;
-      border: 1px dashed #cbd5e1;
-      border-radius: 18px;
-      color: var(--muted);
-      text-align: center;
-      line-height: 1.55;
-      background: #fff;
-    }
-
-    details {
-      border: 1px solid var(--line);
-      border-radius: 18px;
-      background: white;
-      overflow: hidden;
-    }
-
-    details + details { margin-top: 10px; }
-
-    summary {
-      cursor: pointer;
-      list-style: none;
-      padding: 15px 16px;
-      font-weight: 900;
-      display: flex;
-      justify-content: space-between;
-      gap: 12px;
-    }
-
-    summary::-webkit-details-marker { display: none; }
-
-    .manual-grid {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 12px;
-    }
-
-    .manual-item {
-      display: grid;
-      gap: 7px;
-    }
-
-    .manual-item label {
-      color: var(--muted);
-      font-size: 12px;
-      font-weight: 850;
-      text-transform: uppercase;
-      letter-spacing: 0.4px;
-    }
-
-    .ai-panel {
-      margin-top: 18px;
-      border: 1px solid #ddd6fe;
-      background: linear-gradient(135deg, #ffffff, #faf5ff);
-    }
-
-    .ai-head {
-      padding: 15px 16px;
-      border-bottom: 1px solid #ede9fe;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      gap: 12px;
-    }
-
-    .ai-head strong {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      font-size: 16px;
-    }
-
-    .ai-body {
-      padding: 14px;
-    }
-
-    .ai-messages {
-      height: 220px;
-      overflow: auto;
-      display: grid;
-      gap: 10px;
-      padding-right: 4px;
-    }
-
-    .msg {
-      max-width: 88%;
-      padding: 10px 12px;
-      border-radius: 15px;
-      font-size: 13px;
-      line-height: 1.48;
-      white-space: pre-wrap;
-    }
-
-    .msg.bot {
-      background: white;
-      border: 1px solid #ede9fe;
-      color: #312e81;
-      justify-self: start;
-    }
-
-    .msg.user {
-      background: #2563eb;
-      color: white;
-      justify-self: end;
-    }
-
-    .quick-ai {
-      display: flex;
-      gap: 8px;
-      flex-wrap: wrap;
-      margin: 12px 0;
-    }
-
-    .quick-ai button {
-      padding: 9px 10px;
-      border-radius: 999px;
-      font-size: 12px;
-    }
-
-    .ai-input {
-      display: grid;
-      grid-template-columns: 1fr auto;
-      gap: 8px;
-    }
-
-    .toast {
-      position: fixed;
-      left: 50%;
-      bottom: 22px;
-      transform: translateX(-50%) translateY(16px);
-      opacity: 0;
-      pointer-events: none;
-      padding: 12px 16px;
-      border-radius: 999px;
-      color: white;
-      background: rgba(15, 23, 42, 0.94);
-      box-shadow: 0 18px 40px rgba(15, 23, 42, 0.22);
-      font-weight: 800;
-      transition: 0.2s;
-      z-index: 20;
-    }
-
-    .toast.show {
-      opacity: 1;
-      transform: translateX(-50%) translateY(0);
-    }
-
-    .section { margin-top: 18px; }
-
-    .compact-actions {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 10px;
-    }
-
-    @media (max-width: 980px) {
-      .topbar, .layout { grid-template-columns: 1fr; }
-
-      .topbar {
-        align-items: flex-start;
-        flex-direction: column;
-      }
-
-      .stats { justify-content: flex-start; }
-
-      .layout { display: grid; }
-    }
-
-    @media (max-width: 680px) {
-      .app {
-        width: min(100% - 20px, 1180px);
-        padding-top: 14px;
-      }
-
-      .topbar, .card-body, .card-head {
-        padding: 15px;
-      }
-
-      .week-tools, .manual-grid, .ai-input {
-        grid-template-columns: 1fr;
-      }
-
-      .member {
-        grid-template-columns: auto 1fr;
-      }
-
-      .member button { grid-column: 1 / -1; }
-
-      th, td { padding: 13px 12px; }
-
-      .schedule-title {
-        flex-direction: column;
-      }
-
-      .schedule-actions {
-        justify-content: flex-start;
-      }
-
-      .msg { max-width: 96%; }
-    }
-
-    @media print {
-      body { background: white; }
-
-      .topbar,
-      .sidebar,
-      .controls,
-      .manual-section,
-      .history-section,
-      .data-section,
-      .ai-panel {
-        display: none !important;
-      }
-
-      .app {
-        width: 100%;
-        padding: 0;
-      }
-
-      .layout { display: block; }
-
-      .card, .schedule {
-        border: 0;
-        box-shadow: none;
-        border-radius: 0;
-      }
-
-      .card-body { padding: 0; }
-
-      .schedule-actions { display: none; }
-    }
+    :root{
+      --bg:#f6f8fc;--card:#fff;--text:#111827;--muted:#6b7280;--line:#e5e7eb;
+      --blue:#2563eb;--blue2:#7c3aed;--green:#16a34a;--red:#dc2626;--amber:#d97706;
+      --bs:#eff6ff;--gs:#ecfdf5;--rs:#fef2f2;--as:#fffbeb;--ps:#f5f3ff;
+      --shadow:0 14px 36px rgba(15,23,42,.08);--r:22px
+    }
+    *{box-sizing:border-box}
+    body{
+      margin:0;min-height:100vh;font-family:Inter,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+      background:radial-gradient(circle at top left,rgba(37,99,235,.12),transparent 32%),
+                 radial-gradient(circle at bottom right,rgba(124,58,237,.10),transparent 32%),var(--bg);
+      color:var(--text)
+    }
+    .app{width:min(1160px,calc(100% - 28px));margin:auto;padding:22px 0 42px}
+    .top{display:flex;justify-content:space-between;align-items:center;gap:16px;margin-bottom:18px;padding:18px 20px;border:1px solid var(--line);border-radius:var(--r);background:rgba(255,255,255,.9);box-shadow:var(--shadow)}
+    .brand{display:flex;align-items:center;gap:13px}.logo{width:44px;height:44px;border-radius:16px;display:grid;place-items:center;color:#fff;background:linear-gradient(135deg,var(--blue),var(--blue2));font-size:22px}
+    h1{margin:0;font-size:25px;letter-spacing:-.6px}.brand p{margin:3px 0 0;color:var(--muted);font-size:13px}
+    .stats{display:flex;gap:10px;flex-wrap:wrap}.stat{min-width:86px;text-align:center;padding:10px 12px;border:1px solid var(--line);border-radius:16px;background:#fff}.stat b{display:block;font-size:20px}.stat span{font-size:12px;color:var(--muted);font-weight:750}
+    .grid{display:grid;grid-template-columns:335px 1fr;gap:18px;align-items:start}
+    .card{border:1px solid var(--line);border-radius:var(--r);background:rgba(255,255,255,.92);box-shadow:var(--shadow);overflow:hidden}
+    .head{padding:16px 18px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:center;gap:12px}.head h2{margin:0;font-size:18px;letter-spacing:-.3px}
+    .body{padding:18px}
+    input,button,select{font:inherit}
+    input[type=text],input[type=password],input[type=date],input[type=time],input[type=url],input[type=number],select{width:100%;border:1px solid var(--line);border-radius:14px;padding:12px 13px;background:#fff;color:var(--text);outline:0}
+    input:focus,select:focus{border-color:rgba(37,99,235,.55);box-shadow:0 0 0 4px rgba(37,99,235,.08)}
+    button{border:0;border-radius:14px;padding:11px 14px;font-weight:850;white-space:nowrap;cursor:pointer;transition:.15s}
+    button:hover{transform:translateY(-1px);filter:brightness(1.02)}button:active{transform:translateY(1px)}
+    .primary{color:#fff;background:linear-gradient(135deg,var(--blue),var(--blue2))}.blue{color:#1d4ed8;background:var(--bs)}.green{color:#15803d;background:var(--gs)}.red{color:#b91c1c;background:var(--rs)}.amber{color:#92400e;background:var(--as)}.purple{color:var(--blue2);background:var(--ps)}
+    .row,.tools{display:flex;gap:10px;flex-wrap:wrap}.row>*{flex:1}.tools{margin-top:12px}.tools button{flex:unset}
+    .week{display:grid;grid-template-columns:1fr auto auto;gap:10px;margin-bottom:12px}
+    .hint{font-size:12px;color:var(--muted);line-height:1.45;margin:7px 0 0}
+    .members{display:grid;gap:10px;margin-top:14px}.member{display:grid;grid-template-columns:auto 1fr auto;gap:11px;align-items:center;padding:12px;border:1px solid var(--line);border-radius:16px;background:#fff}.member b{display:block;font-size:15px}.member small{display:block;margin-top:3px;color:var(--muted);font-size:12px;line-height:1.4}.member button{padding:8px 10px;border-radius:12px;font-size:12px}
+    .switch{position:relative;width:46px;height:26px;flex:unset}.switch input{display:none}.slider{position:absolute;inset:0;border-radius:999px;background:rgba(22,163,74,.22);border:1px solid rgba(22,163,74,.3);cursor:pointer}.slider:before{content:"";position:absolute;width:20px;height:20px;left:3px;top:2px;border-radius:50%;background:#fff;box-shadow:0 4px 10px rgba(15,23,42,.18);transition:.18s}.switch input:not(:checked)+.slider{background:rgba(220,38,38,.14);border-color:rgba(220,38,38,.2)}.switch input:not(:checked)+.slider:before{transform:translateX(19px)}
+    .schedule{border:1px solid var(--line);border-radius:20px;background:#fff;overflow:hidden}.schedule-title{padding:17px 19px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;gap:12px;align-items:flex-start;background:linear-gradient(135deg,#fff,#f8fafc)}.schedule-title h3{margin:0;font-size:22px;letter-spacing:-.4px}.schedule-title p{margin:5px 0 0;color:var(--muted);font-size:13px;line-height:1.45}.s-actions{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end}.tag{display:inline-flex;align-items:center;padding:7px 10px;border-radius:999px;color:#1d4ed8;background:var(--bs);font-size:12px;font-weight:850}.tag.ok{color:#15803d;background:var(--gs)}.tag.warn{color:#92400e;background:var(--as)}.tag.err{color:#b91c1c;background:var(--rs)}
+    table{width:100%;border-collapse:collapse}th,td{padding:14px 18px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}tr:last-child td{border-bottom:0}th{color:var(--muted);background:#f8fafc;font-size:12px;text-transform:uppercase;letter-spacing:.45px}td:nth-child(2){font-weight:900}.note{margin-top:5px;color:var(--muted);font-size:12px;font-weight:500}.cut td:nth-child(2){color:var(--red)}.done-row{background:rgba(22,163,74,.04)}.done-row td:nth-child(2){color:#15803d}.done{display:flex;align-items:center;gap:8px;color:var(--muted);font-size:13px;font-weight:700}
+    .empty{padding:24px;border:1px dashed #cbd5e1;border-radius:18px;color:var(--muted);text-align:center;background:#fff;line-height:1.55}
+    details{border:1px solid var(--line);border-radius:18px;background:#fff;overflow:hidden;margin-top:14px}summary{cursor:pointer;list-style:none;padding:15px 16px;font-weight:900;display:flex;justify-content:space-between;gap:12px}summary::-webkit-details-marker{display:none}
+    .manual,.days{display:grid;grid-template-columns:1fr 1fr;gap:12px}.field{display:grid;gap:7px}.field label{font-size:12px;color:var(--muted);font-weight:850;text-transform:uppercase;letter-spacing:.4px}
+    .days{grid-template-columns:repeat(7,1fr);margin-top:8px}.day{display:flex;align-items:center;justify-content:center;gap:5px;padding:9px 6px;border:1px solid var(--line);border-radius:13px;background:#fff;font-size:12px;font-weight:850;color:#374151}
+    .remind{margin-top:16px;border:1px solid #bfdbfe;background:linear-gradient(135deg,#fff,#eff6ff)}.today-list{display:grid;gap:8px}.today-item{padding:11px 12px;border:1px solid var(--line);border-radius:14px;background:#fff;display:flex;justify-content:space-between;gap:12px}.today-item b{display:block}.today-item span{color:var(--muted);font-size:13px}
+    .ai{margin-top:16px;border:1px solid #ddd6fe;background:linear-gradient(135deg,#fff,#faf5ff)}.ai-text{white-space:pre-wrap;font-size:13px;line-height:1.5;color:#312e81}
+    .settings-grid,.stats-grid{display:grid;gap:10px}.task-setting{display:grid;grid-template-columns:1fr 82px;gap:10px;align-items:center;padding:10px 12px;border:1px solid var(--line);border-radius:15px;background:#fff}.stat-person{padding:12px;border:1px solid var(--line);border-radius:15px;background:#fff}.stat-person div{display:flex;justify-content:space-between;gap:12px;font-weight:900}.bar{height:8px;border-radius:999px;background:#e5e7eb;overflow:hidden;margin-top:7px}.bar span{display:block;height:100%;border-radius:inherit;background:linear-gradient(135deg,var(--blue),var(--blue2))}
+    .modal{position:fixed;inset:0;background:rgba(15,23,42,.42);display:none;align-items:center;justify-content:center;z-index:50;padding:18px}.modal.show{display:flex}.modal-card{width:min(560px,100%);background:#fff;border-radius:24px;box-shadow:0 24px 80px rgba(15,23,42,.25);overflow:hidden}.modal-card .head{background:linear-gradient(135deg,#fff,#eff6ff)}.modal-text{white-space:pre-wrap;line-height:1.5;color:#374151;font-size:14px}
+    .toast{position:fixed;left:50%;bottom:22px;transform:translateX(-50%) translateY(16px);opacity:0;pointer-events:none;padding:12px 16px;border-radius:999px;color:#fff;background:rgba(15,23,42,.94);box-shadow:0 18px 40px rgba(15,23,42,.22);font-weight:800;transition:.2s;z-index:60}.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+    @media(max-width:1000px){.top,.grid{grid-template-columns:1fr}.top{align-items:flex-start;flex-direction:column}.grid{display:grid}}
+    @media(max-width:700px){.app{width:min(100% - 20px,1160px);padding-top:14px}.top,.body,.head{padding:15px}.week,.manual,.task-setting{grid-template-columns:1fr}.days{grid-template-columns:repeat(4,1fr)}.member{grid-template-columns:auto 1fr}.member button{grid-column:1/-1}th,td{padding:12px}.schedule-title{flex-direction:column}.s-actions{justify-content:flex-start}}
+    @media print{.top,.sidebar,.controls,.remind,.ai,.manual-section,.history-section,.settings-section,.stats-section,.data-section,.backend-section{display:none!important}.app{width:100%;padding:0}.grid{display:block}.card,.schedule{border:0;box-shadow:none;border-radius:0}.body{padding:0}.s-actions{display:none}}
   </style>
 </head>
 <body>
   <main class="app">
-    <header class="topbar">
+    <header class="top">
       <div class="brand">
         <div class="logo">🧹</div>
         <div>
-          <h1>Lịch trực nhật</h1>
-          <p>Xoay tua theo tuần · có trợ lý gợi ý · có xử lý người vắng</p>
+          <h1>Lịch trực nhật dùng chung</h1>
+          <p>Nhiều máy dùng chung · cùng chỉnh một dữ liệu</p>
         </div>
       </div>
-
       <div class="stats">
-        <div class="stat">
-          <strong id="totalMembers">0</strong>
-          <span>Thành viên</span>
-        </div>
-        <div class="stat">
-          <strong id="presentMembers">0</strong>
-          <span>Có mặt</span>
-        </div>
-        <div class="stat">
-          <strong id="totalSchedules">0</strong>
-          <span>Tuần</span>
-        </div>
+        <div class="stat"><b id="totalMembers">0</b><span>Thành viên</span></div>
+        <div class="stat"><b id="presentMembers">0</b><span>Có mặt</span></div>
+        <div class="stat"><b id="totalSchedules">0</b><span>Tuần</span></div>
       </div>
     </header>
 
-    <section class="layout">
+    <section class="grid">
       <aside class="card sidebar">
-        <div class="card-head">
+        <div class="head">
           <h2>Thành viên</h2>
-          <button class="btn-blue" id="markAllPresentBtn">Có mặt hết</button>
+          <button class="blue" id="allPresent">Có mặt hết</button>
         </div>
-
-        <div class="card-body">
+        <div class="body">
           <div class="row">
-            <input id="memberName" type="text" placeholder="Tên thành viên" autocomplete="off" />
-            <button class="btn-primary" id="addMemberBtn">Thêm</button>
+            <input id="memberName" type="text" placeholder="Tên thành viên">
+            <button class="primary" id="addMember">Thêm</button>
           </div>
+          <div id="members" class="members"></div>
+          <div class="tools"><button class="amber" id="allAbsent">Vắng hết</button></div>
 
-          <div id="memberList" class="member-list"></div>
+          <details class="settings-section">
+            <summary><span>Google Calendar</span><span>⌄</span></summary>
+            <div class="body" style="padding-top:0">
+              <div class="field">
+                <label>Ngày nhắc</label>
+                <div class="days" id="reminderDays"></div>
+              </div>
+              <div class="row" style="margin-top:10px">
+                <div class="field">
+                  <label>Giờ nhắc</label>
+                  <input id="reminderTime" type="time" value="20:00">
+                </div>
+                <div class="field">
+                  <label>Tự cập nhật Calendar</label>
+                  <select id="autoSaveCalendar">
+                    <option value="yes">Có</option>
+                    <option value="no">Không</option>
+                  </select>
+                </div>
+              </div>
+              <div class="field" style="margin-top:10px">
+                <label>Tên sự kiện</label>
+                <input id="calendarTitle" type="text" value="Nhắc lịch trực nhật">
+              </div>
+              <div class="tools">
+                <button class="purple" id="saveCalendar">Lưu Calendar</button>
+                <button class="blue" id="openCalendar">Mở Calendar</button>
+              </div>
+            </div>
+          </details>
 
-          <div class="toolbar">
-            <button class="btn-amber" id="markAllAbsentBtn">Vắng hết</button>
-          </div>
+          <details class="settings-section">
+            <summary><span>Điểm công việc</span><span>⌄</span></summary>
+            <div class="body" style="padding-top:0">
+              <div id="weights" class="settings-grid"></div>
+              <div class="tools"><button class="blue" id="resetWeights">Mặc định</button></div>
+            </div>
+          </details>
 
-          <details class="section data-section">
-            <summary>
-              <span>Dữ liệu</span>
-              <span>⌄</span>
-            </summary>
-            <div class="card-body" style="padding-top: 0;">
-              <div class="toolbar">
-                <button class="btn-blue" id="exportDataBtn">Xuất dữ liệu</button>
-                <button class="btn-green" id="importDataBtn">Nhập dữ liệu</button>
-                <button class="btn-red" id="clearBtn">Xóa hết</button>
-                <input type="file" id="importFile" accept="application/json" hidden />
+          <details class="stats-section">
+            <summary><span>Thống kê</span><span>⌄</span></summary>
+            <div class="body" style="padding-top:0"><div id="fairStats" class="stats-grid"></div></div>
+          </details>
+
+          <details class="data-section">
+            <summary><span>Backup dự phòng</span><span>⌄</span></summary>
+            <div class="body" style="padding-top:0">
+              <div class="tools">
+                <button class="blue" id="exportData">Xuất file</button>
+                <button class="green" id="importData">Nhập file</button>
+                <button class="red" id="clearData">Làm mới máy này</button>
+                <input type="file" id="importFile" accept="application/json" hidden>
               </div>
             </div>
           </details>
@@ -708,1231 +144,434 @@
       </aside>
 
       <section class="card">
-        <div class="card-head controls">
+        <div class="head controls">
           <h2>Phân công tuần</h2>
-          <div class="compact-actions">
-            <button class="btn-blue" id="copyBtn">Copy lịch</button>
-            <button class="btn-blue" id="exportTxtBtn">TXT</button>
-            <button class="btn-green" id="exportPdfBtn">PDF</button>
+          <div class="tools" style="margin:0">
+            <button class="blue" id="copySchedule">Copy lịch</button>
+            <button class="green" id="png">Ảnh</button>
+            <button class="green" id="pdf">PDF</button>
           </div>
         </div>
-
-        <div class="card-body">
-          <div class="week-tools controls">
-            <input id="weekStart" type="date" />
-            <button class="btn-blue" id="nextWeekBtn" title="Tự chọn thứ Hai của tuần kế tiếp">Chọn tuần sau</button>
-            <button class="btn-primary" id="generateBtn">Tạo lịch</button>
-          </div>
-          <div class="mini-help controls">
-            “Chọn tuần sau” chỉ tự điền ngày bắt đầu của tuần kế tiếp để tạo lịch nhanh hơn.
+        <div class="body">
+          <div class="week controls">
+            <input id="weekStart" type="date">
+            <button class="blue" id="nextWeek">Tuần sau</button>
+            <button class="primary" id="best">Tạo lịch</button>
           </div>
 
-          <div class="toolbar controls">
-            <button class="btn-green" id="saveManualBtn">Lưu chỉnh tay</button>
-            <button class="btn-red" id="deleteCurrentBtn">Xóa tuần này</button>
+          <div class="tools controls">
+            <button class="purple" id="suggest">Gợi ý</button>
+            <button class="green" id="saveManual">Lưu chỉnh tay</button>
+            <button class="amber" id="remindNow">Xem nhắc</button>
+            <button class="red" id="deleteWeek">Xóa tuần này</button>
           </div>
 
-          <div id="currentSchedule"></div>
+          <div id="scheduleBox"></div>
 
-          <section class="ai-panel schedule">
-            <div class="ai-head">
-              <strong>🤖 Trợ lý trực nhật</strong>
-              <button class="btn-purple" id="aiAnalyzeBtn">Gợi ý nhanh</button>
+          <section class="schedule remind">
+            <div class="head">
+              <h2>🔔 Google Calendar</h2>
+              <span class="tag" id="calendarStatus">Chưa lưu</span>
             </div>
-            <div class="ai-body">
-              <div id="aiMessages" class="ai-messages"></div>
-              <div class="quick-ai">
-                <button class="btn-purple" data-ai="Gợi ý lịch tuần này">Gợi ý lịch</button>
-                <button class="btn-purple" data-ai="Phân tích công bằng">Công bằng?</button>
-                <button class="btn-purple" data-ai="Gợi ý đổi người">Đổi người?</button>
-                <button class="btn-purple" data-ai="Nếu thiếu người thì chia thế nào">Thiếu người?</button>
-                <button class="btn-purple" data-ai="Ưu tiên công việc nào">Ưu tiên việc</button>
-                <button class="btn-purple" data-ai="Vì sao chia như vậy">Vì sao?</button>
-                <button class="btn-purple" data-ai="Tuần sau dùng để làm gì">Tuần sau?</button>
-              </div>
-              <div class="ai-input">
-                <input id="aiInput" type="text" placeholder="Hỏi trợ lý: thiếu 2 người chia sao, nên cắt việc nào..." />
-                <button class="btn-primary" id="aiSendBtn">Gửi</button>
-              </div>
+            <div class="body">
+              <div class="hint">Khi dữ liệu chung thay đổi, nếu bật tự cập nhật, web sẽ gửi lịch mới sang Google Calendar.</div>
+              <div id="todayBox"></div>
             </div>
           </section>
 
-          <details class="section manual-section">
-            <summary>
-              <span>Chỉnh tay phân công</span>
-              <span>⌄</span>
-            </summary>
-            <div class="card-body" style="padding-top: 0;">
-              <div id="manualEditor" class="manual-grid"></div>
+          <section class="schedule ai">
+            <div class="head">
+              <h2>🤖 Phân tích</h2>
+              <button class="purple" id="analyze">Xem</button>
             </div>
+            <div class="body"><div id="aiBox" class="ai-text">Bấm “Xem” để kiểm tra lịch có lệch điểm không.</div></div>
+          </section>
+
+          <details class="manual-section">
+            <summary><span>Chỉnh tay phân công</span><span>⌄</span></summary>
+            <div class="body" style="padding-top:0"><div id="manual" class="manual"></div></div>
           </details>
 
-          <details class="section history-section">
-            <summary>
-              <span>Lịch sử</span>
-              <span>⌄</span>
-            </summary>
-            <div class="card-body" style="padding-top: 0;">
-              <div id="history"></div>
-            </div>
+          <details class="history-section">
+            <summary><span>Lịch sử</span><span>⌄</span></summary>
+            <div class="body" style="padding-top:0"><div id="history"></div></div>
           </details>
         </div>
       </section>
     </section>
   </main>
 
+  <div class="modal" id="reminderModal">
+    <div class="modal-card">
+      <div class="head">
+        <h2>🔔 Nội dung nhắc</h2>
+        <button class="red" id="closeModal">Đóng</button>
+      </div>
+      <div class="body">
+        <div id="modalText" class="modal-text"></div>
+        <div class="tools">
+          <button class="primary" id="sendNow">Lưu Calendar</button>
+          <button class="blue" id="copyReminder">Copy nội dung</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <div class="toast" id="toast"></div>
 
   <script>
-    const TASKS = [
-      "Lavabo - Toilet",
-      "Sàn nvs - cống",
-      "Quét Nhà",
-      "Lau Nhà",
-      "Giặt thảm",
-      "Vứt rác, bình nước"
+    const TASKS=[
+      {id:"lavabo",name:"Lavabo - Toilet",emoji:"🚽",w:5},
+      {id:"san",name:"Sàn nvs - cống",emoji:"🧼",w:5},
+      {id:"quet",name:"Quét Nhà",emoji:"🧹",w:3},
+      {id:"lau",name:"Lau Nhà",emoji:"🪣",w:4},
+      {id:"tham",name:"Giặt thảm",emoji:"🧺",w:2},
+      {id:"rac",name:"Vứt rác, bình nước",emoji:"🗑️",w:2}
     ];
-
-    const CUT_PRIORITY = ["Vứt rác, bình nước", "Giặt thảm"];
-    const STORAGE_KEY = "rotating_cleaning_schedule_v5";
-    const OLD_KEYS = [
-      "rotating_cleaning_schedule_v4",
-      "rotating_cleaning_schedule_v3",
-      "rotating_cleaning_schedule_v2",
-      "weekly_cleaning_assigner_v1"
+    const DAYS=[
+      {v:1,t:"T2"},{v:2,t:"T3"},{v:3,t:"T4"},{v:4,t:"T5"},{v:5,t:"T6"},{v:6,t:"T7"},{v:0,t:"CN"}
     ];
-    const CUT_VALUE = "__CUT__";
-    const $ = selector => document.querySelector(selector);
+    const CUT=["rac","tham"], KEY="cleaning_shared_apps_script_v1", CUTVAL="__CUT__";
+    const OLD=["cleaning_google_calendar_v1","cleaning_github_auto_reminder_v2","rotating_cleaning_schedule_v6"];
+    const $=s=>document.querySelector(s);
 
-    let state = loadState();
-    let selectedScheduleId = null;
-    let attendance = {};
+    // CẤU HÌNH DỮ LIỆU CHUNG - sửa 2 dòng này trước khi upload GitHub.
+    // APP_SCRIPT_URL là link Web App /exec của Google Apps Script.
+    // ROOM_CODE phải giống với ROOM_CODE trong Apps Script.
+    const APP_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwndKHBUuQ-FLjnF1Yr1eRBOO3bmsso0j3rpRzTuwl2H6G-bXZ1R1kIM6d6Ftq68xsKsA/exec";
+    const ROOM_CODE = "P708";
 
-    initAttendanceFromMembers();
+    let state=load(), attendance={}, selected=null, lastReminderText="", saveTimer=null;
+    initAttendance(); normalize();
 
-    function loadState() {
-      try {
-        let raw = localStorage.getItem(STORAGE_KEY);
-
-        if (!raw) {
-          for (const key of OLD_KEYS) {
-            raw = localStorage.getItem(key);
-            if (raw) break;
-          }
-        }
-
-        if (!raw) return { members: [], schedules: [] };
-
-        const parsed = JSON.parse(raw);
-        return {
-          members: Array.isArray(parsed.members) ? parsed.members : [],
-          schedules: Array.isArray(parsed.schedules) ? parsed.schedules : []
-        };
-      } catch {
-        return { members: [], schedules: [] };
-      }
+    function defaults(){return Object.fromEntries(TASKS.map(t=>[t.id,t.w]))}
+    function freshState(){return {members:[],schedules:[],settings:{weights:defaults(),reminderTime:"20:00",reminderDays:[3,4],gasUrl:"",roomCode:"",calendarTitle:"Nhắc lịch trực nhật",autoSaveCalendar:true,autoSync:true}}}
+    function load(){
+      try{
+        let raw=localStorage.getItem(KEY);
+        if(!raw){for(const k of OLD){raw=localStorage.getItem(k);if(raw)break}}
+        if(!raw)return freshState();
+        let p=JSON.parse(raw);
+        return {members:p.members||[],schedules:p.schedules||[],settings:{
+          weights:p.settings?.weights||defaults(),
+          reminderTime:p.settings?.reminderTime||"20:00",
+          reminderDays:p.settings?.reminderDays||[3,4],
+          gasUrl:p.settings?.gasUrl||"",
+          roomCode:p.settings?.roomCode||"",
+          calendarTitle:p.settings?.calendarTitle||"Nhắc lịch trực nhật",
+          autoSaveCalendar:p.settings?.autoSaveCalendar??true,
+          autoSync:p.settings?.autoSync??true
+        }}
+      }catch{return freshState()}
     }
-
-    function saveState() {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-      render();
+    function normalize(){
+      state.settings ||= freshState().settings;
+      state.settings.weights ||= defaults();
+      state.settings.reminderDays ||= [3,4];
+      state.settings.reminderTime ||= "20:00";
+      state.settings.gasUrl ||= "";
+      state.settings.roomCode ||= "";
+      state.settings.calendarTitle ||= "Nhắc lịch trực nhật";
+      state.settings.autoSaveCalendar ??= true;
+      state.settings.autoSync ??= true;
+      TASKS.forEach(t=>state.settings.weights[t.id]=Number(state.settings.weights[t.id])||t.w);
+      state.schedules.forEach(s=>(s.assignments||=[]).forEach(a=>{
+        let t=findTask(a.taskId||a.task); if(t){a.taskId=t.id;a.task=t.name}
+        a.completed ??= false; a.weight=getWeight(a.taskId||a.task)
+      }))
     }
-
-    function initAttendanceFromMembers() {
-      state.members.forEach(member => {
-        if (attendance[member.id] === undefined) attendance[member.id] = true;
+    function save(localOnly=false){normalize();localStorage.setItem(KEY,JSON.stringify(state));render();if(!localOnly)queueSharedSave()}
+    function uid(){return crypto.randomUUID?crypto.randomUUID():String(Date.now()+Math.random())}
+    function toast(m){let t=$("#toast");t.textContent=m;t.classList.add("show");setTimeout(()=>t.classList.remove("show"),2000)}
+    function esc(v){return String(v).replaceAll("&","&amp;").replaceAll("<","&lt;").replaceAll(">","&gt;").replaceAll('"',"&quot;").replaceAll("'","&#039;")}
+    function dateVal(d){return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`}
+    function parse(v){let [y,m,d]=v.split("-").map(Number);return new Date(y,m-1,d)}
+    function addDays(d,n){let x=new Date(d);x.setDate(x.getDate()+n);return x}
+    function nextMon(){let d=new Date();d.setHours(0,0,0,0);let day=d.getDay();d.setDate(d.getDate()+(day===0?1:8-day));return d}
+    function fmt(v){let d=typeof v==="string"?parse(v):v;return new Intl.DateTimeFormat("vi-VN",{weekday:"long",day:"2-digit",month:"2-digit",year:"numeric"}).format(d)}
+    function range(w){let s=parse(w),e=addDays(s,6);return `${fmt(s)} → ${fmt(e)}`}
+    function findTask(v){return TASKS.find(t=>t.id===v||t.name===v)}
+    function getWeight(v){let t=findTask(v);return t?Number(state.settings.weights[t.id])||t.w:3}
+    function before(v){let t=findTask(v),i=t?TASKS.findIndex(x=>x.id===t.id):0;return TASKS[(i-1+TASKS.length)%TASKS.length]}
+    function after(v){let t=findTask(v),i=t?TASKS.findIndex(x=>x.id===t.id):0;return TASKS[(i+1)%TASKS.length]}
+    function initAttendance(){state.members.forEach(m=>attendance[m.id]??=true)}
+    function present(){return state.members.filter(m=>attendance[m.id]!==false)}
+    function absent(){return state.members.filter(m=>attendance[m.id]===false)}
+    function previous(w){return state.schedules.filter(s=>s.weekStart<w).sort((a,b)=>b.weekStart.localeCompare(a.weekStart))[0]||null}
+    function lastOf(id,beforeWeek=null){
+      let arr=[...state.schedules].filter(s=>!beforeWeek||s.weekStart<beforeWeek).sort((a,b)=>b.weekStart.localeCompare(a.weekStart));
+      for(let s of arr){let f=s.assignments.find(a=>a.personId===id&&!a.cut);if(f)return f}return null
+    }
+    function totalJobs(id){return state.schedules.reduce((n,s)=>n+s.assignments.filter(a=>a.personId===id&&!a.cut).length,0)}
+    function points(id,beforeWeek="9999-12-31"){return state.schedules.filter(s=>s.weekStart<beforeWeek).reduce((n,s)=>n+s.assignments.filter(a=>a.personId===id&&!a.cut).reduce((x,a)=>x+getWeight(a.taskId||a.task),0),0)}
+    function doneCount(id){return state.schedules.reduce((n,s)=>n+s.assignments.filter(a=>a.personId===id&&!a.cut&&a.completed).length,0)}
+    function extraCount(id,beforeWeek="9999-12-31"){let e=0;state.schedules.filter(s=>s.weekStart<beforeWeek).forEach(s=>{let c=s.assignments.filter(a=>a.personId===id&&!a.cut).length;if(c>1)e+=c-1});return e}
+    function current(){if(!selected&&state.schedules.length)selected=state.schedules[state.schedules.length-1].id;return state.schedules.find(s=>s.id===selected)||null}
+    function todaySchedule(){let today=new Date();today.setHours(0,0,0,0);return state.schedules.find(s=>{let st=parse(s.weekStart),en=addDays(st,6);st.setHours(0,0,0,0);en.setHours(23,59,59,999);return today>=st&&today<=en})||null}
+    function tasksForWeek(pc,ac){
+      let tasks=[...TASKS],cut=[];
+      if(ac>=2)return {tasks,cut,mode:"Vắng từ 2 người: giữ đủ việc, chia theo điểm việc."};
+      while(tasks.length>pc&&cut.length<CUT.length){let id=CUT[cut.length];tasks=tasks.filter(t=>t.id!==id);cut.push(findTask(id))}
+      return {tasks,cut,mode:cut.length?"Có cắt việc phụ.":"Xoay tua đủ việc."}
+    }
+    function choosePerson(task,loads,w,strategy){
+      let p=present(),prev=previous(w),map=new Map(p.map(m=>[m.id,m]));
+      let ideal=null;if(prev){let pre=before(task.id);let a=prev.assignments.find(x=>findTask(x.taskId||x.task)?.id===pre.id&&!x.cut);if(a)ideal=map.get(a.personId)}
+      let avg=TASKS.reduce((s,t)=>s+getWeight(t.id),0)/Math.max(1,p.length);
+      return p.map(m=>{
+        let last=lastOf(m.id,w),expected=last?after(last.taskId||last.task):TASKS[0],afterPts=loads[m.id].points+getWeight(task.id);
+        let sc=0;
+        if(strategy==="balanced"){sc+=Math.pow(afterPts-avg,2)*36+loads[m.id].count*120+points(m.id,w)*2+extraCount(m.id,w)*45+(ideal?.id===m.id?-90:0)+(expected.id===task.id?-70:0)}
+        if(strategy==="rotation"){sc+=(ideal?.id===m.id?-520:0)+(expected.id===task.id?-120:0)+Math.pow(afterPts-avg,2)*16+loads[m.id].count*180+points(m.id,w)}
+        if(strategy==="extra"){sc+=loads[m.id].count*360+extraCount(m.id,w)*120+Math.pow(afterPts-avg,2)*16+points(m.id,w)*1.5+(ideal?.id===m.id?-70:0)}
+        if(last&&findTask(last.taskId||last.task)?.id===task.id)sc+=120;
+        return {m,sc,ideal}
+      }).sort((a,b)=>a.sc-b.sc)[0]
+    }
+    function candidate(strategy,label){
+      let w=$("#weekStart").value,p=present(),a=absent(),plan=tasksForWeek(p.length,a.length),loads=Object.fromEntries(p.map(m=>[m.id,{count:0,points:0}])),assignments=[];
+      plan.tasks.forEach(t=>{
+        let c=choosePerson(t,loads,w,strategy);loads[c.m.id].count++;loads[c.m.id].points+=getWeight(t.id);
+        assignments.push({taskId:t.id,task:t.name,weight:getWeight(t.id),personId:c.m.id,personName:c.m.name,completed:false,cut:false,note:c.ideal?.id===c.m.id?`${before(t.id).name} → ${t.name}`:""})
       });
+      plan.cut.forEach(t=>assignments.push({taskId:t.id,task:t.name,weight:getWeight(t.id),personId:null,personName:"Tạm cắt",completed:false,cut:true,note:""}));
+      let x={label,strategy,weekStart:w,mode:plan.mode,absentMemberIds:a.map(m=>m.id),absentMemberNames:a.map(m=>m.name),assignments};
+      x.score=score(x,p,w);return x
     }
-
-    function makeId() {
-      return crypto.randomUUID ? crypto.randomUUID() : String(Date.now() + Math.random());
+    function score(c,p,w){
+      let load=Object.fromEntries(p.map(m=>[m.id,{count:0,points:0,repeat:0}]));
+      c.assignments.forEach(a=>{if(!a.personId||a.cut||!load[a.personId])return;load[a.personId].count++;load[a.personId].points+=getWeight(a.taskId||a.task);let l=lastOf(a.personId,w);if(l&&findTask(l.taskId||l.task)?.id===findTask(a.taskId||a.task)?.id)load[a.personId].repeat++});
+      let vals=Object.values(load),pts=vals.map(x=>x.points),cnt=vals.map(x=>x.count),rep=vals.reduce((s,x)=>s+x.repeat,0);
+      return (Math.max(...pts)-Math.min(...pts))*10+(Math.max(...cnt)-Math.min(...cnt))*18+rep*25+c.assignments.filter(a=>a.cut).length*12
     }
-
-    function showToast(message) {
-      const toast = $("#toast");
-      toast.textContent = message;
-      toast.classList.add("show");
-      setTimeout(() => toast.classList.remove("show"), 2000);
+    function proposals(){if(!$("#weekStart").value)return toast("Chọn tuần trước.");if(!state.members.length)return toast("Thêm thành viên trước.");if(!present().length)return toast("Tất cả đang vắng.");return [
+      candidate("balanced","Công bằng điểm"),candidate("rotation","Xoay tua"),candidate("extra","Ít việc phụ")
+    ].sort((a,b)=>a.score-b.score)}
+    function saveSchedule(c,source="auto"){
+      let old=state.schedules.find(s=>s.weekStart===c.weekStart);
+      if(old&&!confirm("Tuần này đã có lịch. Ghi đè?"))return false;
+      let s={id:old?old.id:uid(),weekStart:c.weekStart,createdAt:old?old.createdAt:new Date().toISOString(),updatedAt:new Date().toISOString(),absentMemberIds:c.absentMemberIds,absentMemberNames:c.absentMemberNames,mode:`${c.mode} · ${c.label}`,source,score:c.score,assignments:c.assignments};
+      let i=state.schedules.findIndex(x=>x.weekStart===s.weekStart); if(i>=0)state.schedules[i]=s;else state.schedules.push(s);
+      state.schedules.sort((a,b)=>a.weekStart.localeCompare(b.weekStart));selected=s.id;save();if(state.settings.autoSaveCalendar)saveCalendar(false);return true
     }
-
-    function escapeHTML(value) {
-      return String(value)
-        .replaceAll("&", "&amp;")
-        .replaceAll("<", "&lt;")
-        .replaceAll(">", "&gt;")
-        .replaceAll('"', "&quot;")
-        .replaceAll("'", "&#039;");
+    function best(){let p=proposals();if(p?.length&&saveSchedule(p[0],"best")){toast("Đã tạo lịch.");analyze()}}
+    function saveManual(){
+      let w=$("#weekStart").value;if(!w)return toast("Chọn tuần.");if(!state.members.length)return toast("Thêm thành viên.");
+      let old=state.schedules.find(s=>s.weekStart===w);if(old&&!confirm("Ghi đè lịch tuần này?"))return;
+      let assignments=TASKS.map((t,i)=>{let v=document.querySelector(`[data-task="${i}"]`).value;if(v===CUTVAL)return {taskId:t.id,task:t.name,weight:getWeight(t.id),personId:null,personName:"Tạm cắt",completed:false,cut:true,note:""};let m=state.members.find(x=>x.id===v);return {taskId:t.id,task:t.name,weight:getWeight(t.id),personId:m?.id,personName:m?.name||"Không rõ",completed:false,cut:!m,note:""}});
+      saveSchedule({label:"Chỉnh tay",weekStart:w,mode:"Phân công thủ công.",absentMemberIds:absent().map(m=>m.id),absentMemberNames:absent().map(m=>m.name),assignments,score:0},"manual");toast("Đã lưu chỉnh tay.")
     }
+    function addMember(){let input=$("#memberName"),name=input.value.trim().replace(/\s+/g," ");if(!name)return toast("Tên không được rỗng.");if(state.members.some(m=>m.name.toLowerCase()===name.toLowerCase()))return toast("Tên này đã có.");let m={id:uid(),name,createdAt:new Date().toISOString()};state.members.push(m);attendance[m.id]=true;input.value="";save()}
+    function removeMember(id){let m=state.members.find(x=>x.id===id);if(!m||!confirm(`Xóa "${m.name}"?`))return;state.members=state.members.filter(x=>x.id!==id);delete attendance[id];save()}
+    function setAttendance(id,v){attendance[id]=v;renderStats();renderMembers();renderManual();renderToday()}
+    function markAll(v){state.members.forEach(m=>attendance[m.id]=v);save()}
+    function toggleDone(sid,i,v){let s=state.schedules.find(x=>x.id===sid);if(!s)return;s.assignments[i].completed=v;s.updatedAt=new Date().toISOString();save();if(state.settings.autoSaveCalendar)saveCalendar(false)}
+    function prettyText(s){if(!s)return"";let lines=["📌 LỊCH TRỰC NHẬT TUẦN",`🗓️ ${range(s.weekStart)}`,s.absentMemberNames?.length?`🚫 Vắng: ${s.absentMemberNames.join(", ")}`:"✅ Vắng: Không có",""];s.assignments.forEach(a=>{let t=findTask(a.taskId||a.task);lines.push(`${t?t.emoji:"•"} ${a.task}: ${a.personName}${a.completed?" ✅":""}`)});return lines.join("\n")}
+    function reminderText(s){if(!s)return"";let undone=s.assignments.filter(a=>!a.cut&&!a.completed),lines=["📣 NHẮC LỊCH TRỰC NHẬT",`🗓️ ${range(s.weekStart)}`,""];if(!undone.length){lines.push("✅ Tất cả nhiệm vụ đã hoàn thành.");return lines.join("\n")}lines.push("Các việc chưa hoàn thành:");undone.forEach(a=>{let t=findTask(a.taskId||a.task);lines.push(`${t?t.emoji:"•"} ${a.task}: ${a.personName}`)});lines.push("","Mọi người nhớ hoàn thành đúng lịch nha.");return lines.join("\n")}
+    function copy(t,msg){if(!t)return toast("Không có nội dung.");navigator.clipboard?.writeText(t).then(()=>toast(msg)).catch(()=>{let x=document.createElement("textarea");x.value=t;document.body.appendChild(x);x.select();document.execCommand("copy");x.remove();toast(msg)})}
+    function exportPng(){let s=current();if(!s)return toast("Chưa có lịch.");let sc=2,w=1000,rh=82,h=230+s.assignments.length*rh,c=document.createElement("canvas");c.width=w*sc;c.height=h*sc;let ctx=c.getContext("2d");ctx.scale(sc,sc);ctx.fillStyle="#fff";ctx.fillRect(0,0,w,h);ctx.fillStyle="#eff6ff";round(ctx,32,28,w-64,145,28);ctx.fill();ctx.fillStyle="#111827";ctx.font="bold 42px Arial";ctx.fillText("LỊCH TRỰC NHẬT",64,86);ctx.font="23px Arial";ctx.fillStyle="#374151";ctx.fillText(range(s.weekStart),64,126);ctx.font="19px Arial";ctx.fillStyle="#6b7280";ctx.fillText(`Người vắng: ${s.absentMemberNames?.length?s.absentMemberNames.join(", "):"Không có"}`,64,158);let y=220;ctx.font="bold 19px Arial";ctx.fillStyle="#6b7280";ctx.fillText("NHIỆM VỤ",64,y);ctx.fillText("NGƯỜI PHỤ TRÁCH",555,y);y+=22;s.assignments.forEach(a=>{ctx.strokeStyle="#e5e7eb";ctx.beginPath();ctx.moveTo(64,y);ctx.lineTo(w-64,y);ctx.stroke();let t=findTask(a.taskId||a.task);ctx.font="27px Arial";ctx.fillStyle="#111827";ctx.fillText(`${t?t.emoji:""} ${a.task}`,64,y+50);ctx.font="bold 29px Arial";ctx.fillStyle=a.cut?"#dc2626":a.completed?"#16a34a":"#111827";ctx.fillText(`${a.personName}${a.completed?" ✓":""}`,555,y+50);y+=rh});let a=document.createElement("a");a.href=c.toDataURL("image/png");a.download=`lich-truc-nhat-${s.weekStart}.png`;a.click();toast("Đã xuất ảnh.")}
+    function round(ctx,x,y,w,h,r){ctx.beginPath();ctx.moveTo(x+r,y);ctx.arcTo(x+w,y,x+w,y+h,r);ctx.arcTo(x+w,y+h,x,y+h,r);ctx.arcTo(x,y+h,x,y,r);ctx.arcTo(x,y,x+w,y,r);ctx.closePath()}
+    function exportData(){let blob=new Blob([JSON.stringify(state,null,2)],{type:"application/json"}),u=URL.createObjectURL(blob),a=document.createElement("a");a.href=u;a.download=`du-lieu-truc-nhat-${dateVal(new Date())}.json`;a.click();URL.revokeObjectURL(u)}
+    function importData(f){if(!f)return;let r=new FileReader();r.onload=()=>{try{let p=JSON.parse(r.result);if(!Array.isArray(p.members)||!Array.isArray(p.schedules))throw Error();state={members:p.members,schedules:p.schedules,settings:{...state.settings,...(p.settings||{})}};attendance={};initAttendance();normalize();selected=state.schedules.length?state.schedules[state.schedules.length-1].id:null;save();toast("Đã nhập dữ liệu.")}catch{toast("File không hợp lệ.")}};r.readAsText(f)}
+    function clearData(){if(!confirm("Làm mới dữ liệu tạm trên máy này? Dữ liệu chung trên server không bị xóa."))return;state=freshState();attendance={};selected=null;save(true);loadShared()}
+    function deleteWeek(){let s=current();if(!s)return toast("Chưa có lịch.");if(!confirm("Xóa lịch tuần này?"))return;state.schedules=state.schedules.filter(x=>x.id!==s.id);selected=state.schedules.length?state.schedules[state.schedules.length-1].id:null;save();if(state.settings.autoSaveCalendar)saveCalendar(false)}
+    function remindNow(){let s=todaySchedule()||current();if(!s)return toast("Chưa có lịch để nhắc.");lastReminderText=reminderText(s);$("#modalText").textContent=lastReminderText;$("#reminderModal").classList.add("show")}
 
-    function toLocalDateInputValue(date) {
-      const y = date.getFullYear();
-      const m = String(date.getMonth() + 1).padStart(2, "0");
-      const d = String(date.getDate()).padStart(2, "0");
-      return `${y}-${m}-${d}`;
-    }
-
-    function parseDate(value) {
-      const [y, m, d] = value.split("-").map(Number);
-      return new Date(y, m - 1, d);
-    }
-
-    function addDays(date, days) {
-      const result = new Date(date);
-      result.setDate(result.getDate() + days);
-      return result;
-    }
-
-    function getNextMonday(from = new Date()) {
-      const result = new Date(from);
-      result.setHours(0, 0, 0, 0);
-      const day = result.getDay();
-      const daysUntilMonday = day === 0 ? 1 : 8 - day;
-      result.setDate(result.getDate() + daysUntilMonday);
-      return result;
-    }
-
-    function formatDateVN(dateValue) {
-      const date = typeof dateValue === "string" ? parseDate(dateValue) : dateValue;
-      return new Intl.DateTimeFormat("vi-VN", {
-        weekday: "long",
-        day: "2-digit",
-        month: "2-digit",
-        year: "numeric"
-      }).format(date);
-    }
-
-    function getWeekRangeText(weekStart) {
-      const start = parseDate(weekStart);
-      const end = addDays(start, 6);
-      return `${formatDateVN(start)} → ${formatDateVN(end)}`;
-    }
-
-    function taskBefore(taskName) {
-      const index = TASKS.indexOf(taskName);
-      if (index === -1) return TASKS[0];
-      return TASKS[(index - 1 + TASKS.length) % TASKS.length];
-    }
-
-    function nextTaskAfter(taskName) {
-      const index = TASKS.indexOf(taskName);
-      if (index === -1) return TASKS[0];
-      return TASKS[(index + 1) % TASKS.length];
-    }
-
-    function getPresentMembers() {
-      return state.members.filter(member => attendance[member.id] !== false);
-    }
-
-    function getAbsentMembers() {
-      return state.members.filter(member => attendance[member.id] === false);
-    }
-
-    function getPreviousSchedule(weekStart) {
-      return state.schedules
-        .filter(schedule => schedule.weekStart < weekStart)
-        .sort((a, b) => b.weekStart.localeCompare(a.weekStart))[0] || null;
-    }
-
-    function getLastAssignmentOfMember(memberId, beforeWeekStart = null) {
-      const schedules = [...state.schedules]
-        .filter(schedule => !beforeWeekStart || schedule.weekStart < beforeWeekStart)
-        .sort((a, b) => b.weekStart.localeCompare(a.weekStart));
-
-      for (const schedule of schedules) {
-        const found = schedule.assignments.find(item => item.personId === memberId && !item.cut);
-        if (found) return found;
-      }
-
-      return null;
-    }
-
-    function getAllAssignmentsBefore(memberId, beforeWeekStart) {
-      return state.schedules
-        .filter(schedule => schedule.weekStart < beforeWeekStart)
-        .flatMap(schedule => schedule.assignments.filter(item => item.personId === memberId && !item.cut));
-    }
-
-    function getTotalAssignmentsBefore(memberId, beforeWeekStart) {
-      return getAllAssignmentsBefore(memberId, beforeWeekStart).length;
-    }
-
-    function getTaskCountBefore(memberId, taskName, beforeWeekStart) {
-      return getAllAssignmentsBefore(memberId, beforeWeekStart).filter(item => item.task === taskName).length;
-    }
-
-    function getExtraDutyCountBefore(memberId, beforeWeekStart) {
-      let extra = 0;
-
-      state.schedules
-        .filter(schedule => schedule.weekStart < beforeWeekStart)
-        .forEach(schedule => {
-          const count = schedule.assignments.filter(item => item.personId === memberId && !item.cut).length;
-          if (count > 1) extra += count - 1;
-        });
-
-      return extra;
-    }
-
-    function getTasksForWeek(presentCount, absentCount) {
-      let tasks = [...TASKS];
-      const cutTasks = [];
-
-      if (absentCount >= 2) {
-        return {
-          tasks,
-          cutTasks,
-          mode: "Vắng từ 2 người: giữ đủ việc, chia theo lịch sử việc phụ."
-        };
-      }
-
-      while (tasks.length > presentCount && cutTasks.length < CUT_PRIORITY.length) {
-        const taskToCut = CUT_PRIORITY[cutTasks.length];
-        tasks = tasks.filter(task => task !== taskToCut);
-        cutTasks.push(taskToCut);
-      }
-
+    function publicState(){
       return {
-        tasks,
-        cutTasks,
-        mode: cutTasks.length ? "Có cắt việc phụ." : "Xoay tua đủ việc."
-      };
-    }
-
-    function buildWorkCaps(presentMembers, taskCount, weekStart) {
-      const base = Math.floor(taskCount / presentMembers.length);
-      const extraSlots = taskCount % presentMembers.length;
-
-      const ranked = [...presentMembers].sort((a, b) => {
-        const extraA = getExtraDutyCountBefore(a.id, weekStart);
-        const extraB = getExtraDutyCountBefore(b.id, weekStart);
-        if (extraA !== extraB) return extraA - extraB;
-
-        const totalA = getTotalAssignmentsBefore(a.id, weekStart);
-        const totalB = getTotalAssignmentsBefore(b.id, weekStart);
-        if (totalA !== totalB) return totalA - totalB;
-
-        return a.name.localeCompare(b.name, "vi");
-      });
-
-      const caps = {};
-      ranked.forEach((member, index) => {
-        caps[member.id] = base + (index < extraSlots ? 1 : 0);
-      });
-
-      return caps;
-    }
-
-    function getIdealPersonForTask(taskName, previousSchedule, presentMap) {
-      if (!previousSchedule) return null;
-
-      const prevTask = taskBefore(taskName);
-      const previousAssignment = previousSchedule.assignments.find(item => {
-        return item.task === prevTask && !item.cut && item.personId;
-      });
-
-      if (!previousAssignment) return null;
-      return presentMap.get(previousAssignment.personId) || null;
-    }
-
-    function chooseFallbackPerson(taskName, presentMembers, loads, caps, weekStart) {
-      let candidates = presentMembers.filter(member => loads[member.id] < caps[member.id]);
-      if (candidates.length === 0) candidates = presentMembers;
-
-      return candidates
-        .map(member => {
-          const last = getLastAssignmentOfMember(member.id, weekStart);
-          const expected = last ? nextTaskAfter(last.task) : TASKS[0];
-
-          let score = 0;
-          score += loads[member.id] * 1000;
-          score += expected === taskName ? -180 : 0;
-          score += getExtraDutyCountBefore(member.id, weekStart) * 60;
-          score += getTaskCountBefore(member.id, taskName, weekStart) * 30;
-          score += getTotalAssignmentsBefore(member.id, weekStart) * 8;
-          score += member.name.localeCompare("zzzz", "vi") / 100000;
-
-          return { member, score };
-        })
-        .sort((a, b) => a.score - b.score)[0].member;
-    }
-
-    function generateRotatingAssignments(weekStart, presentMembers, activeTasks) {
-      const previousSchedule = getPreviousSchedule(weekStart);
-      const presentMap = new Map(presentMembers.map(member => [member.id, member]));
-      const caps = buildWorkCaps(presentMembers, activeTasks.length, weekStart);
-      const loads = Object.fromEntries(presentMembers.map(member => [member.id, 0]));
-      const assignments = [];
-
-      activeTasks.forEach(task => {
-        const ideal = getIdealPersonForTask(task, previousSchedule, presentMap);
-        let picked = null;
-        let note = "";
-
-        if (ideal && loads[ideal.id] < caps[ideal.id]) {
-          picked = ideal;
-          note = `${taskBefore(task)} → ${task}`;
-        } else {
-          picked = chooseFallbackPerson(task, presentMembers, loads, caps, weekStart);
-          note = ideal && ideal.id !== picked.id ? "Đổi để cân bằng số việc." : "";
+        version:1,
+        updatedAt:new Date().toISOString(),
+        members:state.members,
+        schedules:state.schedules,
+        settings:{
+          weights:state.settings.weights,
+          reminderTime:state.settings.reminderTime,
+          reminderDays:state.settings.reminderDays,
+          calendarTitle:state.settings.calendarTitle,
+          autoSaveCalendar:state.settings.autoSaveCalendar
         }
-
-        loads[picked.id] += 1;
-
-        assignments.push({
-          task,
-          personId: picked.id,
-          personName: picked.name,
-          cut: false,
-          note
-        });
-      });
-
-      return assignments;
+      }
     }
-
-    function addCutAssignments(assignments, cutTasks) {
-      cutTasks.forEach(task => {
-        assignments.push({
-          task,
-          personId: null,
-          personName: "Tạm cắt",
-          cut: true,
-          note: ""
-        });
-      });
-
-      return assignments;
-    }
-
-    function upsertSchedule(schedule) {
-      const index = state.schedules.findIndex(item => item.weekStart === schedule.weekStart);
-      if (index >= 0) state.schedules[index] = schedule;
-      else state.schedules.push(schedule);
-
-      state.schedules.sort((a, b) => a.weekStart.localeCompare(b.weekStart));
-      selectedScheduleId = schedule.id;
-      saveState();
-    }
-
-    function generateSchedule() {
-      const weekStart = $("#weekStart").value;
-      if (!weekStart) return showToast("Chọn ngày bắt đầu tuần.");
-      if (state.members.length === 0) return showToast("Thêm thành viên trước.");
-
-      const presentMembers = getPresentMembers();
-      const absentMembers = getAbsentMembers();
-
-      if (presentMembers.length === 0) return showToast("Không thể tạo lịch khi tất cả đều vắng.");
-
-      const existed = state.schedules.find(schedule => schedule.weekStart === weekStart);
-      if (existed && !confirm("Tuần này đã có lịch. Ghi đè?")) return;
-
-      const plan = getTasksForWeek(presentMembers.length, absentMembers.length);
-      const assignments = addCutAssignments(
-        generateRotatingAssignments(weekStart, presentMembers, plan.tasks),
-        plan.cutTasks
-      );
-
-      upsertSchedule({
-        id: existed ? existed.id : makeId(),
-        weekStart,
-        createdAt: existed ? existed.createdAt : new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-        absentMemberIds: absentMembers.map(member => member.id),
-        absentMemberNames: absentMembers.map(member => member.name),
-        mode: plan.mode,
-        source: "auto",
-        assignments
-      });
-
-      showToast("Đã tạo lịch.");
-      aiBotSay(buildAutoSuggestion());
-    }
-
-    function saveManualSchedule() {
-      const weekStart = $("#weekStart").value;
-      if (!weekStart) return showToast("Chọn ngày bắt đầu tuần.");
-      if (state.members.length === 0) return showToast("Thêm thành viên trước.");
-
-      const existed = state.schedules.find(schedule => schedule.weekStart === weekStart);
-      if (existed && !confirm("Lưu chỉnh tay sẽ ghi đè lịch tuần này. Tiếp tục?")) return;
-
-      const assignments = TASKS.map((task, index) => {
-        const select = document.querySelector(`[data-task-index="${index}"]`);
-        const value = select ? select.value : CUT_VALUE;
-
-        if (value === CUT_VALUE) {
-          return {
-            task,
-            personId: null,
-            personName: "Tạm cắt",
-            cut: true,
-            note: ""
-          };
-        }
-
-        const member = state.members.find(item => item.id === value);
-
-        return {
-          task,
-          personId: member ? member.id : null,
-          personName: member ? member.name : "Không rõ",
-          cut: !member,
-          note: ""
-        };
-      });
-
-      const absentMembers = getAbsentMembers();
-
-      upsertSchedule({
-        id: existed ? existed.id : makeId(),
-        weekStart,
-        createdAt: existed ? existed.createdAt : new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-        absentMemberIds: absentMembers.map(member => member.id),
-        absentMemberNames: absentMembers.map(member => member.name),
-        mode: "Phân công thủ công.",
-        source: "manual",
-        assignments
-      });
-
-      showToast("Đã lưu chỉnh tay.");
-      aiBotSay("Đã lưu lịch chỉnh tay. Từ tuần sau, hệ thống sẽ lấy lịch này làm mốc xoay tua.");
-    }
-
-    function addMember() {
-      const input = $("#memberName");
-      const name = input.value.trim().replace(/\s+/g, " ");
-
-      if (!name) return showToast("Tên không được rỗng.");
-
-      const duplicated = state.members.some(member => member.name.toLowerCase() === name.toLowerCase());
-      if (duplicated) return showToast("Tên này đã có.");
-
-      const member = { id: makeId(), name, createdAt: new Date().toISOString() };
-      state.members.push(member);
-      attendance[member.id] = true;
-      input.value = "";
-      saveState();
-      showToast("Đã thêm.");
-    }
-
-    function removeMember(id) {
-      const member = state.members.find(item => item.id === id);
-      if (!member) return;
-      if (!confirm(`Xóa "${member.name}"?`)) return;
-
-      state.members = state.members.filter(item => item.id !== id);
-      delete attendance[id];
-      saveState();
-      showToast("Đã xóa.");
-    }
-
-    function setAttendance(id, present) {
-      attendance[id] = present;
-      renderStats();
-      renderMembers();
-      renderManualEditor();
-    }
-
-    function markAll(present) {
-      state.members.forEach(member => attendance[member.id] = present);
+    function applySharedData(data){
+      const keepGas=state.settings.gasUrl, keepCode=state.settings.roomCode;
+      state.members=data.members||[];
+      state.schedules=data.schedules||[];
+      state.settings={...state.settings,...(data.settings||{})};
+      state.settings.gasUrl=keepGas;
+      state.settings.roomCode=keepCode;
+      attendance={};
+      initAttendance();
+      normalize();
+      selected=state.schedules.length?state.schedules[state.schedules.length-1].id:null;
+      localStorage.setItem(KEY,JSON.stringify(state));
       render();
-      showToast(present ? "Đã đánh dấu có mặt." : "Đã đánh dấu vắng.");
     }
-
-    function getTotalAssignmentsForMember(memberId) {
-      return state.schedules.reduce((total, schedule) => {
-        return total + schedule.assignments.filter(item => item.personId === memberId && !item.cut).length;
-      }, 0);
-    }
-
-    function getCurrentSchedule() {
-      if (!selectedScheduleId && state.schedules.length) {
-        selectedScheduleId = state.schedules[state.schedules.length - 1].id;
+    function sharedUrl(){
+      const fixedUrl = APP_SCRIPT_URL.trim();
+      if(!fixedUrl || fixedUrl.includes("PASTE_APPS_SCRIPT")){
+        toast("Chưa cấu hình APP_SCRIPT_URL trong file index.html.");
+        return null;
       }
-
-      return state.schedules.find(schedule => schedule.id === selectedScheduleId) || null;
+      return fixedUrl;
     }
-
-    function selectSchedule(id) {
-      selectedScheduleId = id;
-      const schedule = getCurrentSchedule();
-      if (schedule) $("#weekStart").value = schedule.weekStart;
-      renderCurrentSchedule();
-      renderManualEditor();
-      renderHistory();
-    }
-
-    function deleteCurrentSchedule() {
-      const current = getCurrentSchedule();
-      if (!current) return showToast("Chưa có lịch.");
-      if (!confirm("Xóa lịch tuần đang xem?")) return;
-
-      state.schedules = state.schedules.filter(schedule => schedule.id !== current.id);
-      selectedScheduleId = state.schedules.length ? state.schedules[state.schedules.length - 1].id : null;
-      saveState();
-      showToast("Đã xóa.");
-    }
-
-    function clearAllData() {
-      if (!confirm("Xóa toàn bộ dữ liệu?")) return;
-      state = { members: [], schedules: [] };
-      attendance = {};
-      selectedScheduleId = null;
-      saveState();
-      showToast("Đã xóa toàn bộ.");
-    }
-
-    function makeScheduleText(schedule) {
-      if (!schedule) return "";
-
-      const lines = [];
-      lines.push("LỊCH TRỰC NHẬT");
-      lines.push(`Tuần: ${getWeekRangeText(schedule.weekStart)}`);
-      lines.push(`Người vắng: ${schedule.absentMemberNames?.length ? schedule.absentMemberNames.join(", ") : "Không có"}`);
-      lines.push("");
-      schedule.assignments.forEach((item, index) => {
-        lines.push(`${index + 1}. ${item.task}: ${item.personName}`);
-      });
-
-      return lines.join("\n");
-    }
-
-    function copyCurrentSchedule() {
-      const schedule = getCurrentSchedule();
-      if (!schedule) return showToast("Chưa có lịch để copy.");
-
-      navigator.clipboard.writeText(makeScheduleText(schedule))
-        .then(() => showToast("Đã copy lịch."))
-        .catch(() => {
-          const temp = document.createElement("textarea");
-          temp.value = makeScheduleText(schedule);
-          document.body.appendChild(temp);
-          temp.select();
-          document.execCommand("copy");
-          document.body.removeChild(temp);
-          showToast("Đã copy lịch.");
-        });
-    }
-
-    function exportTxt() {
-      const schedule = getCurrentSchedule();
-      if (!schedule) return showToast("Chưa có lịch.");
-
-      const blob = new Blob([makeScheduleText(schedule)], { type: "text/plain;charset=utf-8" });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `lich-truc-nhat-${schedule.weekStart}.txt`;
-      a.click();
-      URL.revokeObjectURL(url);
-      showToast("Đã xuất TXT.");
-    }
-
-    function exportPdf() {
-      const schedule = getCurrentSchedule();
-      if (!schedule) return showToast("Chưa có lịch.");
-      window.print();
-    }
-
-    function exportData() {
-      const blob = new Blob([JSON.stringify(state, null, 2)], { type: "application/json;charset=utf-8" });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `du-lieu-truc-nhat-${toLocalDateInputValue(new Date())}.json`;
-      a.click();
-      URL.revokeObjectURL(url);
-      showToast("Đã xuất dữ liệu.");
-    }
-
-    function importData(file) {
-      if (!file) return;
-
-      const reader = new FileReader();
-      reader.onload = () => {
-        try {
-          const imported = JSON.parse(reader.result);
-          if (!Array.isArray(imported.members) || !Array.isArray(imported.schedules)) {
-            throw new Error("Invalid format");
-          }
-
-          state = { members: imported.members, schedules: imported.schedules };
-          attendance = {};
-          initAttendanceFromMembers();
-          selectedScheduleId = state.schedules.length ? state.schedules[state.schedules.length - 1].id : null;
-          saveState();
-          showToast("Đã nhập dữ liệu.");
-        } catch {
-          showToast("File không hợp lệ.");
-        }
-      };
-
-      reader.readAsText(file);
-    }
-
-    function renderStats() {
-      $("#totalMembers").textContent = state.members.length;
-      $("#presentMembers").textContent = getPresentMembers().length;
-      $("#totalSchedules").textContent = state.schedules.length;
-    }
-
-    function renderMembers() {
-      const list = $("#memberList");
-
-      if (state.members.length === 0) {
-        list.innerHTML = `<div class="empty">Chưa có thành viên.</div>`;
-        return;
+    function getRoomCode(){
+      const fixedCode = ROOM_CODE.trim();
+      if(!fixedCode || fixedCode.includes("PASTE_ROOM_CODE")){
+        toast("Chưa cấu hình ROOM_CODE trong file index.html.");
+        return "";
       }
-
-      list.innerHTML = state.members.map(member => {
-        const present = attendance[member.id] !== false;
-        const last = getLastAssignmentOfMember(member.id);
-        const next = last ? nextTaskAfter(last.task) : TASKS[0];
-        const extra = getExtraDutyCountBefore(member.id, "9999-12-31");
-
-        return `
-          <div class="member">
-            <label class="switch">
-              <input type="checkbox" ${present ? "checked" : ""} onchange="setAttendance('${member.id}', this.checked)" />
-              <span class="slider"></span>
-            </label>
-            <div>
-              <strong>${escapeHTML(member.name)}</strong>
-              <small>${present ? "Có mặt" : "Vắng"} · ${getTotalAssignmentsForMember(member.id)} việc · phụ ${extra}<br/>Tiếp: ${escapeHTML(next)}</small>
-            </div>
-            <button class="btn-red" onclick="removeMember('${member.id}')">Xóa</button>
-          </div>
-        `;
-      }).join("");
+      return fixedCode;
     }
-
-    function renderCurrentSchedule() {
-      const container = $("#currentSchedule");
-      const schedule = getCurrentSchedule();
-
-      if (!schedule) {
-        container.innerHTML = `<div class="empty">Chưa có lịch. Chọn ngày rồi bấm <b>Tạo lịch</b>.</div>`;
-        return;
-      }
-
-      const absentText = schedule.absentMemberNames?.length ? schedule.absentMemberNames.join(", ") : "Không có";
-      const sourceText = schedule.source === "manual" ? "Chỉnh tay" : "Tự động";
-
-      container.innerHTML = `
-        <article class="schedule">
-          <div class="schedule-title">
-            <div>
-              <h3>${getWeekRangeText(schedule.weekStart)}</h3>
-              <p>Người vắng: ${escapeHTML(absentText)} · ${escapeHTML(schedule.mode || "")}</p>
-            </div>
-            <div class="schedule-actions">
-              <button class="btn-blue" onclick="copyCurrentSchedule()">Copy</button>
-              <span class="tag">${escapeHTML(sourceText)}</span>
-            </div>
-          </div>
-
-          <table>
-            <thead>
-              <tr>
-                <th>Nhiệm vụ</th>
-                <th>Người phụ trách</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${schedule.assignments.map(item => `
-                <tr class="${item.cut ? "cut" : ""}">
-                  <td>${escapeHTML(item.task)}</td>
-                  <td>
-                    ${escapeHTML(item.personName)}
-                    ${item.note ? `<div class="note">${escapeHTML(item.note)}</div>` : ""}
-                  </td>
-                </tr>
-              `).join("")}
-            </tbody>
-          </table>
-        </article>
-      `;
-    }
-
-    function renderManualEditor() {
-      const editor = $("#manualEditor");
-      const schedule = getCurrentSchedule();
-
-      const values = {};
-      if (schedule) {
-        schedule.assignments.forEach(item => values[item.task] = item.cut ? CUT_VALUE : item.personId);
-      }
-
-      editor.innerHTML = TASKS.map((task, index) => {
-        const selectedValue = values[task] || CUT_VALUE;
-
-        return `
-          <div class="manual-item">
-            <label>${escapeHTML(task)}</label>
-            <select data-task-index="${index}">
-              <option value="${CUT_VALUE}" ${selectedValue === CUT_VALUE ? "selected" : ""}>Tạm cắt</option>
-              ${state.members.map(member => {
-                const status = attendance[member.id] === false ? " - vắng" : "";
-                const selected = selectedValue === member.id ? "selected" : "";
-                return `<option value="${member.id}" ${selected}>${escapeHTML(member.name + status)}</option>`;
-              }).join("")}
-            </select>
-          </div>
-        `;
-      }).join("");
-    }
-
-    function renderHistory() {
-      const history = $("#history");
-
-      if (state.schedules.length === 0) {
-        history.innerHTML = `<div class="empty">Chưa có lịch sử.</div>`;
-        return;
-      }
-
-      const schedules = [...state.schedules].sort((a, b) => b.weekStart.localeCompare(a.weekStart));
-
-      history.innerHTML = schedules.map(schedule => `
-        <details ${schedule.id === selectedScheduleId ? "open" : ""}>
-          <summary onclick="selectSchedule('${schedule.id}')">
-            <span>${getWeekRangeText(schedule.weekStart)}</span>
-            <span>${schedule.source === "manual" ? "Chỉnh tay" : "Tự động"}</span>
-          </summary>
-          <table>
-            <tbody>
-              ${schedule.assignments.map(item => `
-                <tr>
-                  <td>${escapeHTML(item.task)}</td>
-                  <td><b>${escapeHTML(item.personName)}</b></td>
-                </tr>
-              `).join("")}
-            </tbody>
-          </table>
-        </details>
-      `).join("");
-    }
-
-    function addAIMessage(role, text) {
-      const box = $("#aiMessages");
-      const div = document.createElement("div");
-      div.className = `msg ${role}`;
-      div.textContent = text;
-      box.appendChild(div);
-      box.scrollTop = box.scrollHeight;
-    }
-
-    function aiBotSay(text) {
-      addAIMessage("bot", text);
-    }
-
-    function aiUserSay(text) {
-      addAIMessage("user", text);
-    }
-
-    function getAIBasicContext() {
-      const present = getPresentMembers();
-      const absent = getAbsentMembers();
-      const weekStart = $("#weekStart").value;
-      const plan = getTasksForWeek(present.length, absent.length);
-      const schedule = getCurrentSchedule();
-      const previousSchedule = weekStart ? getPreviousSchedule(weekStart) : null;
-
-      return { present, absent, weekStart, plan, schedule, previousSchedule };
-    }
-
-    function getCurrentWeekLoads(schedule = getCurrentSchedule()) {
-      const loads = {};
-      state.members.forEach(member => {
-        loads[member.id] = {
-          id: member.id,
-          name: member.name,
-          count: 0,
-          tasks: [],
-          cut: 0,
-          extraHistory: getExtraDutyCountBefore(member.id, "9999-12-31"),
-          totalHistory: getTotalAssignmentsForMember(member.id)
-        };
-      });
-
-      if (!schedule) return loads;
-
-      schedule.assignments.forEach(item => {
-        if (!item.personId || item.cut || !loads[item.personId]) return;
-        loads[item.personId].count += 1;
-        loads[item.personId].tasks.push(item.task);
-      });
-
-      return loads;
-    }
-
-    function getTaskWeight(task) {
-      const weights = {
-        "Lavabo - Toilet": 5,
-        "Sàn nvs - cống": 5,
-        "Quét Nhà": 3,
-        "Lau Nhà": 4,
-        "Giặt thảm": 2,
-        "Vứt rác, bình nước": 2
-      };
-
-      return weights[task] || 3;
-    }
-
-    function getTaskPriorityText() {
-      return [
-        "Mức ưu tiên công việc:",
-        "1. Lavabo - Toilet: rất quan trọng, không nên cắt.",
-        "2. Sàn nvs - cống: rất quan trọng, không nên cắt.",
-        "3. Lau Nhà: nên giữ nếu còn đủ người.",
-        "4. Quét Nhà: nên giữ nếu còn đủ người.",
-        "5. Giặt thảm: có thể cắt khi thiếu người nhẹ.",
-        "6. Vứt rác, bình nước: có thể cắt đầu tiên nếu thiếu người nhẹ.",
-        "",
-        "Khi thiếu người nhẹ, thứ tự cắt hợp lý là: Vứt rác, bình nước → Giặt thảm."
-      ].join("\n");
-    }
-
-    function getWeekLoadSummary(schedule = getCurrentSchedule()) {
-      const loads = Object.values(getCurrentWeekLoads(schedule))
-        .filter(item => item.count > 0)
-        .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name, "vi"));
-
-      if (!loads.length) return "Chưa có dữ liệu phân công trong tuần này.";
-
-      return loads.map(item => {
-        return `- ${item.name}: ${item.count} việc (${item.tasks.join(", ")})`;
-      }).join("\n");
-    }
-
-    function buildAutoSuggestion() {
-      const { present, absent, plan, schedule, weekStart } = getAIBasicContext();
-
-      if (state.members.length === 0) {
-        return "Bạn chưa thêm thành viên. Hãy thêm người trong phòng trước, sau đó mình mới gợi ý lịch được.";
-      }
-
-      if (present.length === 0) {
-        return "Tất cả đang bị đánh dấu vắng nên chưa thể tạo lịch. Cần ít nhất 1 người có mặt.";
-      }
-
-      let text = "";
-      text += `Hiện có ${present.length}/${state.members.length} người có mặt. `;
-
-      if (absent.length) {
-        text += `Người vắng: ${absent.map(m => m.name).join(", ")}.\n`;
-      } else {
-        text += "Không có người vắng.\n";
-      }
-
-      if (absent.length >= 2) {
-        const caps = buildWorkCaps(present, TASKS.length, weekStart || "9999-12-31");
-        const capText = present.map(member => `${member.name}: ${caps[member.id]} việc`).join(", ");
-        text += `Phương án tối ưu: giữ đủ 6 nhiệm vụ, nhưng chia suất việc theo lịch sử để người từng gánh ít việc phụ được nhận thêm trước.\nSuất đề xuất: ${capText}.`;
-      } else if (plan.cutTasks.length) {
-        text += `Phương án tối ưu: cắt tạm ${plan.cutTasks.join(", ")} vì đây là nhóm việc phụ.`;
-      } else {
-        text += "Phương án tối ưu: chia xoay tua đủ 6 nhiệm vụ.";
-      }
-
-      if (schedule) {
-        text += "\n\nLịch hiện tại:\n" + getWeekLoadSummary(schedule);
-        text += "\n\nBạn có thể bấm “Copy lịch” để gửi nhanh.";
-      } else {
-        text += "\n\nBấm “Tạo lịch” để hệ thống chia tự động, hoặc mở “Chỉnh tay phân công” để tự chọn người.";
-      }
-
-      return text;
-    }
-
-    function analyzeFairness() {
-      const { schedule, present, weekStart } = getAIBasicContext();
-
-      if (!schedule) {
-        return "Chưa có lịch để phân tích. Hãy tạo lịch hoặc lưu chỉnh tay trước.";
-      }
-
-      const loads = Object.values(getCurrentWeekLoads(schedule))
-        .filter(item => present.some(member => member.id === item.id));
-
-      if (!loads.length) {
-        return "Lịch hiện tại chưa có ai được phân công.";
-      }
-
-      const counts = loads.map(item => item.count);
-      const max = Math.max(...counts);
-      const min = Math.min(...counts);
-      const heavy = loads.filter(item => item.count === max && max > min);
-      const light = loads.filter(item => item.count === min && max > min);
-
-      let text = "Phân tích công bằng tuần này:\n";
-      text += loads
-        .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name, "vi"))
-        .map(item => `- ${item.name}: ${item.count} việc, đã gánh việc phụ ${item.extraHistory} lần`)
-        .join("\n");
-
-      if (max - min <= 1) {
-        text += "\n\nKết luận: số lượng việc đang khá công bằng vì chênh lệch tối đa chỉ 1 việc.";
-      } else {
-        text += `\n\nKết luận: đang lệch. ${heavy.map(x => x.name).join(", ")} đang nhiều việc hơn ${light.map(x => x.name).join(", ")}.`;
-      }
-
-      const caps = buildWorkCaps(present, schedule.assignments.filter(item => !item.cut).length, weekStart || "9999-12-31");
-      const capText = present.map(member => `${member.name}: nên khoảng ${caps[member.id]} việc`).join(", ");
-      text += `\nSuất hợp lý theo lịch sử: ${capText}.`;
-
-      return text;
-    }
-
-    function suggestSwap() {
-      const { schedule, present } = getAIBasicContext();
-
-      if (!schedule) {
-        return "Chưa có lịch để gợi ý đổi người.";
-      }
-
-      const loads = Object.values(getCurrentWeekLoads(schedule))
-        .filter(item => present.some(member => member.id === item.id));
-
-      if (!loads.length) {
-        return "Lịch hiện tại chưa có phân công.";
-      }
-
-      const sorted = [...loads].sort((a, b) => b.count - a.count || b.extraHistory - a.extraHistory);
-      const heavy = sorted[0];
-      const light = [...loads].sort((a, b) => a.count - b.count || a.extraHistory - b.extraHistory)[0];
-
-      if (!heavy || !light || heavy.count - light.count <= 1) {
-        const mostRepeated = findRepeatedTaskSuggestion(schedule);
-        if (mostRepeated) return mostRepeated;
-        return "Lịch hiện tại đã khá cân bằng. Chưa cần đổi người.";
-      }
-
-      const heavyTasks = schedule.assignments
-        .filter(item => item.personId === heavy.id && !item.cut)
-        .sort((a, b) => getTaskWeight(a.task) - getTaskWeight(b.task));
-
-      const taskToMove = heavyTasks[0];
-
-      if (!taskToMove) return "Chưa tìm được nhiệm vụ phù hợp để đổi.";
-
-      return [
-        "Gợi ý đổi để cân bằng:",
-        `- Chuyển “${taskToMove.task}” từ ${heavy.name} sang ${light.name}.`,
-        `- Lý do: ${heavy.name} đang có ${heavy.count} việc, còn ${light.name} có ${light.count} việc.`,
-        "- Nên ưu tiên đổi việc nhẹ trước để không phá vòng xoay quá nhiều."
-      ].join("\n");
-    }
-
-    function findRepeatedTaskSuggestion(schedule) {
-      for (const item of schedule.assignments) {
-        if (!item.personId || item.cut) continue;
-
-        const last = getLastAssignmentOfMember(item.personId, schedule.weekStart);
-        if (last && last.task === item.task) {
-          const person = state.members.find(member => member.id === item.personId);
-          return [
-            "Có một điểm có thể tối ưu:",
-            `- ${person ? person.name : item.personName} bị lặp lại nhiệm vụ “${item.task}”.`,
-            "- Nếu có người khác đang ít việc hơn, nên đổi nhiệm vụ này để xoay tua đều hơn."
-          ].join("\n");
+    function sharedPayload(action){
+      return {
+        action,
+        roomCode:getRoomCode(),
+        pageUrl:location.href.split("#")[0],
+        data:publicState(),
+        calendar:{
+          reminderTime:state.settings.reminderTime,
+          reminderDays:state.settings.reminderDays,
+          calendarTitle:state.settings.calendarTitle||"Nhắc lịch trực nhật"
         }
       }
-
-      return null;
+    }
+    function queueSharedSave(){
+      if(!APP_SCRIPT_URL.trim() || APP_SCRIPT_URL.includes("PASTE_APPS_SCRIPT") || !ROOM_CODE.trim() || ROOM_CODE.includes("PASTE_ROOM_CODE")) return;
+      clearTimeout(saveTimer);
+      saveTimer=setTimeout(()=>saveShared(false),900);
+    }
+    function saveShared(show=true){
+      const url=sharedUrl(); if(!url)return;
+      const room=getRoomCode(); if(!room)return;
+      fetch(url,{method:"POST",mode:"no-cors",headers:{"Content-Type":"text/plain;charset=utf-8"},body:JSON.stringify(sharedPayload("save"))})
+        .then(()=>{if(show)toast("Đã lưu dữ liệu chung.");})
+        .catch(()=>toast("Không lưu được dữ liệu chung."))
+    }
+    function loadShared(){
+      const url=sharedUrl(); if(!url)return;
+      const room=getRoomCode(); if(!room)return;
+      const cb="jsonp_"+Date.now()+"_"+Math.floor(Math.random()*9999);
+      window[cb]=function(res){
+        try{
+          if(!res||!res.ok) throw new Error(res && res.error ? res.error : "Không tải được");
+          if(res.data) applySharedData(res.data);
+          toast("Đã tải dữ liệu chung.");
+        }catch(e){
+          toast(String(e.message||e));
+        }finally{
+          delete window[cb];
+          script.remove();
+        }
+      };
+      const script=document.createElement("script");
+      script.src=url+(url.includes("?")?"&":"?")+"action=load&roomCode="+encodeURIComponent(room)+"&callback="+cb;
+      script.onerror=function(){toast("Không kết nối được Apps Script.");delete window[cb];script.remove();};
+      document.body.appendChild(script);
+    }
+    function setSync(text,type="warn"){
+      // Bản giao diện mới không hiển thị khung đồng bộ riêng.
+      if(type==="ok") toast(text);
+    }
+    function copyShareLink(){
+      const url=new URL(location.href.split("#")[0]);
+      copy(url.toString(),"Đã copy link website.");
+    }
+    function readQueryConfig(){
+      // Không cần nhập cấu hình trên giao diện.
+      // Dữ liệu chung được lấy từ APP_SCRIPT_URL và ROOM_CODE trong code.
     }
 
-    function explainWhySchedule() {
-      const { schedule } = getAIBasicContext();
-
-      if (!schedule) {
-        return "Chưa có lịch để giải thích. Hãy tạo lịch trước.";
+    function buildCalendarPayload(action="upsert"){
+      return {
+        action,
+        roomCode:getRoomCode(),
+        pageUrl:location.href.split("#")[0],
+        data:publicState(),
+        calendar:{
+          reminderTime:state.settings.reminderTime,
+          reminderDays:state.settings.reminderDays,
+          calendarTitle:state.settings.calendarTitle || "Nhắc lịch trực nhật"
+        }
       }
-
-      const lines = [];
-      lines.push("Vì sao lịch được chia như vậy:");
-
-      if (schedule.source === "manual") {
-        lines.push("- Lịch này do bạn chỉnh tay, nên hệ thống xem nó là mốc chính để xoay tua cho tuần sau.");
-      } else {
-        lines.push("- Hệ thống dựa vào lịch tuần trước: ai làm việc nào thì tuần này được đẩy xuống việc kế tiếp.");
-      }
-
-      lines.push("- Nếu người theo vòng xoay bị vắng hoặc đã đủ số việc, hệ thống chuyển việc sang người có ít việc hơn.");
-      lines.push("- Khi vắng từ 2 người, hệ thống giữ đủ việc nhưng xoay phần việc dư cho người từng gánh phụ ít hơn.");
-      lines.push("");
-      lines.push("Tóm tắt lịch hiện tại:");
-      lines.push(getWeekLoadSummary(schedule));
-
-      return lines.join("\n");
     }
-
-    function explainMissingPeople() {
-      const { present, absent, plan, weekStart } = getAIBasicContext();
-
-      if (state.members.length === 0) {
-        return "Chưa có dữ liệu thành viên nên mình chưa thể tính phương án thiếu người.";
-      }
-
-      if (absent.length === 0) {
-        return "Tuần này chưa có ai vắng. Cứ xoay tua đủ việc là hợp lý nhất.";
-      }
-
-      if (present.length === 0) {
-        return "Không có ai có mặt nên không thể phân công.";
-      }
-
-      if (absent.length === 1) {
-        return [
-          "Vắng 1 người:",
-          `- Nên cắt tạm: ${CUT_PRIORITY[0]}.`,
-          "- Nếu phòng vẫn cần đủ việc, có thể giữ đủ 6 việc và giao thêm 1 việc nhẹ cho người có ít việc phụ nhất.",
-          "- Không nên cắt Lavabo - Toilet hoặc Sàn nvs - cống vì đây là việc quan trọng."
-        ].join("\n");
-      }
-
-      const caps = buildWorkCaps(present, TASKS.length, weekStart || "9999-12-31");
-      const capText = present.map(member => `- ${member.name}: ${caps[member.id]} việc`).join("\n");
-
-      return [
-        `Vắng ${absent.length} người:`,
-        "Không nên cắt quá nhiều vì phòng vẫn cần đủ vệ sinh cơ bản.",
-        "Phương án công bằng nhất là giữ đủ 6 nhiệm vụ rồi chia suất việc theo lịch sử:",
-        capText,
-        "",
-        "Người từng nhận ít việc phụ hơn sẽ được nhận thêm trước. Tuần sau phần việc dư sẽ xoay sang người khác."
-      ].join("\n");
+    function updateSettings(){
+      state.settings.reminderTime=$("#reminderTime").value||"20:00";
+      state.settings.calendarTitle=$("#calendarTitle").value.trim()||"Nhắc lịch trực nhật";
+      state.settings.autoSaveCalendar=$("#autoSaveCalendar").value==="yes";
+      state.settings.reminderDays=[...document.querySelectorAll(".day-check:checked")].map(x=>Number(x.value));
+      localStorage.setItem(KEY,JSON.stringify(state));
+      renderSettings();
+      saveShared(false);
+      if(state.settings.autoSaveCalendar) saveCalendar(false);
     }
-
-    function explainPriority() {
-      return getTaskPriorityText();
+    function saveCalendar(show=true){
+      const url=sharedUrl();
+      if(!url)return;
+      fetch(url,{method:"POST",mode:"no-cors",headers:{"Content-Type":"text/plain;charset=utf-8"},body:JSON.stringify(buildCalendarPayload("calendar"))})
+      .then(()=>{$("#calendarStatus").textContent="Đã gửi Calendar";$("#calendarStatus").className="tag ok";if(show)toast("Đã gửi yêu cầu lưu vào Google Calendar.");})
+      .catch(()=>toast("Không gửi được Apps Script."))
     }
-
-    function explainNextWeek() {
-      return "Nút “Chọn tuần sau” chỉ tự điền ngày bắt đầu của tuần kế tiếp, thường là thứ Hai. Nó không tạo lịch ngay. Sau khi bấm nút này, hãy bấm “Tạo lịch” để sinh lịch cho tuần sau.";
+    function openCalendarTemplate(){
+      const title=encodeURIComponent(state.settings.calendarTitle||"Nhắc lịch trực nhật");
+      const days=(state.settings.reminderDays||[3,4]).map(Number);
+      const byday=days.map(d=>({1:"MO",2:"TU",3:"WE",4:"TH",5:"FR",6:"SA",0:"SU"}[d])).join(",");
+      const start=nextReminderDate(days,state.settings.reminderTime||"20:00");
+      const end=new Date(start.getTime()+15*60000);
+      const dates=toGCalDate(start)+"/"+toGCalDate(end);
+      const details=encodeURIComponent("Mở web lịch trực nhật để xem nhiệm vụ tuần này:\\n"+location.href.split("#")[0]);
+      const recur=encodeURIComponent("RRULE:FREQ=WEEKLY;BYDAY="+byday);
+      const url=`https://calendar.google.com/calendar/render?action=TEMPLATE&text=${title}&dates=${dates}&details=${details}&recur=${recur}&ctz=Asia/Ho_Chi_Minh`;
+      window.open(url,"_blank");
     }
-
-    function answerAIQuestion(question) {
-      const q = question.toLowerCase();
-
-      if (q.includes("tuần sau") || q.includes("tuần tiếp") || q.includes("next")) {
-        return explainNextWeek();
-      }
-
-      if (q.includes("công bằng") || q.includes("cân bằng") || q.includes("lệch") || q.includes("đều")) {
-        return analyzeFairness();
-      }
-
-      if (q.includes("đổi") || q.includes("swap") || q.includes("chuyển")) {
-        return suggestSwap();
-      }
-
-      if (q.includes("vì sao") || q.includes("tại sao") || q.includes("giải thích")) {
-        return explainWhySchedule();
-      }
-
-      if (q.includes("thiếu") || q.includes("vắng") || q.includes("nghỉ")) {
-        return explainMissingPeople();
-      }
-
-      if (q.includes("ưu tiên") || q.includes("công việc") || q.includes("cắt")) {
-        return explainPriority();
-      }
-
-      if (q.includes("copy") || q.includes("sao chép")) {
-        return "Bấm nút “Copy lịch” ở đầu khung phân công hoặc nút “Copy” ngay trên lịch. Nội dung sẽ được đưa vào clipboard để gửi Zalo/Messenger.";
-      }
-
-      if (q.includes("gợi ý") || q.includes("lịch") || q.includes("chia") || q.includes("phân")) {
-        return buildAutoSuggestion();
-      }
-
-      return [
-        "Mình có thể hỗ trợ:",
-        "- Gợi ý lịch tuần này.",
-        "- Phân tích lịch có công bằng không.",
-        "- Gợi ý đổi người để đỡ lệch.",
-        "- Giải thích vì sao chia như vậy.",
-        "- Tư vấn khi thiếu/vắng người.",
-        "- Ưu tiên công việc nào nên giữ hoặc cắt."
-      ].join("\n");
+    function nextReminderDate(days,time){
+      const [hh,mm]=(time||"20:00").split(":").map(Number),now=new Date();let best=null;
+      for(let i=0;i<14;i++){const d=new Date(now);d.setDate(now.getDate()+i);d.setHours(hh||20,mm||0,0,0);if(days.includes(d.getDay())&&d>now){best=d;break}}
+      if(!best){best=new Date(now);best.setDate(now.getDate()+1);best.setHours(hh||20,mm||0,0,0)}return best
     }
+    function toGCalDate(d){const pad=n=>String(n).padStart(2,"0");return `${d.getFullYear()}${pad(d.getMonth()+1)}${pad(d.getDate())}T${pad(d.getHours())}${pad(d.getMinutes())}00`}
 
-    function sendAIMessage(text = null) {
-      const input = $("#aiInput");
-      const message = (text || input.value).trim();
-      if (!message) return;
-
-      aiUserSay(message);
-      input.value = "";
-
-      setTimeout(() => {
-        aiBotSay(answerAIQuestion(message));
-      }, 180);
+    function analyze(){
+      let s=current();if(!s){$("#aiBox").textContent="Chưa có lịch để phân tích.";return}
+      let map={};state.members.forEach(m=>map[m.id]={name:m.name,count:0,pts:0});
+      s.assignments.forEach(a=>{if(!a.personId||a.cut||!map[a.personId])return;map[a.personId].count++;map[a.personId].pts+=getWeight(a.taskId||a.task)});
+      let vals=Object.values(map).filter(x=>x.count>0),txt="Phân tích công bằng:\n"+vals.sort((a,b)=>b.pts-a.pts).map(x=>`- ${x.name}: ${x.count} việc / ${x.pts} điểm`).join("\n");
+      if(vals.length>1){let max=vals.reduce((a,b)=>a.pts>b.pts?a:b),min=vals.reduce((a,b)=>a.pts<b.pts?a:b),diff=max.pts-min.pts;txt+=diff>3?`\n\n⚠️ Lệch: ${max.name} hơn ${min.name} ${diff} điểm. Nên đổi một việc nhẹ.`:`\n\n✅ Lịch khá cân bằng, chênh lệch ${diff} điểm.`}
+      $("#aiBox").textContent=txt
     }
-
-    function render() {
-      initAttendanceFromMembers();
-      renderStats();
-      renderMembers();
-      renderCurrentSchedule();
-      renderManualEditor();
-      renderHistory();
+    function renderStats(){$("#totalMembers").textContent=state.members.length;$("#presentMembers").textContent=present().length;$("#totalSchedules").textContent=state.schedules.length}
+    function renderMembers(){let box=$("#members");if(!state.members.length){box.innerHTML='<div class="empty">Chưa có thành viên.</div>';return}box.innerHTML=state.members.map(m=>{let l=lastOf(m.id),n=l?after(l.taskId||l.task):TASKS[0];return `<div class="member"><label class="switch"><input type="checkbox" ${attendance[m.id]!==false?"checked":""} onchange="setAttendance('${m.id}',this.checked)"><span class="slider"></span></label><div><b>${esc(m.name)}</b><small>${attendance[m.id]!==false?"Có mặt":"Vắng"} · ${totalJobs(m.id)} việc · ${points(m.id)} điểm<br>Tiếp: ${esc(n.name)}</small></div><button class="red" onclick="removeMember('${m.id}')">Xóa</button></div>`}).join("")}
+    function renderSchedule(){let s=current(),box=$("#scheduleBox");if(!s){box.innerHTML='<div class="empty">Chưa có lịch. Chọn tuần rồi bấm <b>Tạo lịch</b>.</div>';return}let done=s.assignments.filter(a=>!a.cut&&a.completed).length,total=s.assignments.filter(a=>!a.cut).length,abs=s.absentMemberNames?.length?s.absentMemberNames.join(", "):"Không có";box.innerHTML=`<article class="schedule"><div class="schedule-title"><div><h3>${range(s.weekStart)}</h3><p>Người vắng: ${esc(abs)} · ${esc(s.mode||"")}</p></div><div class="s-actions"><span class="tag ok">${done}/${total} xong</span><span class="tag">${s.source==="manual"?"Chỉnh tay":"Tự động"}</span></div></div><table><thead><tr><th>Nhiệm vụ</th><th>Người phụ trách</th><th>Điểm</th><th>Xong</th></tr></thead><tbody>${s.assignments.map((a,i)=>{let t=findTask(a.taskId||a.task);return `<tr class="${a.cut?"cut":a.completed?"done-row":""}"><td>${t?t.emoji:""} ${esc(a.task)}</td><td>${esc(a.personName)}${a.note?`<div class="note">${esc(a.note)}</div>`:""}</td><td>${a.cut?"-":getWeight(a.taskId||a.task)}</td><td>${a.cut?"-":`<label class="done"><input type="checkbox" ${a.completed?"checked":""} onchange="toggleDone('${s.id}',${i},this.checked)"> ${a.completed?"Đã xong":"Chưa"}</label>`}</td></tr>`}).join("")}</tbody></table></article>`}
+    function renderManual(){let box=$("#manual"),s=current(),vals={};if(s)s.assignments.forEach(a=>vals[a.taskId||a.task]=a.cut?CUTVAL:a.personId);box.innerHTML=TASKS.map((t,i)=>`<div class="field"><label>${t.emoji} ${esc(t.name)}</label><select data-task="${i}"><option value="${CUTVAL}" ${vals[t.id]===CUTVAL?"selected":""}>Tạm cắt</option>${state.members.map(m=>`<option value="${m.id}" ${vals[t.id]===m.id?"selected":""}>${esc(m.name+(attendance[m.id]===false?" - vắng":""))}</option>`).join("")}</select></div>`).join("")}
+    function renderHistory(){let h=$("#history");if(!state.schedules.length){h.innerHTML='<div class="empty">Chưa có lịch sử.</div>';return}h.innerHTML=[...state.schedules].sort((a,b)=>b.weekStart.localeCompare(a.weekStart)).map(s=>`<details ${s.id===selected?"open":""}><summary onclick="selected='${s.id}';$('#weekStart').value='${s.weekStart}';renderSchedule();renderManual();renderHistory();renderToday()"><span>${range(s.weekStart)}</span><span>${s.source==="manual"?"Chỉnh tay":"Tự động"}</span></summary><table><tbody>${s.assignments.map(a=>`<tr><td>${esc(a.task)}</td><td><b>${esc(a.personName)}</b></td></tr>`).join("")}</tbody></table></details>`).join("")}
+    function renderWeights(){let b=$("#weights");b.innerHTML=TASKS.map(t=>`<div class="task-setting"><b>${t.emoji} ${esc(t.name)}</b><input type="number" min="1" max="10" value="${getWeight(t.id)}" onchange="state.settings.weights['${t.id}']=Math.max(1,Math.min(10,Number(this.value)||1));save()"></div>`).join("")}
+    function renderFair(){let box=$("#fairStats");if(!state.members.length){box.innerHTML='<div class="empty">Chưa có thành viên.</div>';return}let max=Math.max(1,...state.members.map(m=>points(m.id)));box.innerHTML=state.members.map(m=>{let p=points(m.id),pct=Math.round(p/max*100);return `<div class="stat-person"><div><span>${esc(m.name)}</span><span>${p} điểm</span></div><div class="bar"><span style="width:${pct}%"></span></div><small>${totalJobs(m.id)} việc · ${doneCount(m.id)} đã xong · ${extraCount(m.id)} lần phụ</small></div>`}).join("")}
+    function renderToday(){let box=$("#todayBox"),s=todaySchedule();if(!s){box.innerHTML='<div class="empty">Chưa có lịch thuộc tuần hiện tại.</div>';return}let undone=s.assignments.filter(a=>!a.cut&&!a.completed);if(!undone.length){box.innerHTML='<div class="empty">Tất cả nhiệm vụ tuần này đã hoàn thành.</div>';return}box.innerHTML=`<div class="today-list">${undone.map(a=>{let t=findTask(a.taskId||a.task);return `<div class="today-item"><div><b>${t?t.emoji:""} ${esc(a.task)}</b><span>${esc(a.personName)}</span></div><span>Chưa xong</span></div>`}).join("")}</div>`}
+    function renderDays(){let box=$("#reminderDays");box.innerHTML=DAYS.map(d=>`<label class="day"><input class="day-check" type="checkbox" value="${d.v}" ${state.settings.reminderDays.map(Number).includes(d.v)?"checked":""} onchange="updateSettings()"> ${d.t}</label>`).join("")}
+    function renderSettings(){
+      $("#reminderTime").value=state.settings.reminderTime;
+      $("#calendarTitle").value=state.settings.calendarTitle||"Nhắc lịch trực nhật";
+      $("#autoSaveCalendar").value=state.settings.autoSaveCalendar?"yes":"no";
+      const configured = APP_SCRIPT_URL.trim() && !APP_SCRIPT_URL.includes("PASTE_APPS_SCRIPT") && ROOM_CODE.trim() && !ROOM_CODE.includes("PASTE_ROOM_CODE");
+      $("#calendarStatus").textContent=configured?"Đang dùng dữ liệu chung":"Chưa cấu hình";
+      $("#calendarStatus").className="tag "+(configured?"ok":"warn");
     }
-
-    $("#addMemberBtn").addEventListener("click", addMember);
-    $("#memberName").addEventListener("keydown", event => {
-      if (event.key === "Enter") addMember();
-    });
-
-    $("#nextWeekBtn").addEventListener("click", () => {
-      $("#weekStart").value = toLocalDateInputValue(getNextMonday());
-      selectedScheduleId = null;
-      renderCurrentSchedule();
-      renderManualEditor();
-      renderHistory();
-      showToast("Đã chọn tuần sau.");
-      aiBotSay(explainNextWeek());
-    });
-
-    $("#weekStart").addEventListener("change", () => {
-      const matched = state.schedules.find(schedule => schedule.weekStart === $("#weekStart").value);
-      selectedScheduleId = matched ? matched.id : null;
-      renderCurrentSchedule();
-      renderManualEditor();
-      renderHistory();
-    });
-
-    $("#generateBtn").addEventListener("click", generateSchedule);
-    $("#saveManualBtn").addEventListener("click", saveManualSchedule);
-    $("#copyBtn").addEventListener("click", copyCurrentSchedule);
-    $("#exportTxtBtn").addEventListener("click", exportTxt);
-    $("#exportPdfBtn").addEventListener("click", exportPdf);
-    $("#deleteCurrentBtn").addEventListener("click", deleteCurrentSchedule);
-    $("#markAllPresentBtn").addEventListener("click", () => markAll(true));
-    $("#markAllAbsentBtn").addEventListener("click", () => markAll(false));
-    $("#clearBtn").addEventListener("click", clearAllData);
-    $("#exportDataBtn").addEventListener("click", exportData);
-    $("#importDataBtn").addEventListener("click", () => $("#importFile").click());
-    $("#importFile").addEventListener("change", event => {
-      importData(event.target.files[0]);
-      event.target.value = "";
-    });
-
-    $("#aiAnalyzeBtn").addEventListener("click", () => aiBotSay(buildAutoSuggestion()));
-    $("#aiSendBtn").addEventListener("click", () => sendAIMessage());
-    $("#aiInput").addEventListener("keydown", event => {
-      if (event.key === "Enter") sendAIMessage();
-    });
-
-    document.querySelectorAll("[data-ai]").forEach(button => {
-      button.addEventListener("click", () => sendAIMessage(button.dataset.ai));
-    });
-
-    $("#weekStart").value = toLocalDateInputValue(getNextMonday());
+    function render(){initAttendance();renderStats();renderMembers();renderSchedule();renderManual();renderHistory();renderWeights();renderFair();renderToday();renderDays();renderSettings()}
+    $("#addMember").onclick=addMember;$("#memberName").onkeydown=e=>{if(e.key==="Enter")addMember()};
+    $("#allPresent").onclick=()=>markAll(true);$("#allAbsent").onclick=()=>markAll(false);
+    $("#nextWeek").onclick=()=>{$("#weekStart").value=dateVal(nextMon());selected=null;renderSchedule();renderManual();renderHistory();toast("Đã chọn tuần sau.")};
+    $("#weekStart").onchange=()=>{let m=state.schedules.find(s=>s.weekStart===$("#weekStart").value);selected=m?m.id:null;renderSchedule();renderManual();renderHistory();renderToday()};
+    $("#best").onclick=best;$("#suggest").onclick=()=>{let p=proposals();if(p?.length){$("#aiBox").textContent=`Phương án tốt nhất: ${p[0].label}\nĐiểm đánh giá: ${p[0].score.toFixed(1)}\nBấm “Tạo lịch” để áp dụng.`;toast("Đã phân tích phương án.")}};
+    $("#saveManual").onclick=saveManual;$("#deleteWeek").onclick=deleteWeek;$("#remindNow").onclick=remindNow;$("#analyze").onclick=analyze;
+    $("#copySchedule").onclick=()=>copy(prettyText(current()),"Đã copy lịch.");$("#png").onclick=exportPng;$("#pdf").onclick=()=>current()?window.print():toast("Chưa có lịch.");
+    $("#exportData").onclick=exportData;$("#importData").onclick=()=>$("#importFile").click();$("#importFile").onchange=e=>{importData(e.target.files[0]);e.target.value=""};$("#clearData").onclick=clearData;
+    $("#resetWeights").onclick=()=>{state.settings.weights=defaults();save();toast("Đã khôi phục điểm mặc định.")};
+    $("#saveCalendar").onclick=()=>{updateSettings();saveCalendar(true)};$("#openCalendar").onclick=()=>{updateSettings();openCalendarTemplate()};
+    $("#reminderTime").onchange=updateSettings;$("#calendarTitle").onchange=updateSettings;$("#autoSaveCalendar").onchange=updateSettings;
+    $("#closeModal").onclick=()=>$("#reminderModal").classList.remove("show");$("#copyReminder").onclick=()=>copy(lastReminderText,"Đã copy nhắc lịch.");$("#sendNow").onclick=()=>saveCalendar(true);
+    readQueryConfig();
+    $("#weekStart").value=dateVal(nextMon());
     render();
-    aiBotSay("Mình là trợ lý trực nhật. Mình có thể phân tích công bằng, gợi ý đổi người, giải thích vì sao chia như vậy, và tư vấn khi thiếu người.");
+    setTimeout(loadShared,300)
   </script>
 </body>
 </html>
