@@ -186,9 +186,29 @@
       body{background:#fff}.topbar,.bill-sidebar,.range-panel,.legend,.result-actions,.closed-banner,.clean-sidebar,.clean-actions,details.simple{display:none!important}.shell{width:100%;padding:0}.card{box-shadow:none;border:0;background:#fff}.billing-layout,.two-col{display:block}.calendar-card{display:none}.billing-result{display:block!important;margin:0}.billing-result .card-head{border-bottom:1px solid #ddd}.page{display:none!important}.page.print-target{display:block!important}th,td{padding:10px}
     }
 
+    /* Secure account and role management */
+    .account-fab{position:fixed;right:18px;top:18px;z-index:75;display:none;align-items:center;gap:9px;max-width:min(330px,calc(100vw - 36px));padding:9px 13px;border-radius:999px;background:rgba(255,255,255,.92);backdrop-filter:blur(16px);border:1px solid var(--line);box-shadow:0 12px 30px rgba(15,23,42,.12);color:var(--text);font-weight:850}
+    .account-fab.show{display:flex}.account-fab img{width:28px;height:28px;border-radius:50%;object-fit:cover}.account-fab .account-icon{width:28px;height:28px;border-radius:50%;display:grid;place-items:center;background:var(--blue-soft)}.account-fab small{display:block;color:var(--muted);font-size:10px;font-weight:750}.account-fab span{min-width:0;text-align:left}.account-fab b{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px}
+    .auth-gate{position:fixed;inset:0;z-index:150;display:flex;align-items:center;justify-content:center;padding:18px;background:radial-gradient(circle at top left,rgba(37,99,235,.18),transparent 34%),radial-gradient(circle at bottom right,rgba(124,58,237,.15),transparent 30%),rgba(244,247,252,.94);backdrop-filter:blur(18px)}.auth-gate.hidden{display:none}.auth-card{width:min(520px,100%);padding:28px;border-radius:28px;background:#fff;border:1px solid var(--line);box-shadow:0 28px 90px rgba(15,23,42,.22)}.auth-logo{width:68px;height:68px;border-radius:22px;display:grid;place-items:center;margin-bottom:18px;background:linear-gradient(135deg,var(--blue),var(--purple));color:#fff;font-size:31px}.auth-card h2{margin:0;font-size:26px;letter-spacing:-.6px}.auth-card p{color:var(--muted);line-height:1.6}.auth-actions{display:grid;gap:10px;margin-top:18px}.google-btn{background:#fff;border:1px solid var(--line);color:var(--text)}.google-mark{width:24px;height:24px;border-radius:50%;display:grid;place-items:center;background:#fff;border:1px solid var(--line);font-weight:950;color:#4285f4}.auth-user{display:flex;gap:12px;align-items:center;padding:12px;border-radius:17px;background:#f8fafc;border:1px solid var(--line)}.auth-user img{width:44px;height:44px;border-radius:50%;object-fit:cover}.auth-user b{display:block}.auth-user small{color:var(--muted)}
+    .role-badge{display:inline-flex;align-items:center;gap:6px;padding:7px 10px;border-radius:999px;font-size:11px;font-weight:900}.role-badge.admin{background:var(--purple-soft);color:var(--purple)}.role-badge.member{background:var(--green-soft);color:var(--green)}.lock-note{display:inline-flex;align-items:center;gap:6px;color:var(--muted);font-size:11px;font-weight:800}.locked-control{opacity:.48;cursor:not-allowed!important;filter:grayscale(.15)}
+    .access-modal-card{width:min(900px,100%)}.access-section{padding:18px 20px;border-bottom:1px solid var(--line)}.access-section:last-child{border-bottom:0}.access-section h4{margin:0 0 12px;font-size:15px}.access-grid{display:grid;gap:10px}.access-row{display:grid;grid-template-columns:minmax(170px,1.2fr) minmax(160px,1fr) 130px auto;gap:9px;align-items:center;padding:12px;border:1px solid var(--line);border-radius:16px;background:#fbfcff}.access-row .identity b{display:block}.access-row .identity small{display:block;color:var(--muted);margin-top:3px;overflow-wrap:anywhere}.access-actions{display:flex;gap:7px;justify-content:flex-end}.audit-list{display:grid;gap:8px;max-height:270px;overflow:auto}.audit-item{padding:11px 12px;border:1px solid var(--line);border-radius:14px;background:#fbfcff}.audit-item b{display:block;font-size:13px}.audit-item small{display:block;color:var(--muted);margin-top:4px;line-height:1.45}.self-highlight{box-shadow:0 0 0 3px rgba(37,99,235,.08);border-color:#bfdbfe}.toast{display:flex;align-items:center;gap:10px}.toast-action{border:0;border-radius:999px;padding:6px 10px;background:#fff;color:#172033;font-size:12px;font-weight:900;white-space:nowrap}.admin-only.role-hidden{display:none!important}
+    @media(max-width:720px){.account-fab{right:10px;top:10px}.access-row{grid-template-columns:1fr}.access-actions{justify-content:stretch}.access-actions .btn{flex:1}.auth-card{padding:22px;border-radius:22px}}
+
   </style>
 </head>
 <body>
+
+  <button class="account-fab" id="accountButton" onclick="openAccountPanel()" aria-label="Tài khoản và phân quyền">
+    <span class="account-icon" id="accountAvatar">🔐</span>
+    <span><b id="accountName">Tài khoản</b><small id="accountRole">Chưa đăng nhập</small></span>
+  </button>
+
+  <div class="auth-gate" id="authGate">
+    <div class="auth-card">
+      <div class="auth-logo">🏠</div>
+      <div id="authGateContent"><h2>Đang khởi động bảo mật…</h2><p>Hệ thống đang kiểm tra tài khoản và quyền truy cập phòng P708.</p></div>
+    </div>
+  </div>
   <section class="page home-page active" id="page-home" data-page="home">
     <main class="shell">
       <div class="hero">
@@ -231,17 +251,17 @@
       </header>
       <div class="two-col">
         <aside class="card sticky clean-sidebar">
-          <div class="card-head"><div><h2>Thành viên</h2><p>Bật xanh nếu có mặt tuần này.</p></div><button class="btn small soft" onclick="setAllPresence(true)">Có mặt hết</button></div>
+          <div class="card-head"><div><h2>Thành viên</h2><p>Bật xanh nếu có mặt tuần này.</p></div><button class="btn small soft admin-only" onclick="setAllPresence(true)">Có mặt hết</button></div>
           <div class="card-body">
-            <div class="add-row"><input id="cleanMemberName" placeholder="Tên thành viên"><button class="btn primary" onclick="addMember()">Thêm</button></div>
+            <div class="add-row admin-only"><input id="cleanMemberName" placeholder="Tên thành viên"><button class="btn primary" onclick="addMember()">Thêm</button></div>
             <div class="member-list" id="cleanMemberList"></div>
           </div>
         </aside>
         <section class="card">
           <div class="card-head"><div><h2>Phân công tuần</h2><p>Hệ thống ưu tiên cân bằng tổng điểm công việc.</p></div></div>
           <div class="card-body">
-            <div class="clean-controls clean-actions"><div class="field"><label>Tuần bắt đầu</label><input id="cleanWeek" type="date"></div><button class="btn primary" onclick="createSchedule()">✨ Tạo lịch công bằng</button></div>
-            <div class="action-strip clean-actions"><button class="btn soft" onclick="openManual()">Chỉnh phân công</button><button class="btn danger" onclick="deleteCurrentSchedule()">Xóa tuần này</button></div>
+            <div class="clean-controls clean-actions"><div class="field"><label>Tuần bắt đầu</label><input id="cleanWeek" type="date"></div><button class="btn primary admin-only" onclick="createSchedule()">✨ Tạo lịch công bằng</button></div>
+            <div class="action-strip clean-actions admin-only"><button class="btn soft" onclick="openManual()">Chỉnh phân công</button><button class="btn danger" onclick="deleteCurrentSchedule()">Xóa tuần này</button></div>
             <div id="cleanScheduleBox"></div>
             <details class="simple clean-actions"><summary>Lịch sử các tuần ▾</summary><div class="history-list" id="cleanHistory"></div></details>
           </div>
@@ -271,7 +291,7 @@
 
           <section class="card step-card" style="margin-top:14px">
             <div class="step-label"><span class="step-number">2</span><h3>Chọn người</h3></div>
-            <div class="people-head"><button class="btn small soft" style="flex:1" onclick="syncBillingMembers()">Đồng bộ thành viên</button><button class="btn small primary" onclick="openAddBillingPerson()">+ Thêm</button></div>
+            <div class="people-head admin-only"><button class="btn small soft" style="flex:1" onclick="syncBillingMembers()">Đồng bộ thành viên</button><button class="btn small primary" onclick="openAddBillingPerson()">+ Thêm</button></div>
             <div class="people-list" id="billPeopleList" style="margin-top:12px"></div>
           </section>
         </aside>
@@ -288,13 +308,13 @@
                 <button class="btn" onclick="applyStayRange(false)">Đánh dấu vắng</button>
               </div>
               <p class="range-note">Có thể thêm nhiều lượt ở trong tháng. Ví dụ: đánh dấu Thứ 4–Thứ 6, sau đó tiếp tục đánh dấu từ Thứ 7 cho lượt kế tiếp. Ngày về không còn ở thì chọn ngày trước đó làm “ngày cuối còn ở”.</p>
-              <div class="quick-actions"><button class="btn small soft" onclick="presetStay('all')">Ở cả tháng</button><button class="btn small soft" onclick="presetStay('weekdays')">Chỉ Thứ 2–Thứ 6</button><button class="btn small" onclick="presetStay('none')">Bỏ chọn hết</button><button class="btn small danger" onclick="removeActiveBillingPerson()">Xóa người này</button></div>
+              <div class="quick-actions"><button class="btn small soft" onclick="presetStay('all')">Ở cả tháng</button><button class="btn small soft" onclick="presetStay('weekdays')">Chỉ Thứ 2–Thứ 6</button><button class="btn small" onclick="presetStay('none')">Bỏ chọn hết</button><button class="btn small danger admin-only" onclick="removeActiveBillingPerson()">Xóa người này</button></div>
             </div>
             <div class="calendar-wrap"><div class="weekday-grid"><div class="weekday">T2</div><div class="weekday">T3</div><div class="weekday">T4</div><div class="weekday">T5</div><div class="weekday">T6</div><div class="weekday weekend">T7</div><div class="weekday weekend">CN</div></div><div class="day-grid" id="billCalendar"></div><div class="person-summary" id="billPersonSummary"><b>Chưa chọn người</b><span>0 ngày</span></div></div>
           </article>
 
           <article class="card billing-result" id="billingResultCard">
-            <div class="card-head"><div><h2>3. Bảng chốt tiền</h2><p>Tiền từng người = số ngày ở × đơn giá ngày-người.</p></div><div class="result-actions"><button class="btn small" onclick="downloadBillingCsv()">Tải CSV</button><button class="btn small" id="billCloseButton" onclick="toggleBillClosed()">🔒 Chốt sổ</button></div></div>
+            <div class="card-head"><div><h2>3. Bảng chốt tiền</h2><p>Tiền từng người = số ngày ở × đơn giá ngày-người.</p></div><div class="result-actions"><button class="btn small" onclick="downloadBillingCsv()">Tải CSV</button><button class="btn small admin-only" id="billCloseButton" onclick="toggleBillClosed()">🔒 Chốt sổ</button></div></div>
             <div class="card-body" style="padding:0;overflow:auto"><div id="billingTable"></div></div>
           </article>
         </section>
@@ -315,6 +335,15 @@
 
   <div class="modal" id="manualModal">
     <div class="modal-card"><div class="card-head"><div><h3>Chỉnh phân công</h3><p>Chọn người phụ trách cho từng việc.</p></div><button class="icon-btn" onclick="closeModal('manualModal')">✕</button></div><div class="modal-grid" id="manualFields"></div><div class="modal-actions"><button class="btn" onclick="closeModal('manualModal')">Hủy</button><button class="btn primary" onclick="saveManualSchedule()">Lưu thay đổi</button></div></div>
+  </div>
+
+
+  <div class="modal" id="accessModal">
+    <div class="modal-card access-modal-card">
+      <div class="card-head"><div><h3>Tài khoản & phân quyền</h3><p>Mỗi người chỉ sửa dữ liệu của chính mình. Trưởng phòng quản lý toàn bộ.</p></div><button class="icon-btn" onclick="closeModal('accessModal')">✕</button></div>
+      <div id="accessModalBody"></div>
+      <div class="modal-actions"><button class="btn" onclick="secureSignOut()">Đăng xuất</button><button class="btn primary" onclick="closeModal('accessModal')">Đóng</button></div>
+    </div>
   </div>
 
   <div class="cloud-overlay" id="cloudOverlay" aria-hidden="true">
@@ -361,6 +390,8 @@
   let state=loadState(),selectedScheduleId=null,activeBillPersonId=null,saveTimer=null,syncTimer=null;
   let syncInfo={ready:false,loading:false,saving:false,verifying:false,dirty:false,pendingSave:false,lastFingerprint:"",lastCloudAt:null,lastLocalEditAt:0,saveAttempts:0,lastError:""};
   let realtimeEngine=null;
+  let authSession={status:"loading",user:null,access:null,request:null,adminExists:false};
+  let accessRequests=[],accessAccounts=[],auditLogs=[];
   const roomChannel="BroadcastChannel" in window?new BroadcastChannel(`p708-${ROOM_CODE}`):null;
 
   function todayMonth(){const d=new Date();return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}`}
@@ -371,7 +402,7 @@
   function money(v){return new Intl.NumberFormat("vi-VN").format(Math.round(Number(v)||0))+" đ"}
   function monthLabel(v){if(!/^\d{4}-\d{2}$/.test(v||""))return v;const [y,m]=v.split("-");return `Tháng ${Number(m)}/${y}`}
   function monthDays(v){const [y,m]=v.split("-").map(Number);return new Date(y,m,0).getDate()}
-  function toast(msg){const el=$("#toast");if(!el)return;el.textContent=msg;el.classList.add("show");clearTimeout(toast.t);toast.t=setTimeout(()=>el.classList.remove("show"),2100)}
+  function toast(msg,options={}){const el=$("#toast");if(!el)return;el.innerHTML="";const span=document.createElement("span");span.textContent=msg;el.appendChild(span);if(options.actionLabel&&typeof options.onAction==="function"){const btn=document.createElement("button");btn.className="toast-action";btn.textContent=options.actionLabel;btn.onclick=()=>{clearTimeout(toast.t);el.classList.remove("show");options.onAction()};el.appendChild(btn)}el.classList.add("show");clearTimeout(toast.t);toast.t=setTimeout(()=>el.classList.remove("show"),options.duration||2600)}
   function nowIso(){return new Date().toISOString()}
   function deepClone(v){return JSON.parse(JSON.stringify(v??null))}
   function defaultSyncMeta(){return {version:SYNC_SCHEMA_VERSION,presenceUpdatedAt:{},deletedMembers:{},deletedSchedules:{},deletedBillingPeople:{},lastWriteId:""}}
@@ -565,6 +596,28 @@
 
   function hasCachedData(){return !!(state.members?.length||state.schedules?.length||state.billing?.months?.length)}
 
+  function isAdmin(){return authSession.access?.active&&authSession.access?.role==="admin"}
+  function myMemberId(){return authSession.access?.memberId||null}
+  function myMember(){return state.members.find(m=>m.id===myMemberId())||null}
+  function canEditMember(id){return isAdmin()||Boolean(myMemberId()&&myMemberId()===id)}
+  function canEditBillingPerson(person){return Boolean(person&&(isAdmin()||(myMemberId()&&person.memberId===myMemberId())))}
+  function requireAdmin(){if(isAdmin())return true;toast("Chỉ trưởng phòng được thực hiện thao tác này");return false}
+  function memberOptions(selected=""){return `<option value="">— Chưa liên kết —</option>${state.members.map(m=>`<option value="${m.id}" ${m.id===selected?"selected":""}>${esc(m.name)}</option>`).join("")}`}
+  function safeTime(value){try{if(value?.toDate)return value.toDate().toLocaleString("vi-VN");if(value)return new Date(value).toLocaleString("vi-VN")}catch{}return "Vừa xong"}
+  function renderPermissionUI(){document.querySelectorAll(".admin-only").forEach(el=>el.classList.toggle("role-hidden",!isAdmin()));const e=$("#billElectricity"),w=$("#billWater");if(e)e.disabled=!isAdmin();if(w)w.disabled=!isAdmin()}
+  function renderAccountButton(){const btn=$("#accountButton");if(!btn)return;const active=authSession.status==="active";btn.classList.toggle("show",Boolean(authSession.user));$("#accountName").textContent=authSession.access?.displayName||authSession.user?.displayName||authSession.user?.email||"Tài khoản";$("#accountRole").textContent=active?(isAdmin()?"Trưởng phòng · Quản trị":"Thành viên · Chỉ sửa dữ liệu cá nhân"):(authSession.status==="pending"?"Đang chờ duyệt":"Chưa được cấp quyền");const avatar=$("#accountAvatar");if(authSession.user?.photoURL)avatar.innerHTML=`<img src="${esc(authSession.user.photoURL)}" alt="">`;else avatar.textContent=isAdmin()?"👑":"👤"}
+  function renderAuthGate(){const gate=$("#authGate"),box=$("#authGateContent");if(!gate||!box)return;renderAccountButton();if(authSession.status==="active"){gate.classList.add("hidden");return}gate.classList.remove("hidden");const u=authSession.user;if(authSession.status==="loading"||authSession.status==="checking"){box.innerHTML=`<h2>Đang kiểm tra quyền…</h2><p>Vui lòng chờ trong giây lát.</p>`;return}if(!u){box.innerHTML=`<h2>Đăng nhập để vào phòng P708</h2><p>Mỗi tài khoản Google được gắn với đúng một thành viên. Bạn sẽ không thể chỉnh nhầm dữ liệu của người khác.</p><div class="auth-actions"><button class="btn google-btn" onclick="secureGoogleLogin()"><span class="google-mark">G</span> Đăng nhập bằng Google</button></div>`;return}const userCard=`<div class="auth-user">${u.photoURL?`<img src="${esc(u.photoURL)}" alt="">`:`<span class="avatar">${esc((u.displayName||u.email||"?").charAt(0))}</span>`}<div><b>${esc(u.displayName||"Tài khoản Google")}</b><small>${esc(u.email||"")}</small></div></div>`;if(authSession.status==="pending"){box.innerHTML=`<h2>Đang chờ trưởng phòng duyệt</h2>${userCard}<p>Yêu cầu với tên <b>${esc(authSession.request?.displayName||"")}</b> đã được gửi. Sau khi duyệt, trang sẽ tự mở.</p><div class="auth-actions"><button class="btn danger" onclick="cancelAccessRequest()">Hủy yêu cầu</button><button class="btn" onclick="secureSignOut()">Đăng xuất</button></div>`;return}if(!authSession.adminExists){box.innerHTML=`<h2>Thiết lập trưởng phòng đầu tiên</h2>${userCard}<p>Phòng chưa có tài khoản quản trị. Chỉ người quản lý phòng nên bấm nút dưới đây trước khi chia link cho mọi người.</p><div class="field"><label>Tên hiển thị</label><input id="claimAdminName" value="${esc(u.displayName||"")}" placeholder="Tên trưởng phòng"></div><div class="auth-actions"><button class="btn primary" onclick="claimFirstAdmin()">👑 Nhận quyền trưởng phòng</button><button class="btn" onclick="secureSignOut()">Đăng xuất</button></div>`;return}box.innerHTML=`<h2>Gửi yêu cầu tham gia phòng</h2>${userCard}<p>Nhập đúng tên đang có trong danh sách phòng. Trưởng phòng sẽ liên kết tài khoản này với tên của bạn.</p><div class="field"><label>Tên trong phòng</label><input id="requestDisplayName" value="${esc(u.displayName||"")}" placeholder="Ví dụ: Nguyễn Phát"></div><div class="auth-actions"><button class="btn primary" onclick="sendAccessRequest()">Gửi yêu cầu</button><button class="btn" onclick="secureSignOut()">Đăng xuất</button></div>`}
+  function renderAccessModal(){const body=$("#accessModalBody");if(!body)return;const u=authSession.user,a=authSession.access;let html=`<section class="access-section"><h4>Tài khoản hiện tại</h4><div class="auth-user">${u?.photoURL?`<img src="${esc(u.photoURL)}" alt="">`:`<span class="avatar">${esc((u?.displayName||u?.email||"?").charAt(0))}</span>`}<div><b>${esc(a?.displayName||u?.displayName||"Tài khoản")}</b><small>${esc(u?.email||"")}</small></div><span class="role-badge ${isAdmin()?"admin":"member"}">${isAdmin()?"👑 Trưởng phòng":"👤 Thành viên"}</span></div><p class="range-note">${isAdmin()?"Bạn được thêm/xóa thành viên, tạo lịch, nhập hóa đơn và quản lý quyền.":`Bạn chỉ được chỉnh trạng thái và ngày ở của ${esc(myMember()?.name||"chính mình")}.`}</p></section>`;if(isAdmin()){html+=`<section class="access-section"><h4>Yêu cầu đang chờ (${accessRequests.length})</h4><div class="access-grid">${accessRequests.length?accessRequests.map(r=>`<div class="access-row"><div class="identity"><b>${esc(r.displayName||"Chưa đặt tên")}</b><small>${esc(r.email||"")}</small></div><select id="approve-member-${r.uid}">${memberOptions("")}</select><select id="approve-role-${r.uid}"><option value="member">Thành viên</option><option value="admin">Quản trị viên</option></select><div class="access-actions"><button class="btn small primary" onclick="approveAccess('${r.uid}')">Duyệt</button></div></div>`).join(""):'<div class="empty">Không có yêu cầu mới.</div>'}</div></section>`;html+=`<section class="access-section"><h4>Tài khoản đã cấp quyền (${accessAccounts.length})</h4><div class="access-grid">${accessAccounts.length?accessAccounts.map(x=>`<div class="access-row ${x.uid===u?.uid?"self-highlight":""}"><div class="identity"><b>${esc(x.displayName||"Thành viên")}${x.uid===u?.uid?" · Bạn":""}</b><small>${esc(x.email||x.uid)} · ${x.active===false?"Đã khóa":"Đang hoạt động"}</small></div><select id="access-member-${x.uid}">${memberOptions(x.memberId||"")}</select><select id="access-role-${x.uid}" ${x.uid===u?.uid?"disabled":""}><option value="member" ${x.role!=="admin"?"selected":""}>Thành viên</option><option value="admin" ${x.role==="admin"?"selected":""}>Quản trị viên</option></select><div class="access-actions"><button class="btn small soft" onclick="saveAccess('${x.uid}')">Lưu</button>${x.uid!==u?.uid?`<button class="btn small danger" onclick="revokeAccess('${x.uid}')">Khóa</button>`:""}</div></div>`).join(""):'<div class="empty">Chưa có tài khoản.</div>'}</div></section>`;html+=`<section class="access-section"><h4>Nhật ký thay đổi</h4><div class="audit-list">${auditLogs.length?auditLogs.map(log=>`<div class="audit-item"><b>${esc(log.summary||log.action||"Cập nhật dữ liệu")}</b><small>${esc(log.actorName||log.actorEmail||"Người dùng")} · ${safeTime(log.createdAt)}</small></div>`).join(""):'<div class="empty">Chưa có hoạt động.</div>'}</div></section>`}body.innerHTML=html}
+  function openAccountPanel(){renderAccessModal();$("#accessModal").classList.add("show")}
+  async function secureGoogleLogin(){try{await realtimeEngine?.signInGoogle()}catch(e){toast(e?.message||"Không thể đăng nhập Google")}}
+  async function secureSignOut(){try{closeModal("accessModal");await realtimeEngine?.signOut()}catch(e){toast(e?.message||"Không thể đăng xuất")}}
+  async function claimFirstAdmin(){const name=$("#claimAdminName")?.value?.trim();try{await realtimeEngine?.claimAdmin(name);toast("Đã thiết lập quyền trưởng phòng")}catch(e){toast(e?.message||"Không thể nhận quyền trưởng phòng")}}
+  async function sendAccessRequest(){const name=$("#requestDisplayName")?.value?.trim();try{await realtimeEngine?.requestAccess(name);toast("Đã gửi yêu cầu tham gia")}catch(e){toast(e?.message||"Không thể gửi yêu cầu")}}
+  async function cancelAccessRequest(){try{await realtimeEngine?.cancelAccessRequest();toast("Đã hủy yêu cầu")}catch(e){toast(e?.message||"Không thể hủy yêu cầu")}}
+  async function approveAccess(uid){const memberId=$("#approve-member-"+uid)?.value||"",role=$("#approve-role-"+uid)?.value||"member",req=accessRequests.find(x=>x.uid===uid);if(!memberId&&!confirm("Bạn chưa liên kết tài khoản này với tên thành viên. Vẫn duyệt?"))return;try{await realtimeEngine?.approveRequest({uid,memberId,role,displayName:req?.displayName||""});toast("Đã duyệt tài khoản")}catch(e){toast(e?.message||"Không thể duyệt")}}
+  async function saveAccess(uid){const memberId=$("#access-member-"+uid)?.value||"";let role=$("#access-role-"+uid)?.value||"member";if(uid===authSession.user?.uid&&isAdmin())role="admin";const item=accessAccounts.find(x=>x.uid===uid);try{await realtimeEngine?.updateAccess({uid,memberId,role,displayName:item?.displayName||"",active:true});toast("Đã cập nhật quyền")}catch(e){toast(e?.message||"Không thể cập nhật quyền")}}
+  async function revokeAccess(uid){const item=accessAccounts.find(x=>x.uid===uid);if(!confirm(`Khóa quyền của ${item?.displayName||item?.email||"tài khoản này"}?`))return;try{await realtimeEngine?.revokeAccess(uid);toast("Đã khóa quyền truy cập")}catch(e){toast(e?.message||"Không thể khóa quyền")}}
+
   function setSyncMode(mode,text){
     ["#cleanSyncButton","#billSyncButton"].forEach(id=>{
       const e=$(id);if(!e)return;
@@ -576,18 +629,12 @@
     setSyncText(text);
   }
 
-  function persist(message=""){
+  function persist(message="",audit={},undoSnapshot=null){
     normalize();markStateChanged();saveCache();renderAll();announceLocalChange();
     const nextShape=toSyncShape(state);
-    if(realtimeEngine){
-      realtimeEngine.recordShape(nextShape).catch(error=>{
-        syncInfo.lastError=String(error?.message||error);
-        setSyncMode("offline","Đã lưu trên máy — sẽ thử lại");
-      });
-    }
-    if(message)toast(message);
+    if(realtimeEngine){realtimeEngine.recordShape(nextShape,{action:audit.action||"UPDATE_DATA",summary:audit.summary||message||"Cập nhật dữ liệu",targetMemberId:audit.targetMemberId||null}).catch(error=>{syncInfo.lastError=String(error?.message||error);setSyncMode("offline","Không thể lưu thay đổi");toast(error?.message||"Bạn không có quyền thực hiện thay đổi này");void realtimeEngine.forceSync()})}
+    if(message){if(undoSnapshot)toast(message,{actionLabel:"Hoàn tác",duration:8500,onAction:()=>{state=normalizeState(deepClone(undoSnapshot));persist("Đã hoàn tác",{action:"UNDO",summary:`Hoàn tác: ${message}`})}});else toast(message)}
   }
-
   async function saveRemote(show=true){
     if(!realtimeEngine){setSyncMode("offline","Chưa cấu hình Firestore");return false}
     const ok=await realtimeEngine.flush();
@@ -613,44 +660,18 @@
   async function startCloudMode(){
     const overlay=$("#cloudOverlay");overlay?.classList.add("show");overlay?.setAttribute("aria-hidden","false");
     try{
-      const {createP708SyncEngine}=await import("./p708-sync-engine.js");
-      realtimeEngine=createP708SyncEngine({
-        firebaseConfig:FIREBASE_CONFIG,
-        roomCode:ROOM_CODE,
-        deviceId:DEVICE_ID,
-        initialShape:toSyncShape(state),
-        restoreUnsynced:!!state._pendingSync,
-        hasMeaningfulLocalData:hasCachedData(),
-        onShape:(shape,meta)=>{
-          state=fromSyncShape(shape);
-          state._pendingSync=meta.pending>0;
-          syncInfo.dirty=meta.pending>0;
-          syncInfo.lastCloudAt=new Date();
-          saveCache();
-          if(selectedScheduleId&&!state.schedules.some(s=>s.id===selectedScheduleId))selectedScheduleId=state.schedules.at(-1)?.id||null;
-          const bill=currentBill(false);if(activeBillPersonId&&!bill?.people?.some(p=>p.id===activeBillPersonId))activeBillPersonId=bill?.people?.[0]?.id||null;
-          renderAll();
-        },
-        onStatus:status=>{
-          syncInfo.lastError=status.error?String(status.error?.message||status.error):"";
-          syncInfo.dirty=status.pending>0;
-          state._pendingSync=status.pending>0;
-          if(status.mode==="online")syncInfo.lastCloudAt=new Date();
-          setSyncMode(status.mode,status.text);
-          saveCache();
-        }
+      const {createP708SecureEngine}=await import("./p708-secure-sync-engine.js");
+      realtimeEngine=createP708SecureEngine({
+        firebaseConfig:FIREBASE_CONFIG,roomCode:ROOM_CODE,deviceId:DEVICE_ID,initialShape:toSyncShape(state),
+        onShape:(shape,meta)=>{state=fromSyncShape(shape);state._pendingSync=meta.pending>0;syncInfo.dirty=meta.pending>0;syncInfo.lastCloudAt=new Date();saveCache();if(selectedScheduleId&&!state.schedules.some(s=>s.id===selectedScheduleId))selectedScheduleId=state.schedules.at(-1)?.id||null;const bill=currentBill(false);if(authSession.status==="active"&&!isAdmin()&&myMemberId()){const own=bill?.people?.find(p=>p.memberId===myMemberId());if(own)activeBillPersonId=own.id}else if(activeBillPersonId&&!bill?.people?.some(p=>p.id===activeBillPersonId))activeBillPersonId=bill?.people?.[0]?.id||null;renderAll();renderAuthGate()},
+        onStatus:status=>{syncInfo.lastError=status.error?String(status.error?.message||status.error):"";syncInfo.dirty=status.pending>0;state._pendingSync=status.pending>0;if(status.mode==="online")syncInfo.lastCloudAt=new Date();setSyncMode(status.mode,status.text);saveCache()},
+        onSession:session=>{authSession={...authSession,...session};renderAuthGate();renderAll()},
+        onAdminData:data=>{if(data.requests!==undefined)accessRequests=data.requests;if(data.accesses!==undefined)accessAccounts=data.accesses;if(data.logs!==undefined)auditLogs=data.logs;renderAccessModal()}
       });
-      await realtimeEngine.start();
-      syncInfo.ready=true;
-    }catch(error){
-      syncInfo.lastError=String(error?.message||error);
-      setSyncMode("offline",error?.message||"Không thể khởi động đồng bộ");
-      toast("Cần điền FIREBASE_CONFIG trước khi dùng đồng bộ real-time");
-    }finally{
-      overlay?.classList.remove("show");overlay?.setAttribute("aria-hidden","true");
-    }
+      await realtimeEngine.start();syncInfo.ready=true;
+    }catch(error){syncInfo.lastError=String(error?.message||error);setSyncMode("offline",error?.message||"Không thể khởi động bảo mật");authSession={...authSession,status:"error"};renderAuthGate();toast(error?.message||"Không thể khởi động ứng dụng")}
+    finally{overlay?.classList.remove("show");overlay?.setAttribute("aria-hidden","true")}
   }
-
   function setSyncText(t){
     ["#cleanSync","#billSync"].forEach(id=>{const e=$(id);if(e)e.textContent=t});
     const h=$("#homeSyncText");if(h){const bad=t.includes("Mất")||t.includes("Lỗi")||t.includes("Chưa")||t.includes("ngoại tuyến");h.textContent=bad?"Dữ liệu đang giữ an toàn trên máy và sẽ tự đồng bộ lại":`Phòng ${ROOM_CODE} · ${t}${syncInfo.lastCloudAt?` lúc ${syncInfo.lastCloudAt.toLocaleTimeString("vi-VN")}`:""}`}
@@ -664,42 +685,29 @@
   function closeModal(id){$("#"+id).classList.remove("show")}
 
   /* Members & cleaning */
-  function addMember(){const input=$("#cleanMemberName"),name=input.value.trim().replace(/\s+/g," ");if(!name)return toast("Nhập tên thành viên");if(state.members.some(m=>m.name.toLowerCase()===name.toLowerCase()))return toast("Tên này đã có");const t=nowIso(),m={id:uid(),name,createdAt:t,updatedAt:t};state.members.push(m);state.presence[m.id]=true;state._sync.presenceUpdatedAt[m.id]=t;delete state._sync.deletedMembers[m.id];input.value="";persist("Đã thêm thành viên")}
-  function removeMember(id){const m=state.members.find(x=>x.id===id);if(!m||!confirm(`Xóa ${m.name} khỏi danh sách thành viên?`))return;state.members=state.members.filter(x=>x.id!==id);delete state.presence[id];state._sync.deletedMembers[id]=nowIso();persist("Đã xóa thành viên")}
-  function togglePresence(id){state.presence[id]=state.presence[id]===false;touchPresence(id);persist()}
-  function setAllPresence(v){state.members.forEach(m=>{state.presence[m.id]=v;touchPresence(m.id)});persist()}
+  function addMember(){if(!requireAdmin())return;const input=$("#cleanMemberName"),name=input.value.trim().replace(/\s+/g," ");if(!name)return toast("Nhập tên thành viên");if(state.members.some(m=>m.name.toLowerCase()===name.toLowerCase()))return toast("Tên này đã có");const t=nowIso(),m={id:uid(),name,createdAt:t,updatedAt:t};state.members.push(m);state.presence[m.id]=true;state._sync.presenceUpdatedAt[m.id]=t;delete state._sync.deletedMembers[m.id];input.value="";persist("Đã thêm thành viên",{action:"ADD_MEMBER",summary:`Thêm thành viên ${name}`,targetMemberId:m.id})}
+  function removeMember(id){if(!requireAdmin())return;const m=state.members.find(x=>x.id===id);if(!m||!confirm(`Xóa ${m.name} khỏi danh sách thành viên?`))return;state.members=state.members.filter(x=>x.id!==id);delete state.presence[id];state._sync.deletedMembers[id]=nowIso();persist("Đã xóa thành viên",{action:"REMOVE_MEMBER",summary:`Xóa thành viên ${m.name}`,targetMemberId:id})}
+  function togglePresence(id){if(!canEditMember(id))return toast("Bạn chỉ được chỉnh trạng thái của chính mình");const m=state.members.find(x=>x.id===id),before=deepClone(state),next=state.presence[id]===false;if(!next&&!confirm(`Xác nhận đánh dấu ${isAdmin()?m?.name:"bạn"} VẮNG?`))return;state.presence[id]=next;touchPresence(id);persist(next?"Đã đánh dấu có mặt":"Đã đánh dấu vắng",{action:"UPDATE_PRESENCE",summary:`${m?.name||"Thành viên"}: ${next?"Có mặt":"Vắng"}`,targetMemberId:id},before)}
+  function setAllPresence(v){if(!requireAdmin())return;state.members.forEach(m=>{state.presence[m.id]=v;touchPresence(m.id)});persist(v?"Đã đánh dấu tất cả có mặt":"Đã đánh dấu tất cả vắng",{action:"SET_ALL_PRESENCE",summary:v?"Đánh dấu tất cả có mặt":"Đánh dấu tất cả vắng"})}
   function nextMonday(){const d=new Date();d.setHours(0,0,0,0);const day=d.getDay();d.setDate(d.getDate()+(day===0?1:8-day));return d}
   function weekRange(v){const s=parseDate(v),e=addDays(s,6);const f=d=>new Intl.DateTimeFormat("vi-VN",{day:"2-digit",month:"2-digit",year:"numeric"}).format(d);return `${f(s)} – ${f(e)}`}
   function historicalPoints(memberId,beforeWeek="9999-99-99"){return state.schedules.filter(s=>s.weekStart<beforeWeek).reduce((sum,s)=>sum+s.assignments.filter(a=>a.personId===memberId&&!a.cut).reduce((z,a)=>z+(state.settings.weights[a.taskId]||3),0),0)}
-  function createSchedule(){const week=$("#cleanWeek").value;if(!week)return toast("Chọn tuần bắt đầu");const people=state.members.filter(m=>state.presence[m.id]!==false);if(!people.length)return toast("Chưa có thành viên có mặt");let tasks=[...TASKS];const absent=state.members.length-people.length;if(absent===1)tasks=tasks.filter(t=>t.id!=="rac");const loads=Object.fromEntries(people.map(m=>[m.id,{points:historicalPoints(m.id,week),weekPoints:0,count:0}]));const assignments=tasks.slice().sort((a,b)=>b.w-a.w).map(task=>{const chosen=people.slice().sort((a,b)=>(loads[a.id].points+loads[a.id].weekPoints)-(loads[b.id].points+loads[b.id].weekPoints)||loads[a.id].count-loads[b.id].count)[0];loads[chosen.id].weekPoints+=task.w;loads[chosen.id].count++;return {taskId:task.id,task:task.name,personId:chosen.id,personName:chosen.name,completed:false,cut:false}});if(absent===1)assignments.push({taskId:"rac",task:"Vứt rác, bình nước",personId:null,personName:"Tạm cắt",completed:false,cut:true});const old=state.schedules.find(s=>s.weekStart===week);if(old&&!confirm("Tuần này đã có lịch. Ghi đè?"))return;const t=nowIso(),schedule={id:old?.id||uid(),weekStart:week,createdAt:old?.createdAt||t,updatedAt:t,assignments,absentNames:state.members.filter(m=>state.presence[m.id]===false).map(m=>m.name)};const i=state.schedules.findIndex(s=>s.weekStart===week);if(i>=0)state.schedules[i]=schedule;else state.schedules.push(schedule);delete state._sync.deletedSchedules[week];state.schedules.sort((a,b)=>a.weekStart.localeCompare(b.weekStart));selectedScheduleId=schedule.id;persist("Đã tạo lịch công bằng")}
+  function createSchedule(){if(!requireAdmin())return;const week=$("#cleanWeek").value;if(!week)return toast("Chọn tuần bắt đầu");const people=state.members.filter(m=>state.presence[m.id]!==false);if(!people.length)return toast("Chưa có thành viên có mặt");let tasks=[...TASKS];const absent=state.members.length-people.length;if(absent===1)tasks=tasks.filter(t=>t.id!=="rac");const loads=Object.fromEntries(people.map(m=>[m.id,{points:historicalPoints(m.id,week),weekPoints:0,count:0}]));const assignments=tasks.slice().sort((a,b)=>b.w-a.w).map(task=>{const chosen=people.slice().sort((a,b)=>(loads[a.id].points+loads[a.id].weekPoints)-(loads[b.id].points+loads[b.id].weekPoints)||loads[a.id].count-loads[b.id].count)[0];loads[chosen.id].weekPoints+=task.w;loads[chosen.id].count++;return {taskId:task.id,task:task.name,personId:chosen.id,personName:chosen.name,completed:false,cut:false}});if(absent===1)assignments.push({taskId:"rac",task:"Vứt rác, bình nước",personId:null,personName:"Tạm cắt",completed:false,cut:true});const old=state.schedules.find(s=>s.weekStart===week);if(old&&!confirm("Tuần này đã có lịch. Ghi đè?"))return;const t=nowIso(),schedule={id:old?.id||uid(),weekStart:week,createdAt:old?.createdAt||t,updatedAt:t,assignments,absentNames:state.members.filter(m=>state.presence[m.id]===false).map(m=>m.name)};const i=state.schedules.findIndex(s=>s.weekStart===week);if(i>=0)state.schedules[i]=schedule;else state.schedules.push(schedule);delete state._sync.deletedSchedules[week];state.schedules.sort((a,b)=>a.weekStart.localeCompare(b.weekStart));selectedScheduleId=schedule.id;persist("Đã tạo lịch công bằng")}
   function currentSchedule(){if(!selectedScheduleId&&state.schedules.length)selectedScheduleId=state.schedules[state.schedules.length-1].id;return state.schedules.find(s=>s.id===selectedScheduleId)||null}
   function selectSchedule(id){selectedScheduleId=id;const s=currentSchedule();if(s)$("#cleanWeek").value=s.weekStart;renderCleaning()}
-  function toggleTaskDone(i,checked){const s=currentSchedule();if(!s||!s.assignments[i]||s.assignments[i].cut)return;s.assignments[i].completed=Boolean(checked);touchSchedule(s);persist(checked?"Đã đánh dấu hoàn thành":"Đã bỏ đánh dấu hoàn thành")}
-  function deleteCurrentSchedule(){const s=currentSchedule();if(!s)return toast("Chưa có lịch để xóa");if(!confirm("Xóa lịch tuần này?"))return;state._sync.deletedSchedules[s.weekStart]=nowIso();state.schedules=state.schedules.filter(x=>x.id!==s.id);selectedScheduleId=state.schedules.at(-1)?.id||null;persist("Đã xóa lịch")}
-  function openManual(){const s=currentSchedule();if(!s)return toast("Hãy tạo lịch trước");$("#manualFields").innerHTML=TASKS.map(task=>{const a=s.assignments.find(x=>x.taskId===task.id);return `<div class="field"><label>${task.emoji} ${esc(task.name)}</label><select data-manual-task="${task.id}"><option value="__CUT__" ${a?.cut?"selected":""}>Tạm cắt</option>${state.members.map(m=>`<option value="${m.id}" ${a?.personId===m.id?"selected":""}>${esc(m.name)}</option>`).join("")}</select></div>`}).join("");$("#manualModal").classList.add("show")}
-  function saveManualSchedule(){const s=currentSchedule();if(!s)return;const assignments=TASKS.map(task=>{const v=document.querySelector(`[data-manual-task="${task.id}"]`).value;if(v==="__CUT__")return {taskId:task.id,task:task.name,personId:null,personName:"Tạm cắt",completed:false,cut:true};const m=state.members.find(x=>x.id===v);return {taskId:task.id,task:task.name,personId:m?.id||null,personName:m?.name||"Không rõ",completed:false,cut:!m}});s.assignments=assignments;touchSchedule(s);closeModal("manualModal");persist("Đã lưu phân công")}
+  function toggleTaskDone(i,checked){if(!requireAdmin())return;const s=currentSchedule();if(!s||!s.assignments[i]||s.assignments[i].cut)return;s.assignments[i].completed=Boolean(checked);touchSchedule(s);persist(checked?"Đã đánh dấu hoàn thành":"Đã bỏ đánh dấu hoàn thành",{action:"UPDATE_TASK",summary:`${s.assignments[i].task}: ${checked?"Đã xong":"Chưa xong"}`,targetMemberId:s.assignments[i].personId||null})}
+  function deleteCurrentSchedule(){if(!requireAdmin())return;const s=currentSchedule();if(!s)return toast("Chưa có lịch để xóa");if(!confirm("Xóa lịch tuần này?"))return;state._sync.deletedSchedules[s.weekStart]=nowIso();state.schedules=state.schedules.filter(x=>x.id!==s.id);selectedScheduleId=state.schedules.at(-1)?.id||null;persist("Đã xóa lịch",{action:"DELETE_SCHEDULE",summary:`Xóa lịch tuần ${s.weekStart}`})}
+  function openManual(){if(!requireAdmin())return;const s=currentSchedule();if(!s)return toast("Hãy tạo lịch trước");$("#manualFields").innerHTML=TASKS.map(task=>{const a=s.assignments.find(x=>x.taskId===task.id);return `<div class="field"><label>${task.emoji} ${esc(task.name)}</label><select data-manual-task="${task.id}"><option value="__CUT__" ${a?.cut?"selected":""}>Tạm cắt</option>${state.members.map(m=>`<option value="${m.id}" ${a?.personId===m.id?"selected":""}>${esc(m.name)}</option>`).join("")}</select></div>`}).join("");$("#manualModal").classList.add("show")}
+  function saveManualSchedule(){if(!requireAdmin())return;const s=currentSchedule();if(!s)return;const assignments=TASKS.map(task=>{const v=document.querySelector(`[data-manual-task="${task.id}"]`).value;if(v==="__CUT__")return {taskId:task.id,task:task.name,personId:null,personName:"Tạm cắt",completed:false,cut:true};const m=state.members.find(x=>x.id===v);return {taskId:task.id,task:task.name,personId:m?.id||null,personName:m?.name||"Không rõ",completed:false,cut:!m}});s.assignments=assignments;touchSchedule(s);closeModal("manualModal");persist("Đã lưu phân công",{action:"UPDATE_SCHEDULE",summary:"Chỉnh phân công công việc"})}
   function scheduleText(){const s=currentSchedule();if(!s)return "";return [`📌 LỊCH TRỰC NHẬT`, `🗓️ ${weekRange(s.weekStart)}`,s.absentNames?.length?`🚫 Vắng: ${s.absentNames.join(", ")}`:"✅ Không có người vắng","",...s.assignments.map(a=>`${TASKS.find(t=>t.id===a.taskId)?.emoji||"•"} ${a.task}: ${a.personName}${a.completed?" ✅":""}`)].join("\n")}
   function copyText(text,msg){if(!text)return toast("Không có nội dung");navigator.clipboard?.writeText(text).then(()=>toast(msg)).catch(()=>{const t=document.createElement("textarea");t.value=text;document.body.appendChild(t);t.select();document.execCommand("copy");t.remove();toast(msg)})}
   function copySchedule(){copyText(scheduleText(),"Đã copy lịch")}
   function renderCleaning(){
-    normalize();
-    const presentCount=state.members.filter(m=>state.presence[m.id]!==false).length;
-    const absentCount=state.members.length-presentCount;
-    $("#cleanMemberList").innerHTML=state.members.length
-      ? state.members.map(m=>`<div class="member-row"><button class="presence ${state.presence[m.id]===false?"off":""}" onclick="togglePresence('${m.id}')" aria-label="Đổi trạng thái"></button><div><b>${esc(m.name)}</b><small>${state.presence[m.id]===false?"⚪ Vắng":"🟢 Có mặt"}</small></div><button class="btn small danger" onclick="removeMember('${m.id}')">Xóa</button></div>`).join("")
-      : '<div class="empty">Chưa có thành viên.</div>';
-    const s=currentSchedule(),box=$("#cleanScheduleBox");
-    if(!s) box.innerHTML='<div class="empty">Chọn tuần và bấm <b>Tạo lịch công bằng</b>.</div>';
-    else {
-      const doneCount=s.assignments.filter(a=>!a.cut&&a.completed).length;
-      const totalCount=s.assignments.filter(a=>!a.cut).length;
-      box.innerHTML=`<div class="schedule-card"><div class="schedule-title"><div><h3>${weekRange(s.weekStart)}</h3><p>${s.absentNames?.length?`Vắng: ${esc(s.absentNames.join(", "))}`:"Tất cả thành viên có mặt"}</p></div><span class="mini-tag">${doneCount}/${totalCount} đã xong</span></div><div class="meta-strip"><span class="meta-chip">👥 ${presentCount} có mặt</span><span class="meta-chip">🏠 ${absentCount} vắng</span><span class="meta-chip">🧽 ${totalCount} công việc</span></div><div class="table-wrap"><table><thead><tr><th>Công việc</th><th>Phụ trách</th><th>Hoàn thành</th></tr></thead><tbody>${s.assignments.map((a,i)=>`<tr class="${a.completed?"done-row":""}"><td class="task-name" data-label="Công việc">${TASKS.find(t=>t.id===a.taskId)?.emoji||""} ${esc(a.task)}</td><td class="${a.cut?"cut-text":"person-name"}" data-label="Phụ trách">${esc(a.personName)}</td><td data-label="Hoàn thành">${a.cut?"—":`<label class="done-check"><input type="checkbox" ${a.completed?"checked":""} onchange="toggleTaskDone(${i},this.checked)"> ${a.completed?"Đã xong":"Chưa xong"}</label>`}</td></tr>`).join("")}</tbody></table></div></div>`;
-    }
-    $("#cleanHistory").innerHTML=state.schedules.length
-      ? [...state.schedules].reverse().map(x=>`<button class="history-btn ${x.id===selectedScheduleId?"active":""}" onclick="selectSchedule('${x.id}')">${weekRange(x.weekStart)}</button>`).join("")
-      : '<div class="empty">Chưa có lịch sử.</div>';
+    normalize();const presentCount=state.members.filter(m=>state.presence[m.id]!==false).length,absentCount=state.members.length-presentCount;
+    $("#cleanMemberList").innerHTML=state.members.length?state.members.map(m=>{const editable=canEditMember(m.id),mine=myMemberId()===m.id;return `<div class="member-row ${mine?"self-highlight":""}"><button class="presence ${state.presence[m.id]===false?"off":""} ${editable?"":"locked-control"}" onclick="togglePresence('${m.id}')" ${editable?"":"disabled"} aria-label="Đổi trạng thái"></button><div><b>${esc(m.name)} ${mine?'<span class="role-badge member">Bạn</span>':""}</b><small>${state.presence[m.id]===false?"⚪ Vắng":"🟢 Có mặt"} ${editable?"":"· 🔒 Chỉ xem"}</small></div>${isAdmin()?`<button class="btn small danger" onclick="removeMember('${m.id}')">Xóa</button>`:`<span class="lock-note">🔒</span>`}</div>`}).join(""):'<div class="empty">Chưa có thành viên.</div>';
+    const s=currentSchedule(),box=$("#cleanScheduleBox");if(!s)box.innerHTML=`<div class="empty">${isAdmin()?"Chọn tuần và bấm <b>Tạo lịch công bằng</b>.":"Trưởng phòng chưa tạo lịch cho tuần này."}</div>`;else{const doneCount=s.assignments.filter(a=>!a.cut&&a.completed).length,totalCount=s.assignments.filter(a=>!a.cut).length;box.innerHTML=`<div class="schedule-card"><div class="schedule-title"><div><h3>${weekRange(s.weekStart)}</h3><p>${s.absentNames?.length?`Vắng: ${esc(s.absentNames.join(", "))}`:"Tất cả thành viên có mặt"}</p></div><span class="mini-tag">${doneCount}/${totalCount} đã xong</span></div><div class="meta-strip"><span class="meta-chip">👥 ${presentCount} có mặt</span><span class="meta-chip">🏠 ${absentCount} vắng</span><span class="meta-chip">🧽 ${totalCount} công việc</span></div><div class="table-wrap"><table><thead><tr><th>Công việc</th><th>Phụ trách</th><th>Hoàn thành</th></tr></thead><tbody>${s.assignments.map((a,i)=>`<tr class="${a.completed?"done-row":""}"><td class="task-name" data-label="Công việc">${TASKS.find(t=>t.id===a.taskId)?.emoji||""} ${esc(a.task)}</td><td class="${a.cut?"cut-text":"person-name"}" data-label="Phụ trách">${esc(a.personName)}</td><td data-label="Hoàn thành">${a.cut?"—":isAdmin()?`<label class="done-check"><input type="checkbox" ${a.completed?"checked":""} onchange="toggleTaskDone(${i},this.checked)"> ${a.completed?"Đã xong":"Chưa xong"}</label>`:`<span class="done-check locked-control">${a.completed?"✅ Đã xong":"⏳ Chưa xong"}</span>`}</td></tr>`).join("")}</tbody></table></div></div>`}
+    $("#cleanHistory").innerHTML=state.schedules.length?[...state.schedules].reverse().map(x=>`<button class="history-btn ${x.id===selectedScheduleId?"active":""}" onclick="selectSchedule('${x.id}')">${weekRange(x.weekStart)}</button>`).join(""):'<div class="empty">Chưa có lịch sử.</div>';renderPermissionUI()
   }
-
   /* Billing */
   function currentBill(create=false){normalize();const month=state.billing.selectedMonth;let b=state.billing.months.find(x=>x.month===month);return b||null}
   function emptyBill(month=state.billing.selectedMonth||todayMonth()){return {id:`preview-${month}`,month,electricity:0,water:0,closed:false,people:[],updatedAt:"",fieldUpdatedAt:{electricity:"",water:"",closed:""}}}
@@ -708,57 +716,32 @@
   function allocate(total,people,b){total=Math.max(0,Math.round(Number(total)||0));const rows=people.map((p,i)=>({id:p.id,i,days:stayCount(p,b),base:0,frac:0}));const totalDays=rows.reduce((s,r)=>s+r.days,0);if(!totalDays||!total)return Object.fromEntries(rows.map(r=>[r.id,0]));let used=0;rows.forEach(r=>{const exact=total*r.days/totalDays;r.base=Math.floor(exact);r.frac=exact-r.base;used+=r.base});rows.sort((a,z)=>z.frac-a.frac||z.days-a.days||a.i-z.i);for(let k=0;k<total-used;k++)rows[k%rows.length].base++;return Object.fromEntries(rows.map(r=>[r.id,r.base]))}
   function billCalc(source=currentBill(false)||emptyBill()){const b=source,people=b.people||[],totalDays=people.reduce((s,p)=>s+stayCount(p,b),0),electric=allocate(b.electricity,people,b),water=allocate(b.water,people,b);return {b,people,totalDays,electric,water,electricRate:totalDays?b.electricity/totalDays:0,waterRate:totalDays?b.water/totalDays:0}}
   function setBillMonth(v){if(!/^\d{4}-\d{2}$/.test(v||""))return;state.billing.selectedMonth=v;saveLocalUi();const b=currentBill(false);activeBillPersonId=b?.people?.[0]?.id||null;renderHome();renderBilling()}
-  function updateBill(kind,v){const b=ensureCurrentBill();if(b.closed)return toast("Tháng đã chốt sổ");b[kind]=Math.max(0,Math.round(Number(v)||0));touchBillField(b,kind);persist()}
-  function syncBillingMembers(){const b=ensureCurrentBill();if(b.closed)return toast("Tháng đã chốt sổ");const n=monthDays(b.month),all=Object.fromEntries(Array.from({length:n},(_,i)=>[String(i+1),true]));let added=0;state.members.forEach(m=>{if(!b.people.some(p=>p.memberId===m.id||p.name.toLowerCase()===m.name.toLowerCase())){const t=nowIso(),p={id:uid(),memberId:m.id,name:m.name,days:{...all},updatedAt:t,dayUpdatedAt:Object.fromEntries(Object.keys(all).map(d=>[d,t]))};b.people.push(p);delete state._sync.deletedBillingPeople[b.month]?.[billPersonKey(p)];added++}});b.updatedAt=nowIso();activeBillPersonId=activeBillPersonId||b.people[0]?.id||null;persist(added?`Đã thêm ${added} thành viên`:"Danh sách đã đầy đủ")}
-  function openAddBillingPerson(){$("#billNewPersonName").value="";$("#memberModal").classList.add("show");setTimeout(()=>$("#billNewPersonName").focus(),80)}
-  function addBillingPerson(){const name=$("#billNewPersonName").value.trim().replace(/\s+/g," "),b=ensureCurrentBill();if(!name)return toast("Nhập tên người");if(b.closed)return toast("Tháng đã chốt sổ");if(b.people.some(p=>p.name.toLowerCase()===name.toLowerCase()))return toast("Tên này đã có");const t=nowIso(),p={id:uid(),memberId:null,name,days:{},updatedAt:t,dayUpdatedAt:{}};b.people.push(p);b.updatedAt=t;delete state._sync.deletedBillingPeople[b.month]?.[billPersonKey(p)];activeBillPersonId=p.id;closeModal("memberModal");persist("Đã thêm người/khách")}
+  function updateBill(kind,v){if(!requireAdmin())return renderBilling();const b=ensureCurrentBill();if(b.closed)return toast("Tháng đã chốt sổ");b[kind]=Math.max(0,Math.round(Number(v)||0));touchBillField(b,kind);persist("Đã cập nhật hóa đơn",{action:"UPDATE_BILL",summary:`Cập nhật ${kind==="electricity"?"tiền điện":"tiền nước"} ${monthLabel(b.month)}`})}
+  function syncBillingMembers(){if(!requireAdmin())return;const b=ensureCurrentBill();if(b.closed)return toast("Tháng đã chốt sổ");const n=monthDays(b.month),all=Object.fromEntries(Array.from({length:n},(_,i)=>[String(i+1),true]));let added=0;state.members.forEach(m=>{if(!b.people.some(p=>p.memberId===m.id||p.name.toLowerCase()===m.name.toLowerCase())){const t=nowIso(),p={id:uid(),memberId:m.id,name:m.name,days:{...all},updatedAt:t,dayUpdatedAt:Object.fromEntries(Object.keys(all).map(d=>[d,t]))};b.people.push(p);delete state._sync.deletedBillingPeople[b.month]?.[billPersonKey(p)];added++}});b.updatedAt=nowIso();activeBillPersonId=activeBillPersonId||b.people[0]?.id||null;persist(added?`Đã thêm ${added} thành viên`:"Danh sách đã đầy đủ",{action:"SYNC_BILL_MEMBERS",summary:`Đồng bộ thành viên vào ${monthLabel(b.month)}`})}
+  function openAddBillingPerson(){if(!requireAdmin())return;$("#billNewPersonName").value="";$("#memberModal").classList.add("show");setTimeout(()=>$("#billNewPersonName").focus(),80)}
+  function addBillingPerson(){if(!requireAdmin())return;const name=$("#billNewPersonName").value.trim().replace(/\s+/g," "),b=ensureCurrentBill();if(!name)return toast("Nhập tên người");if(b.closed)return toast("Tháng đã chốt sổ");if(b.people.some(p=>p.name.toLowerCase()===name.toLowerCase()))return toast("Tên này đã có");const t=nowIso(),p={id:uid(),memberId:null,name,days:{},updatedAt:t,dayUpdatedAt:{}};b.people.push(p);b.updatedAt=t;delete state._sync.deletedBillingPeople[b.month]?.[billPersonKey(p)];activeBillPersonId=p.id;closeModal("memberModal");persist("Đã thêm người/khách",{action:"ADD_BILL_PERSON",summary:`Thêm ${name} vào ${monthLabel(b.month)}`})}
   function activeBillPerson(b=currentBill(false)){if(!b)return null;if(!activeBillPersonId||!b.people.some(p=>p.id===activeBillPersonId))activeBillPersonId=b.people[0]?.id||null;return b.people.find(p=>p.id===activeBillPersonId)||null}
   function selectBillPerson(id){activeBillPersonId=id;renderBilling()}
-  function removeActiveBillingPerson(){const b=currentBill(false),p=activeBillPerson(b);if(!b||!p)return;if(b.closed)return toast("Tháng đã chốt sổ");if(!confirm(`Xóa ${p.name} khỏi tháng này?`))return;state._sync.deletedBillingPeople[b.month]||={};state._sync.deletedBillingPeople[b.month][billPersonKey(p)]=nowIso();b.people=b.people.filter(x=>x.id!==p.id);b.updatedAt=nowIso();activeBillPersonId=b.people[0]?.id||null;persist("Đã xóa khỏi bảng tháng")}
-  function toggleBillDay(day){const b=currentBill(false),p=activeBillPerson(b);if(!p)return toast("Chọn người trước");if(b.closed)return toast("Tháng đã chốt sổ — bấm Mở khóa để chỉnh sửa");p.days[String(day)]=!p.days?.[String(day)];touchBillPerson(b,p,[day]);persist()}
+  function removeActiveBillingPerson(){if(!requireAdmin())return;const b=currentBill(false),p=activeBillPerson(b);if(!b||!p)return;if(b.closed)return toast("Tháng đã chốt sổ");if(!confirm(`Xóa ${p.name} khỏi tháng này?`))return;state._sync.deletedBillingPeople[b.month]||={};state._sync.deletedBillingPeople[b.month][billPersonKey(p)]=nowIso();b.people=b.people.filter(x=>x.id!==p.id);b.updatedAt=nowIso();activeBillPersonId=b.people[0]?.id||null;persist("Đã xóa khỏi bảng tháng",{action:"REMOVE_BILL_PERSON",summary:`Xóa ${p.name} khỏi ${monthLabel(b.month)}`,targetMemberId:p.memberId||null})}
+  function toggleBillDay(day){const b=currentBill(false),p=activeBillPerson(b);if(!p)return toast("Chọn người trước");if(!canEditBillingPerson(p))return toast("Bạn chỉ được chỉnh ngày ở của chính mình");if(b.closed)return toast("Tháng đã chốt sổ");const before=deepClone(state);p.days[String(day)]=!p.days?.[String(day)];touchBillPerson(b,p,[day]);persist(p.days[String(day)]?`Ngày ${day}: Có ở`:`Ngày ${day}: Vắng`,{action:"UPDATE_BILL_DAY",summary:`${p.name} · ngày ${day}/${b.month}: ${p.days[String(day)]?"Có ở":"Vắng"}`,targetMemberId:p.memberId||null},before)}
   function dateDay(v,b){if(!v)return null;const [y,m,d]=v.split("-").map(Number),[by,bm]=b.month.split("-").map(Number);return y===by&&m===bm?d:null}
-  function applyStayRange(value){const b=currentBill(false),p=activeBillPerson(b);if(!p)return toast("Chọn người trước");if(b.closed)return toast("Tháng đã chốt sổ");let from=dateDay($("#stayFrom").value,b),to=dateDay($("#stayTo").value,b);if(!from||!to)return toast("Chọn ngày bắt đầu và ngày cuối");if(from>to)[from,to]=[to,from];const changed=[];for(let d=from;d<=to;d++){p.days[String(d)]=value;changed.push(d)}touchBillPerson(b,p,changed);persist(value?`Đã đánh dấu ở từ ngày ${from} đến ${to}`:`Đã đánh dấu vắng từ ngày ${from} đến ${to}`)}
-  function presetStay(mode){const b=currentBill(false),p=activeBillPerson(b);if(!p)return toast("Chọn người trước");if(b.closed)return toast("Tháng đã chốt sổ");const [y,m]=b.month.split("-").map(Number),n=monthDays(b.month),changed=[];p.days={};for(let d=1;d<=n;d++){const dow=new Date(y,m-1,d).getDay();p.days[String(d)]=mode==="all"||(mode==="weekdays"&&dow!==0&&dow!==6);changed.push(d)}touchBillPerson(b,p,changed);persist(mode==="all"?"Đã chọn ở cả tháng":mode==="weekdays"?"Đã chọn Thứ 2–Thứ 6":"Đã bỏ chọn toàn bộ")}
-  function toggleBillClosed(){const b=currentBill(false);if(!b)return toast("Chưa có dữ liệu tháng này");if(!b.closed){const c=billCalc(b);if(!c.totalDays)return toast("Chưa có ngày ở để chốt");if(!confirm("Chốt sổ tháng này và khóa chỉnh sửa?"))return;b.closed=true;touchBillField(b,"closed");persist("Đã chốt sổ tháng")}else{if(!confirm("Mở khóa tháng để chỉnh sửa?"))return;b.closed=false;touchBillField(b,"closed");persist("Đã mở khóa tháng")}}
+  function applyStayRange(value){const b=currentBill(false),p=activeBillPerson(b);if(!p)return toast("Chọn người trước");if(!canEditBillingPerson(p))return toast("Bạn chỉ được chỉnh ngày ở của chính mình");if(b.closed)return toast("Tháng đã chốt sổ");let from=dateDay($("#stayFrom").value,b),to=dateDay($("#stayTo").value,b);if(!from||!to)return toast("Chọn ngày bắt đầu và ngày cuối");if(from>to)[from,to]=[to,from];if(!value&&!confirm(`Xác nhận đánh dấu vắng từ ngày ${from} đến ${to}?`))return;const before=deepClone(state),changed=[];for(let d=from;d<=to;d++){p.days[String(d)]=value;changed.push(d)}touchBillPerson(b,p,changed);persist(value?`Đã đánh dấu ở từ ngày ${from} đến ${to}`:`Đã đánh dấu vắng từ ngày ${from} đến ${to}`,{action:"UPDATE_BILL_RANGE",summary:`${p.name}: ${value?"Có ở":"Vắng"} ngày ${from}–${to}/${b.month}`,targetMemberId:p.memberId||null},before)}
+  function presetStay(mode){const b=currentBill(false),p=activeBillPerson(b);if(!p)return toast("Chọn người trước");if(!canEditBillingPerson(p))return toast("Bạn chỉ được chỉnh ngày ở của chính mình");if(b.closed)return toast("Tháng đã chốt sổ");if(mode==="none"&&!confirm("Bỏ chọn toàn bộ ngày ở trong tháng?"))return;const before=deepClone(state),[y,m]=b.month.split("-").map(Number),n=monthDays(b.month),changed=[];p.days={};for(let d=1;d<=n;d++){const dow=new Date(y,m-1,d).getDay();p.days[String(d)]=mode==="all"||(mode==="weekdays"&&dow!==0&&dow!==6);changed.push(d)}touchBillPerson(b,p,changed);persist(mode==="all"?"Đã chọn ở cả tháng":mode==="weekdays"?"Đã chọn Thứ 2–Thứ 6":"Đã bỏ chọn toàn bộ",{action:"PRESET_BILL_DAYS",summary:`${p.name}: cập nhật nhanh ngày ở ${monthLabel(b.month)}`,targetMemberId:p.memberId||null},before)}
+  function toggleBillClosed(){if(!requireAdmin())return;const b=currentBill(false);if(!b)return toast("Chưa có dữ liệu tháng này");if(!b.closed){const c=billCalc(b);if(!c.totalDays)return toast("Chưa có ngày ở để chốt");if(!confirm("Chốt sổ tháng này và khóa chỉnh sửa?"))return;b.closed=true;touchBillField(b,"closed");persist("Đã chốt sổ tháng",{action:"CLOSE_BILL",summary:`Chốt sổ ${monthLabel(b.month)}`})}else{if(!confirm("Mở khóa tháng để chỉnh sửa?"))return;b.closed=false;touchBillField(b,"closed");persist("Đã mở khóa tháng",{action:"OPEN_BILL",summary:`Mở khóa ${monthLabel(b.month)}`})}}
   function billingText(){const c=billCalc();return [`⚡💧 TIỀN ĐIỆN NƯỚC ${monthLabel(c.b.month).toUpperCase()}`,`Tổng ngày-người: ${c.totalDays}`,`Điện: ${money(c.b.electricity)} · Nước: ${money(c.b.water)}`,"",...c.people.map(p=>`• ${p.name}: ${stayCount(p,c.b)} ngày · ${money(c.electric[p.id]+c.water[p.id])}`),"",`TỔNG: ${money(c.b.electricity+c.b.water)}`].join("\n")}
   function copyBilling(){copyText(billingText(),"Đã copy bảng tiền")}
   function downloadBillingCsv(){const c=billCalc();const rows=[["Tên người","Số ngày ở","Tiền điện","Tiền nước","Tổng cộng"],...c.people.map(p=>[p.name,stayCount(p,c.b),c.electric[p.id],c.water[p.id],c.electric[p.id]+c.water[p.id]]),["TỔNG",c.totalDays,c.b.electricity,c.b.water,c.b.electricity+c.b.water]];const csv="\ufeff"+rows.map(r=>r.map(v=>`"${String(v).replaceAll('"','""')}"`).join(",")).join("\n");const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([csv],{type:"text/csv;charset=utf-8"}));a.download=`dien-nuoc-${c.b.month}.csv`;a.click();URL.revokeObjectURL(a.href);toast("Đã tải CSV")}
   function renderBilling(){
-    normalize();
-    const c=billCalc(),b=c.b,p=activeBillPerson(currentBill(false));
-    $("#billMonth").value=b.month;
-    $("#billElectricity").value=b.electricity||"";
-    $("#billWater").value=b.water||"";
-    $("#billTotalDays").textContent=c.totalDays;
-    $("#billTotalMoney").textContent=money(b.electricity+b.water);
-    $("#billPeopleList").innerHTML=c.people.length
-      ? c.people.map(x=>`<button class="person-pick ${p?.id===x.id?"active":""}" onclick="selectBillPerson('${x.id}')"><span class="avatar">${esc(x.name.charAt(0).toUpperCase())}</span><span><b>${esc(x.name)}</b><small>${stayCount(x,b)} ngày ở</small></span><span class="person-amount">${money(c.electric[x.id]+c.water[x.id])}</span></button>`).join("")
-      : '<div class="empty">Chưa có người. Bấm “Đồng bộ thành viên” hoặc “+ Thêm”.</div>';
-    $("#calendarPersonTitle").textContent=p?`Lịch ở của ${p.name}`:"Chọn một người";
-    $("#calendarPersonHint").textContent=p?"Bấm vào ô ngày để chuyển giữa Có ở và Vắng.":"Sau đó bấm vào từng ngày có ở trong phòng.";
-    const [y,m]=b.month.split("-").map(Number),n=monthDays(b.month),first=new Date(y,m-1,1).getDay(),lead=(first+6)%7,today=new Date();
-    let cells="";
-    for(let i=0;i<lead;i++)cells+='<span class="day-cell blank"></span>';
-    for(let d=1;d<=n;d++){
-      const dow=new Date(y,m-1,d).getDay(),stay=!!p?.days?.[String(d)],isToday=today.getFullYear()===y&&today.getMonth()+1===m&&today.getDate()===d;
-      cells+=`<button class="day-cell ${stay?"stay":""} ${dow===0||dow===6?"weekend":""} ${isToday?"today":""}" onclick="toggleBillDay(${d})" ${!p?"disabled":""}><span class="day-num">${d}</span><span class="day-state">${stay?"✓ Có ở":"Vắng"}</span></button>`;
-    }
-    $("#billCalendar").innerHTML=cells;
-    $("#billPersonSummary").innerHTML=p?`<b>${esc(p.name)}</b><span>${stayCount(p,b)} ngày · ${money(c.electric[p.id]+c.water[p.id])}</span>`:'<b>Chưa chọn người</b><span>0 ngày</span>';
-    const min=`${b.month}-01`,max=`${b.month}-${String(n).padStart(2,"0")}`;
-    ["#stayFrom","#stayTo"].forEach(id=>{const el=$(id);el.min=min;el.max=max;if(!el.value||!el.value.startsWith(b.month)){el.value=id==="#stayFrom"?min:max}});
-    $("#billClosedBanner").classList.toggle("show",b.closed);
-    $("#billRangePanel").style.opacity=b.closed?".62":"1";
-    $("#billCloseButton").textContent=b.closed?"🔓 Mở khóa":"🔒 Chốt sổ";
-    const rows=c.people.length
-      ? c.people.map(x=>`<tr><td data-label="Tên người"><b>${esc(x.name)}</b></td><td data-label="Ngày ở">${stayCount(x,b)}</td><td data-label="Tiền điện">${money(c.electric[x.id])}</td><td data-label="Tiền nước">${money(c.water[x.id])}</td><td class="amount-total" data-label="Tổng cộng">${money(c.electric[x.id]+c.water[x.id])}</td></tr>`).join("")
-      : '<tr><td colspan="5">Chưa có dữ liệu.</td></tr>';
-    $("#billingTable").innerHTML=`<table><thead><tr><th>Tên người</th><th>Ngày ở</th><th>Tiền điện</th><th>Tiền nước</th><th>Tổng cộng</th></tr></thead><tbody>${rows}</tbody><tfoot><tr class="total-row"><td data-label="Tổng">TỔNG</td><td data-label="Ngày ở">${c.totalDays}</td><td data-label="Tiền điện">${money(b.electricity)}</td><td data-label="Tiền nước">${money(b.water)}</td><td data-label="Tổng cộng">${money(b.electricity+b.water)}</td></tr></tfoot></table>`;
+    normalize();const c=billCalc(),b=c.b;let p=activeBillPerson(currentBill(false));if(!isAdmin()&&myMemberId()){const own=b.people?.find(x=>x.memberId===myMemberId());if(own&&(!p||!canEditBillingPerson(p))){activeBillPersonId=own.id;p=own}}
+    $("#billMonth").value=b.month;$("#billElectricity").value=b.electricity||"";$("#billWater").value=b.water||"";$("#billTotalDays").textContent=c.totalDays;$("#billTotalMoney").textContent=money(b.electricity+b.water);
+    $("#billPeopleList").innerHTML=c.people.length?c.people.map(x=>{const mine=x.memberId===myMemberId();return `<button class="person-pick ${p?.id===x.id?"active":""} ${mine?"self-highlight":""}" onclick="selectBillPerson('${x.id}')"><span class="avatar">${esc(x.name.charAt(0).toUpperCase())}</span><span><b>${esc(x.name)} ${mine?'<span class="role-badge member">Bạn</span>':""}</b><small>${stayCount(x,b)} ngày ở ${mine||isAdmin()?"":"· Chỉ xem"}</small></span><span class="person-amount">${money(c.electric[x.id]+c.water[x.id])}</span></button>`}).join(""):'<div class="empty">Chưa có người. Trưởng phòng cần đồng bộ thành viên.</div>';
+    const editable=canEditBillingPerson(p)&&!b.closed;$("#calendarPersonTitle").textContent=p?`Lịch ở của ${p.name}`:"Chọn một người";$("#calendarPersonHint").textContent=p?(editable?"Bạn có thể chỉnh các ngày của tài khoản này.":"🔒 Chỉ xem — bạn không được sửa ngày của người này."):"Sau đó bấm vào từng ngày có ở trong phòng.";
+    const [y,m]=b.month.split("-").map(Number),n=monthDays(b.month),first=new Date(y,m-1,1).getDay(),lead=(first+6)%7,today=new Date();let cells="";for(let i=0;i<lead;i++)cells+='<span class="day-cell blank"></span>';for(let d=1;d<=n;d++){const dow=new Date(y,m-1,d).getDay(),stay=!!p?.days?.[String(d)],isToday=today.getFullYear()===y&&today.getMonth()+1===m&&today.getDate()===d;cells+=`<button class="day-cell ${stay?"stay":""} ${dow===0||dow===6?"weekend":""} ${isToday?"today":""} ${editable?"":"locked-control"}" onclick="toggleBillDay(${d})" ${!p||!editable?"disabled":""}><span class="day-num">${d}</span><span class="day-state">${stay?"✓ Có ở":"Vắng"}</span></button>`}$("#billCalendar").innerHTML=cells;
+    $("#billPersonSummary").innerHTML=p?`<b>${esc(p.name)}</b><span>${stayCount(p,b)} ngày · ${money(c.electric[p.id]+c.water[p.id])} ${editable?"":"· 🔒 Chỉ xem"}</span>`:'<b>Chưa chọn người</b><span>0 ngày</span>';const min=`${b.month}-01`,max=`${b.month}-${String(n).padStart(2,"0")}`;["#stayFrom","#stayTo"].forEach(id=>{const el=$(id);el.min=min;el.max=max;el.disabled=!editable;if(!el.value||!el.value.startsWith(b.month))el.value=id==="#stayFrom"?min:max});$("#billClosedBanner").classList.toggle("show",b.closed);$("#billRangePanel").style.display=editable?"block":"none";$("#billCloseButton").textContent=b.closed?"🔓 Mở khóa":"🔒 Chốt sổ";
+    const rows=c.people.length?c.people.map(x=>`<tr><td data-label="Tên người"><b>${esc(x.name)}</b></td><td data-label="Ngày ở">${stayCount(x,b)}</td><td data-label="Tiền điện">${money(c.electric[x.id])}</td><td data-label="Tiền nước">${money(c.water[x.id])}</td><td class="amount-total" data-label="Tổng cộng">${money(c.electric[x.id]+c.water[x.id])}</td></tr>`).join(""):'<tr><td colspan="5">Chưa có dữ liệu.</td></tr>';$("#billingTable").innerHTML=`<table><thead><tr><th>Tên người</th><th>Ngày ở</th><th>Tiền điện</th><th>Tiền nước</th><th>Tổng cộng</th></tr></thead><tbody>${rows}</tbody><tfoot><tr class="total-row"><td data-label="Tổng">TỔNG</td><td data-label="Ngày ở">${c.totalDays}</td><td data-label="Tiền điện">${money(b.electricity)}</td><td data-label="Tiền nước">${money(b.water)}</td><td data-label="Tổng cộng">${money(b.electricity+b.water)}</td></tr></tfoot></table>`;renderPermissionUI()
   }
-
   function renderHome(){normalize();const b=currentBill(false)||emptyBill();const presentCount=state.members.filter(m=>state.presence[m.id]!==false).length;const set=(id,value)=>{const el=$(id);if(el)el.textContent=value};set("#homeMemberCount",`${state.members.length} thành viên`);set("#homeWeekCount",`${state.schedules.length} tuần đã lưu`);set("#homeBillingMonth",monthLabel(b.month));set("#homeBillingPeople",`${b.people.length} người`);set("#appStatMembers",state.members.length);set("#appStatPresent",presentCount);set("#appStatSchedules",state.schedules.length);set("#appStatBill",money((b?.electricity||0)+(b?.water||0)))}
-  function renderAll(){renderHome();renderCleaning();renderBilling()}
-
+  function renderAll(){renderHome();renderCleaning();renderBilling();renderPermissionUI();renderAccountButton()}
   $("#cleanMemberName").addEventListener("keydown",e=>{if(e.key==="Enter")addMember()});
   $("#billNewPersonName").addEventListener("keydown",e=>{if(e.key==="Enter")addBillingPerson()});
   $("#cleanWeek").addEventListener("change",()=>{const s=state.schedules.find(x=>x.weekStart===$("#cleanWeek").value);selectedScheduleId=s?.id||null;renderCleaning()});
@@ -776,7 +759,7 @@
   window.addEventListener("storage",e=>{if(e.key===KEY&&e.newValue&&!syncInfo.dirty){try{const incoming=normalizeState(JSON.parse(e.newValue));if(timeMs(incoming.updatedAt)>timeMs(state.updatedAt)){state=incoming;renderAll()}}catch{}}});
   window.addEventListener("online",()=>{setSyncMode("syncing","Đang kết nối lại…");if(realtimeEngine)void realtimeEngine.flush()});
   window.addEventListener("offline",()=>setSyncMode("offline","Mất kết nối"));
-  window.addEventListener("beforeunload",()=>{try{roomChannel?.close()}catch{}});
+  window.addEventListener("beforeunload",()=>{try{roomChannel?.close();realtimeEngine?.stop()}catch{}});
   document.addEventListener("visibilitychange",()=>{if(!document.hidden&&realtimeEngine)void realtimeEngine.forceSync()});
 </script>
 </body>

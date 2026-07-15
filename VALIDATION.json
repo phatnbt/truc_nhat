@@ -1,0 +1,22 @@
+{
+  "javascript_syntax": [
+    {
+      "file": "p708-secure-sync-engine.js",
+      "ok": true,
+      "stderr": ""
+    },
+    {
+      "file": "p708-inline-check.js",
+      "ok": true,
+      "stderr": ""
+    }
+  ],
+  "required_files": [
+    "public/index.html",
+    "public/p708-secure-sync-engine.js",
+    "firestore-secure.rules",
+    "firebase.json",
+    "README_P708_SECURE.md"
+  ],
+  "firebase_project_id": "p708-room-manager"
+}
