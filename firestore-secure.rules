@@ -1,0 +1,111 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function configPath(roomId) {
+      return /databases/$(database)/documents/rooms/$(roomId)/security/config;
+    }
+
+    function accessPath(roomId, uid) {
+      return /databases/$(database)/documents/rooms/$(roomId)/access/$(uid);
+    }
+
+    function isPrimaryAdmin(roomId) {
+      return signedIn()
+        && exists(configPath(roomId))
+        && get(configPath(roomId)).data.adminUid == request.auth.uid;
+    }
+
+    function hasActiveAccess(roomId) {
+      return signedIn()
+        && exists(accessPath(roomId, request.auth.uid))
+        && get(accessPath(roomId, request.auth.uid)).data.active == true;
+    }
+
+    function isAdmin(roomId) {
+      return isPrimaryAdmin(roomId)
+        || (hasActiveAccess(roomId)
+          && get(accessPath(roomId, request.auth.uid)).data.role == 'admin');
+    }
+
+    function ownMemberId(roomId) {
+      return get(accessPath(roomId, request.auth.uid)).data.memberId;
+    }
+
+    match /rooms/{roomId} {
+      allow read: if hasActiveAccess(roomId) || isPrimaryAdmin(roomId);
+      allow create, update, delete: if isAdmin(roomId);
+
+      match /security/{configId} {
+        allow read: if signedIn();
+        allow create: if signedIn()
+          && configId == 'config'
+          && !exists(configPath(roomId))
+          && request.resource.data.adminUid == request.auth.uid
+          && request.resource.data.roomCode == roomId;
+        allow update, delete: if isAdmin(roomId);
+      }
+
+      match /access/{uid} {
+        allow read: if signedIn() && (uid == request.auth.uid || isAdmin(roomId));
+        allow create, update, delete: if isAdmin(roomId);
+      }
+
+      match /accessRequests/{uid} {
+        allow read: if signedIn() && (uid == request.auth.uid || isAdmin(roomId));
+        allow create, update: if signedIn()
+          && uid == request.auth.uid
+          && request.resource.data.uid == request.auth.uid
+          && request.resource.data.email == request.auth.token.email
+          && request.resource.data.keys().hasOnly([
+            'uid', 'email', 'displayName', 'photoURL', 'status',
+            'requestedAt', 'updatedAt'
+          ]);
+        allow delete: if signedIn() && (uid == request.auth.uid || isAdmin(roomId));
+      }
+
+      match /memberData/{uid} {
+        allow read: if hasActiveAccess(roomId) || isPrimaryAdmin(roomId);
+
+        allow create: if isAdmin(roomId)
+          || (signedIn()
+            && uid == request.auth.uid
+            && hasActiveAccess(roomId)
+            && request.resource.data.memberId == ownMemberId(roomId)
+            && request.resource.data.updatedBy == request.auth.uid
+            && request.resource.data.keys().hasOnly([
+              'memberId', 'presence', 'billingMonths', 'updatedBy', 'updatedAt'
+            ]));
+
+        allow update: if isAdmin(roomId)
+          || (signedIn()
+            && uid == request.auth.uid
+            && hasActiveAccess(roomId)
+            && request.resource.data.memberId == ownMemberId(roomId)
+            && request.resource.data.updatedBy == request.auth.uid
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+              'memberId', 'presence', 'billingMonths', 'updatedBy', 'updatedAt'
+            ]));
+
+        allow delete: if isAdmin(roomId);
+      }
+
+      match /auditLogs/{logId} {
+        allow read: if isAdmin(roomId);
+        allow create: if signedIn()
+          && hasActiveAccess(roomId)
+          && request.resource.data.actorUid == request.auth.uid
+          && request.resource.data.roomCode == roomId
+          && request.resource.data.keys().hasOnly([
+            'roomCode', 'actorUid', 'actorName', 'actorEmail', 'role',
+            'action', 'summary', 'targetMemberId', 'deviceId', 'createdAt'
+          ]);
+        allow update, delete: if false;
+      }
+    }
+  }
+}
