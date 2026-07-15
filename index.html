@@ -170,6 +170,18 @@
       .person-amount{grid-area:amount;text-align:left}
       .bill-kpis{grid-template-columns:1fr}
     }
+
+    .sync-pill{cursor:pointer;transition:.16s}.sync-pill:hover{transform:translateY(-1px);border-color:#bfdbfe;color:var(--blue-dark)}
+    .sync-pill.syncing .sync-dot{background:var(--amber);animation:syncBlink .85s ease-in-out infinite}
+    .sync-pill.offline .sync-dot{background:var(--red)}
+    @keyframes syncBlink{0%,100%{opacity:.35;transform:scale(.82)}50%{opacity:1;transform:scale(1.14)}}
+    .cloud-overlay{position:fixed;inset:0;z-index:120;display:none;align-items:center;justify-content:center;padding:20px;background:rgba(244,247,252,.82);backdrop-filter:blur(16px)}
+    .cloud-overlay.show{display:flex}
+    .cloud-loader{width:min(360px,100%);padding:28px;border-radius:26px;background:#fff;border:1px solid var(--line);box-shadow:0 28px 80px rgba(15,23,42,.18);text-align:center}
+    .cloud-icon{width:64px;height:64px;margin:0 auto 16px;border-radius:22px;display:grid;place-items:center;font-size:30px;background:linear-gradient(135deg,var(--blue-soft),var(--purple-soft));animation:cloudFloat 1.8s ease-in-out infinite}
+    .cloud-loader h3{margin:0;font-size:20px}.cloud-loader p{margin:8px 0 0;color:var(--muted);font-size:13px;line-height:1.55}
+    @keyframes cloudFloat{0%,100%{transform:translateY(0)}50%{transform:translateY(-6px)}}
+
     @media print{
       body{background:#fff}.topbar,.bill-sidebar,.range-panel,.legend,.result-actions,.closed-banner,.clean-sidebar,.clean-actions,details.simple{display:none!important}.shell{width:100%;padding:0}.card{box-shadow:none;border:0;background:#fff}.billing-layout,.two-col{display:block}.calendar-card{display:none}.billing-result{display:block!important;margin:0}.billing-result .card-head{border-bottom:1px solid #ddd}.page{display:none!important}.page.print-target{display:block!important}th,td{padding:10px}
     }
@@ -208,7 +220,7 @@
     <main class="shell">
       <header class="topbar">
         <div class="brand"><button class="icon-btn" onclick="go('home')" aria-label="Về trang chủ">←</button><div><h1>Lịch trực nhật</h1><p>Phân công gọn, dễ kiểm tra</p></div></div>
-        <div class="top-actions"><span class="sync-pill"><i class="sync-dot"></i><span id="cleanSync">Đã lưu</span></span><button class="btn soft" onclick="copySchedule()"><span>📋</span><span class="label">Copy lịch</span></button><button class="btn" onclick="printPage('cleaning')">🖨️</button></div>
+        <div class="top-actions"><button class="sync-pill" id="cleanSyncButton" onclick="forceCloudSync()" title="Bấm để đồng bộ ngay"><i class="sync-dot"></i><span id="cleanSync">Đang kết nối…</span></button><button class="btn soft" onclick="copySchedule()"><span>📋</span><span class="label">Copy lịch</span></button><button class="btn" onclick="printPage('cleaning')">🖨️</button></div>
       </header>
       <div class="two-col">
         <aside class="card sticky clean-sidebar">
@@ -235,7 +247,7 @@
     <main class="shell">
       <header class="topbar">
         <div class="brand"><button class="icon-btn" onclick="go('home')" aria-label="Về trang chủ">←</button><div><h1>Chia tiền điện & nước</h1><p>Tính theo ngày-người, rõ ràng và công bằng</p></div></div>
-        <div class="top-actions"><span class="sync-pill"><i class="sync-dot"></i><span id="billSync">Đã lưu</span></span><button class="btn soft" onclick="copyBilling()"><span>📋</span><span class="label">Copy kết quả</span></button><button class="btn" onclick="printPage('billing')">🖨️</button></div>
+        <div class="top-actions"><button class="sync-pill" id="billSyncButton" onclick="forceCloudSync()" title="Bấm để đồng bộ ngay"><i class="sync-dot"></i><span id="billSync">Đang kết nối…</span></button><button class="btn soft" onclick="copyBilling()"><span>📋</span><span class="label">Copy kết quả</span></button><button class="btn" onclick="printPage('billing')">🖨️</button></div>
       </header>
 
       <div class="billing-layout">
@@ -298,6 +310,14 @@
     <div class="modal-card"><div class="card-head"><div><h3>Chỉnh phân công</h3><p>Chọn người phụ trách cho từng việc.</p></div><button class="icon-btn" onclick="closeModal('manualModal')">✕</button></div><div class="modal-grid" id="manualFields"></div><div class="modal-actions"><button class="btn" onclick="closeModal('manualModal')">Hủy</button><button class="btn primary" onclick="saveManualSchedule()">Lưu thay đổi</button></div></div>
   </div>
 
+  <div class="cloud-overlay show" id="cloudOverlay">
+    <div class="cloud-loader">
+      <div class="cloud-icon">☁️</div>
+      <h3>Đang tải dữ liệu chung</h3>
+      <p>Đang kết nối phòng P708 để mọi thiết bị cùng sử dụng một bộ dữ liệu.</p>
+    </div>
+  </div>
+
   <div class="toast" id="toast"></div>
 
 <script>
@@ -310,10 +330,14 @@
     {id:"rac",name:"Vứt rác, bình nước",emoji:"🗑️",w:2}
   ];
   const KEY="cleaning_shared_apps_script_v1";
-  const APP_SCRIPT_URL="https://script.google.com/macros/s/AKfycbz4R8VkZO073bjly8KIwoJF2Vkg2cehS4b_DH7BCMaUN9nR3f0heMeLDc-NTcer3EdiXQ/exec";
+  const APP_SCRIPT_URL="https://script.google.com/macros/s/AKfycbzYXjhxCs_ICoVMFQcm9QB42XJ79aoR3YdJxdM6HQjlAadoB--TdsnYneNYCWVN4MJZAQ/exec";
   const ROOM_CODE="P708";
   const $=s=>document.querySelector(s);
-  let state=loadState(),selectedScheduleId=null,activeBillPersonId=null,saveTimer=null;
+  const DEVICE_ID=localStorage.getItem("P708_DEVICE_ID")||uid();
+  localStorage.setItem("P708_DEVICE_ID",DEVICE_ID);
+  const SYNC_INTERVAL_MS=5000;
+  let state=loadState(),selectedScheduleId=null,activeBillPersonId=null,saveTimer=null,syncTimer=null;
+  let syncInfo={ready:false,loading:false,saving:false,dirty:false,pendingSave:false,lastFingerprint:"",lastCloudAt:null};
 
   function uid(){return crypto.randomUUID?crypto.randomUUID():Date.now().toString(36)+Math.random().toString(36).slice(2)}
   function todayMonth(){const d=new Date();return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}`}
@@ -328,12 +352,166 @@
   function defaultState(){return {members:[],presence:{},schedules:[],billing:{selectedMonth:todayMonth(),months:[]},settings:{weights:Object.fromEntries(TASKS.map(t=>[t.id,t.w]))}}}
   function loadState(){try{const raw=localStorage.getItem(KEY);if(!raw)return defaultState();const p=JSON.parse(raw);return {...defaultState(),...p,settings:{...defaultState().settings,...(p.settings||{})},billing:p.billing||defaultState().billing,presence:p.presence||{}}}catch{return defaultState()}}
   function normalize(){state.members||=[];state.schedules||=[];state.presence||={};state.billing||={selectedMonth:todayMonth(),months:[]};state.billing.selectedMonth||=todayMonth();state.billing.months||=[];state.settings||={};state.settings.weights||=Object.fromEntries(TASKS.map(t=>[t.id,t.w]));state.members.forEach(m=>state.presence[m.id]??=true);state.billing.months.forEach(b=>{b.people||=[];b.electricity=Number(b.electricity)||0;b.water=Number(b.water)||0;b.closed=!!b.closed;b.people.forEach(p=>p.days||={})})}
-  function persist(message=""){normalize();localStorage.setItem(KEY,JSON.stringify(state));renderAll();queueRemoteSave();if(message)toast(message)}
-  function queueRemoteSave(){clearTimeout(saveTimer);saveTimer=setTimeout(()=>saveRemote(false),700)}
-  function publicState(){return {...state,updatedAt:new Date().toISOString()}}
-  function saveRemote(show=true){if(!APP_SCRIPT_URL||!ROOM_CODE)return;setSyncText("Đang lưu…");fetch(APP_SCRIPT_URL,{method:"POST",mode:"no-cors",headers:{"Content-Type":"text/plain;charset=utf-8"},body:JSON.stringify({action:"save",roomCode:ROOM_CODE,pageUrl:location.href.split("#")[0],data:publicState()})}).then(()=>{setSyncText("Đã lưu");if(show)toast("Đã lưu dữ liệu chung")}).catch(()=>setSyncText("Lưu cục bộ"))}
-  function loadRemote(){if(!APP_SCRIPT_URL||!ROOM_CODE)return;setSyncText("Đang tải…");const cb="room_cb_"+Date.now();const script=document.createElement("script");window[cb]=res=>{try{if(res?.ok&&res.data){state={...defaultState(),...res.data,settings:{...defaultState().settings,...(res.data.settings||{})},billing:res.data.billing||defaultState().billing,presence:res.data.presence||{}};normalize();localStorage.setItem(KEY,JSON.stringify(state));renderAll();setSyncText("Đã đồng bộ")}else setSyncText("Dữ liệu cục bộ")}finally{delete window[cb];script.remove()}};script.onerror=()=>{setSyncText("Dữ liệu cục bộ");delete window[cb];script.remove()};script.src=`${APP_SCRIPT_URL}?action=load&roomCode=${encodeURIComponent(ROOM_CODE)}&callback=${cb}`;document.body.appendChild(script)}
-  function setSyncText(t){["#cleanSync","#billSync"].forEach(id=>{const e=$(id);if(e)e.textContent=t});const h=$("#homeSyncText");if(h)h.textContent=t.includes("cục bộ")?"Dữ liệu đang được lưu trên thiết bị này":"Dữ liệu được lưu và đồng bộ tự động"}
+  function stateFingerprint(data){
+    try{
+      const clone=JSON.parse(JSON.stringify(data||{}));
+      delete clone.updatedAt;delete clone.updatedBy;delete clone.roomCode;
+      return JSON.stringify(clone);
+    }catch{return ""}
+  }
+  function markStateChanged(){
+    state.updatedAt=new Date().toISOString();
+    state.updatedBy=DEVICE_ID;
+    state.roomCode=ROOM_CODE;
+    syncInfo.dirty=true;
+  }
+  function persist(message=""){
+    normalize();markStateChanged();
+    localStorage.setItem(KEY,JSON.stringify(state));
+    renderAll();queueRemoteSave();
+    if(message)toast(message);
+  }
+  function queueRemoteSave(){
+    clearTimeout(saveTimer);
+    saveTimer=setTimeout(()=>saveRemote(false),550);
+  }
+  function publicState(){
+    normalize();
+    return {...state,roomCode:ROOM_CODE,updatedAt:state.updatedAt||new Date().toISOString(),updatedBy:state.updatedBy||DEVICE_ID};
+  }
+  function setSyncMode(mode,text){
+    ["#cleanSyncButton","#billSyncButton"].forEach(id=>{
+      const e=$(id);if(!e)return;
+      e.classList.toggle("syncing",mode==="syncing");
+      e.classList.toggle("offline",mode==="offline");
+    });
+    setSyncText(text);
+  }
+  function saveRemote(show=true){
+    if(!APP_SCRIPT_URL||!ROOM_CODE)return Promise.resolve(false);
+    if(syncInfo.saving){syncInfo.pendingSave=true;return Promise.resolve(false)}
+    syncInfo.saving=true;syncInfo.pendingSave=false;
+    setSyncMode("syncing","Đang lưu chung…");
+    const payload=publicState();
+    return fetch(APP_SCRIPT_URL,{method:"POST",mode:"no-cors",headers:{"Content-Type":"text/plain;charset=utf-8"},body:JSON.stringify({action:"save",roomCode:ROOM_CODE,pageUrl:location.href.split("#")[0],deviceId:DEVICE_ID,data:payload})})
+      .then(()=>{
+        syncInfo.dirty=false;
+        syncInfo.lastFingerprint=stateFingerprint(payload);
+        syncInfo.lastCloudAt=new Date();
+        setSyncMode("online","Đã đồng bộ");
+        if(show)toast("Đã lưu lên dữ liệu chung của phòng");
+        return true;
+      })
+      .catch(()=>{
+        syncInfo.dirty=true;
+        setSyncMode("offline","Mất kết nối");
+        if(show)toast("Chưa kết nối được dữ liệu chung");
+        return false;
+      })
+      .finally(()=>{
+        syncInfo.saving=false;
+        if(syncInfo.pendingSave){syncInfo.pendingSave=false;queueRemoteSave()}
+      });
+  }
+  function applyCloudState(remoteData){
+    state={...defaultState(),...remoteData,settings:{...defaultState().settings,...(remoteData.settings||{})},billing:remoteData.billing||defaultState().billing,presence:remoteData.presence||{}};
+    normalize();
+    state.roomCode=ROOM_CODE;
+    syncInfo.lastFingerprint=stateFingerprint(state);
+    syncInfo.dirty=false;
+    syncInfo.lastCloudAt=new Date();
+    localStorage.setItem(KEY,JSON.stringify(state));
+    selectedScheduleId=state.schedules.at(-1)?.id||null;
+    const bill=currentBill(false);
+    activeBillPersonId=bill?.people?.[0]?.id||null;
+    renderAll();
+  }
+  function hasCachedData(){
+    return !!(state.members?.length||state.schedules?.length||state.billing?.months?.length);
+  }
+  function loadRemote({initial=false,force=false,silent=false}={}){
+    if(!APP_SCRIPT_URL||!ROOM_CODE)return Promise.resolve(false);
+    if(syncInfo.loading)return Promise.resolve(false);
+    syncInfo.loading=true;
+    if(!silent)setSyncMode("syncing",initial?"Đang tải dữ liệu chung…":"Đang làm mới…");
+    return new Promise(resolve=>{
+      const cb="room_cb_"+Date.now()+"_"+Math.floor(Math.random()*9999);
+      const script=document.createElement("script");
+      let finished=false;
+      const finish=ok=>{
+        if(finished)return;finished=true;
+        clearTimeout(timeout);syncInfo.loading=false;
+        try{delete window[cb]}catch{}
+        script.remove();resolve(ok);
+      };
+      const timeout=setTimeout(()=>{
+        if(initial){normalize();renderAll()}
+        setSyncMode("offline","Mất kết nối");
+        finish(false);
+      },12000);
+      window[cb]=res=>{
+        try{
+          if(res?.ok&&res.data){
+            const remoteFingerprint=stateFingerprint(res.data);
+            const shouldApply=initial||force||(!syncInfo.dirty&&!syncInfo.saving&&remoteFingerprint!==syncInfo.lastFingerprint);
+            if(shouldApply)applyCloudState(res.data);
+            syncInfo.lastFingerprint=remoteFingerprint||syncInfo.lastFingerprint;
+            setSyncMode("online","Đã đồng bộ");
+            finish(true);
+          }else if(initial&&hasCachedData()){
+            renderAll();
+            saveRemote(false);
+            setSyncMode("online","Đang tạo dữ liệu chung…");
+            finish(true);
+          }else{
+            if(initial){state=defaultState();normalize();renderAll();saveRemote(false)}
+            setSyncMode("online","Đã kết nối");
+            finish(true);
+          }
+        }catch{
+          if(initial){normalize();renderAll()}
+          setSyncMode("offline","Lỗi đồng bộ");
+          finish(false);
+        }
+      };
+      script.onerror=()=>{
+        if(initial){normalize();renderAll()}
+        setSyncMode("offline","Mất kết nối");
+        finish(false);
+      };
+      script.src=`${APP_SCRIPT_URL}?action=load&roomCode=${encodeURIComponent(ROOM_CODE)}&callback=${cb}&_=${Date.now()}`;
+      document.body.appendChild(script);
+    });
+  }
+  function wait(ms){return new Promise(resolve=>setTimeout(resolve,ms))}
+  async function forceCloudSync(){
+    if(syncInfo.dirty){
+      const saved=await saveRemote(false);
+      if(saved)await wait(1200);
+    }
+    const ok=await loadRemote({force:true,silent:false});
+    toast(ok?"Đã lấy dữ liệu chung mới nhất":"Không thể kết nối dữ liệu chung");
+  }
+  function startSyncLoop(){
+    clearInterval(syncTimer);
+    syncTimer=setInterval(()=>{
+      if(document.hidden||syncInfo.dirty||syncInfo.saving)return;
+      loadRemote({silent:true});
+    },SYNC_INTERVAL_MS);
+  }
+  async function startCloudMode(){
+    const overlay=$("#cloudOverlay");
+    const ok=await loadRemote({initial:true,force:true});
+    syncInfo.ready=true;
+    overlay?.classList.remove("show");
+    startSyncLoop();
+    if(ok)setSyncMode("online","Đã đồng bộ");
+  }
+  function setSyncText(t){
+    ["#cleanSync","#billSync"].forEach(id=>{const e=$(id);if(e)e.textContent=t});
+    const h=$("#homeSyncText");
+    if(h)h.textContent=t.includes("Mất")||t.includes("Lỗi")?"Đang dùng bộ nhớ đệm — sẽ tự đồng bộ khi có mạng":"Mọi thiết bị đang dùng chung dữ liệu phòng P708";
+  }
 
   function go(page){location.hash=page==="home"?"":page;showPage(page)}
   function syncMobileNav(page){document.querySelectorAll('.nav-btn').forEach(btn=>btn.classList.toggle('active',btn.dataset.nav===page))}
@@ -380,7 +558,7 @@
   }
 
   /* Billing */
-  function currentBill(create=true){normalize();const month=state.billing.selectedMonth;let b=state.billing.months.find(x=>x.month===month);if(!b&&create){const days=monthDays(month);const allDays=Object.fromEntries(Array.from({length:days},(_,i)=>[String(i+1),true]));b={id:uid(),month,electricity:0,water:0,closed:false,people:state.members.map(m=>({id:uid(),memberId:m.id,name:m.name,days:{...allDays}}))};state.billing.months.push(b);localStorage.setItem(KEY,JSON.stringify(state))}return b||null}
+  function currentBill(create=true){normalize();const month=state.billing.selectedMonth;let b=state.billing.months.find(x=>x.month===month);if(!b&&create){const days=monthDays(month);const allDays=Object.fromEntries(Array.from({length:days},(_,i)=>[String(i+1),true]));b={id:uid(),month,electricity:0,water:0,closed:false,people:state.members.map(m=>({id:uid(),memberId:m.id,name:m.name,days:{...allDays}}))};state.billing.months.push(b);markStateChanged();localStorage.setItem(KEY,JSON.stringify(state));if(syncInfo.ready)queueRemoteSave()}return b||null}
   function stayCount(p,b=currentBill()){const n=monthDays(b.month);let c=0;for(let d=1;d<=n;d++)if(p.days?.[String(d)])c++;return c}
   function allocate(total,people,b){total=Math.max(0,Math.round(Number(total)||0));const rows=people.map((p,i)=>({id:p.id,i,days:stayCount(p,b),base:0,frac:0}));const totalDays=rows.reduce((s,r)=>s+r.days,0);if(!totalDays||!total)return Object.fromEntries(rows.map(r=>[r.id,0]));let used=0;rows.forEach(r=>{const exact=total*r.days/totalDays;r.base=Math.floor(exact);r.frac=exact-r.base;used+=r.base});rows.sort((a,z)=>z.frac-a.frac||z.days-a.days||a.i-z.i);for(let k=0;k<total-used;k++)rows[k%rows.length].base++;return Object.fromEntries(rows.map(r=>[r.id,r.base]))}
   function billCalc(){const b=currentBill(),people=b.people||[],totalDays=people.reduce((s,p)=>s+stayCount(p,b),0),electric=allocate(b.electricity,people,b),water=allocate(b.water,people,b);return {b,people,totalDays,electric,water,electricRate:totalDays?b.electricity/totalDays:0,waterRate:totalDays?b.water/totalDays:0}}
@@ -446,10 +624,11 @@
 
   normalize();
   $("#cleanWeek").value=dateValue(nextMonday());
-  currentBill(true);
-  renderAll();
   showPage(location.hash.replace("#","")||"home");
-  setTimeout(loadRemote,300);
+  startCloudMode();
+  window.addEventListener("online",()=>{setSyncMode("syncing","Đang kết nối lại…");forceCloudSync()});
+  window.addEventListener("offline",()=>setSyncMode("offline","Mất kết nối"));
+  document.addEventListener("visibilitychange",()=>{if(!document.hidden&&!syncInfo.dirty)loadRemote({silent:true})});
 </script>
 </body>
 </html>
