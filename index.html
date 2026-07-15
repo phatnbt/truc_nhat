@@ -195,7 +195,7 @@
         <div class="brand-mark">🏠</div>
         <h1>Quản lý phòng P708</h1>
         <p>Một nơi đơn giản để chia lịch trực nhật và tính tiền điện, nước minh bạch theo số ngày ở thực tế.</p>
-        <div class="surface-note">✨ Dữ liệu dùng chung · thao tác tức thì · tự đồng bộ giữa các thiết bị</div>
+        <div class="surface-note">✨ Đồng bộ hai chiều · hợp nhất thay đổi · dùng chung trên điện thoại và máy tính</div>
       </div>
       <div class="app-stats">
         <div class="app-stat"><span>Thành viên</span><b id="appStatMembers">0</b></div>
@@ -219,7 +219,7 @@
           <button class="btn green" onclick="go('billing')">Mở bảng điện nước →</button>
         </article>
       </div>
-      <div class="home-footer"><span id="homeSyncText">Dữ liệu được lưu tự động</span></div>
+      <div class="home-footer"><span id="homeSyncText">Đang kiểm tra dữ liệu chung…</span></div>
     </main>
   </section>
 
@@ -336,19 +336,23 @@
     {id:"tham",name:"Giặt thảm",emoji:"🧺",w:2},
     {id:"rac",name:"Vứt rác, bình nước",emoji:"🗑️",w:2}
   ];
-  const KEY="cleaning_shared_apps_script_v1";
-  const APP_SCRIPT_URL="https://script.google.com/macros/s/AKfycbwMyVelPxOmIn97-cKrXUhu1pUNEbMHjyVtEyZcYS_2pla_mJw8OD9mI46rX6_kGXIYFg/exec";
+  const KEY="cleaning_shared_apps_script_v2";
+  const LEGACY_KEY="cleaning_shared_apps_script_v1";
+  const LOCAL_UI_KEY="P708_LOCAL_UI_V2";
+  const APP_SCRIPT_URL="https://script.google.com/macros/s/AKfycbyN2pgFG6Kc-FKEplyGG8jhvWYCcK5oqcXnWXyWjaAHD_9eAwSSrt5wrokExCSLY-Mg5g/exec";
   const ROOM_CODE="P708";
+  const SYNC_SCHEMA_VERSION=2;
   const $=s=>document.querySelector(s);
   function uid(){return crypto.randomUUID?crypto.randomUUID():Date.now().toString(36)+Math.random().toString(36).slice(2)}
   function storageGet(key){try{return localStorage.getItem(key)}catch{return null}}
   function storageSet(key,value){try{localStorage.setItem(key,value);return true}catch{return false}}
   function getDeviceId(){const old=storageGet("P708_DEVICE_ID");if(old)return old;const id=uid();storageSet("P708_DEVICE_ID",id);return id}
   const DEVICE_ID=getDeviceId();
-  const SYNC_INTERVAL_MS=5000;
-  const LOCAL_EDIT_GRACE_MS=4500;
-  let state=loadState(),selectedScheduleId=null,activeBillPersonId=null,saveTimer=null,syncTimer=null,verifyTimer=null;
-  let syncInfo={ready:false,loading:false,saving:false,verifying:false,dirty:false,pendingSave:false,lastFingerprint:"",lastCloudAt:null,lastLocalEditAt:0,saveAttempts:0};
+  const SYNC_INTERVAL_MS=4000;
+  const LOCAL_EDIT_GRACE_MS=1800;
+  let state=loadState(),selectedScheduleId=null,activeBillPersonId=null,saveTimer=null,syncTimer=null;
+  let syncInfo={ready:false,loading:false,saving:false,verifying:false,dirty:false,pendingSave:false,lastFingerprint:"",lastCloudAt:null,lastLocalEditAt:0,saveAttempts:0,lastError:""};
+  const roomChannel="BroadcastChannel" in window?new BroadcastChannel(`p708-${ROOM_CODE}`):null;
 
   function todayMonth(){const d=new Date();return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}`}
   function dateValue(d){return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`}
@@ -359,131 +363,268 @@
   function monthLabel(v){if(!/^\d{4}-\d{2}$/.test(v||""))return v;const [y,m]=v.split("-");return `Tháng ${Number(m)}/${y}`}
   function monthDays(v){const [y,m]=v.split("-").map(Number);return new Date(y,m,0).getDate()}
   function toast(msg){const el=$("#toast");if(!el)return;el.textContent=msg;el.classList.add("show");clearTimeout(toast.t);toast.t=setTimeout(()=>el.classList.remove("show"),2100)}
-  function defaultState(){return {members:[],presence:{},schedules:[],billing:{selectedMonth:todayMonth(),months:[]},settings:{weights:Object.fromEntries(TASKS.map(t=>[t.id,t.w]))},updatedAt:"",updatedBy:"",_pendingSync:false}}
-  function loadState(){try{const raw=storageGet(KEY);if(!raw)return defaultState();const p=JSON.parse(raw);return {...defaultState(),...p,settings:{...defaultState().settings,...(p.settings||{})},billing:p.billing||defaultState().billing,presence:p.presence||{}}}catch{return defaultState()}}
-  function normalize(){state.members||=[];state.schedules||=[];state.presence||={};state.billing||={selectedMonth:todayMonth(),months:[]};state.billing.selectedMonth||=todayMonth();state.billing.months||=[];state.settings||={};state.settings.weights||=Object.fromEntries(TASKS.map(t=>[t.id,t.w]));state.members.forEach(m=>state.presence[m.id]??=true);state.billing.months.forEach(b=>{b.people||=[];b.electricity=Number(b.electricity)||0;b.water=Number(b.water)||0;b.closed=!!b.closed;b.people.forEach(p=>p.days||={})});state._pendingSync=!!state._pendingSync}
+  function nowIso(){return new Date().toISOString()}
+  function deepClone(v){return JSON.parse(JSON.stringify(v??null))}
+  function defaultSyncMeta(){return {version:SYNC_SCHEMA_VERSION,presenceUpdatedAt:{},deletedMembers:{},deletedSchedules:{},deletedBillingPeople:{},lastWriteId:""}}
+  function defaultState(){return {members:[],presence:{},schedules:[],billing:{selectedMonth:todayMonth(),months:[]},settings:{weights:Object.fromEntries(TASKS.map(t=>[t.id,t.w]))},updatedAt:"",updatedBy:"",_sync:defaultSyncMeta(),_pendingSync:false}}
+  function loadLocalUi(){try{return JSON.parse(storageGet(LOCAL_UI_KEY)||"{}")||{}}catch{return {}}}
+  function saveLocalUi(){storageSet(LOCAL_UI_KEY,JSON.stringify({selectedMonth:state.billing?.selectedMonth||todayMonth()}))}
+  function loadState(){
+    try{
+      const raw=storageGet(KEY)||storageGet(LEGACY_KEY);
+      const p=raw?JSON.parse(raw):defaultState();
+      const ui=loadLocalUi();
+      const merged={...defaultState(),...p,settings:{...defaultState().settings,...(p.settings||{})},billing:p.billing||defaultState().billing,presence:p.presence||{},_sync:{...defaultSyncMeta(),...(p._sync||{})}};
+      merged.billing.selectedMonth=ui.selectedMonth||merged.billing.selectedMonth||todayMonth();
+      return normalizeState(merged);
+    }catch{return normalizeState(defaultState())}
+  }
+  function normalizeState(s){
+    s=s||defaultState();
+    s.members||=[];s.schedules||=[];s.presence||={};
+    s.billing||={selectedMonth:todayMonth(),months:[]};s.billing.selectedMonth||=todayMonth();s.billing.months||=[];
+    s.settings||={};s.settings.weights||=Object.fromEntries(TASKS.map(t=>[t.id,t.w]));
+    s._sync={...defaultSyncMeta(),...(s._sync||{})};
+    s._sync.presenceUpdatedAt||={};s._sync.deletedMembers||={};s._sync.deletedSchedules||={};s._sync.deletedBillingPeople||={};
+    const fallback=s.updatedAt||"";
+    s.members.forEach(m=>{m.updatedAt||=fallback;s.presence[m.id]??=true;s._sync.presenceUpdatedAt[m.id]||=m.updatedAt||fallback});
+    s.schedules.forEach(x=>x.updatedAt||=x.createdAt||fallback);
+    s.billing.months.forEach(b=>{
+      b.people||=[];b.electricity=Number(b.electricity)||0;b.water=Number(b.water)||0;b.closed=!!b.closed;b.updatedAt||=fallback;
+      const fieldMeta=b.fieldUpdatedAt||{};
+      b.fieldUpdatedAt={
+        electricity:Object.prototype.hasOwnProperty.call(fieldMeta,"electricity")?fieldMeta.electricity:b.updatedAt,
+        water:Object.prototype.hasOwnProperty.call(fieldMeta,"water")?fieldMeta.water:b.updatedAt,
+        closed:Object.prototype.hasOwnProperty.call(fieldMeta,"closed")?fieldMeta.closed:b.updatedAt
+      };
+      b.people.forEach(p=>{p.days||={};p.updatedAt||=b.updatedAt||fallback;p.dayUpdatedAt||={};Object.keys(p.days).forEach(d=>p.dayUpdatedAt[d]||=p.updatedAt)});
+      s._sync.deletedBillingPeople[b.month]||={};
+    });
+    s._pendingSync=!!s._pendingSync;
+    return s;
+  }
+  function normalize(){state=normalizeState(state)}
   function timeMs(v){const n=Date.parse(v||"");return Number.isFinite(n)?n:0}
+  function laterIso(a,b){return timeMs(a)>=timeMs(b)?(a||""):(b||"")}
+  function mergeTimestampMaps(a={},b={}){const out={...a};Object.entries(b||{}).forEach(([k,v])=>{out[k]=laterIso(out[k],v)});return out}
   function stateFingerprint(data){
     try{
-      const clone=JSON.parse(JSON.stringify(data||{}));
-      delete clone.updatedAt;delete clone.updatedBy;delete clone.roomCode;delete clone.serverSavedAt;delete clone._pendingSync;
+      const clone=deepClone(data||{});
+      delete clone.updatedAt;delete clone.updatedBy;delete clone.roomCode;delete clone.serverSavedAt;delete clone.serverRevision;delete clone._pendingSync;
+      if(clone.billing)delete clone.billing.selectedMonth;
+      if(clone._sync)delete clone._sync.lastWriteId;
       return JSON.stringify(clone);
     }catch{return ""}
   }
-  function markStateChanged(){
-    state.updatedAt=new Date().toISOString();
-    state.updatedBy=DEVICE_ID;
-    state.roomCode=ROOM_CODE;
-    state._pendingSync=true;
-    syncInfo.dirty=true;
-    syncInfo.lastLocalEditAt=Date.now();
+  function billPersonKey(p){return p?.memberId?`member:${p.memberId}`:`name:${String(p?.name||"").trim().toLowerCase()}`}
+  function chooseNewer(a,b,aFallback="",bFallback=""){
+    if(!a)return deepClone(b);if(!b)return deepClone(a);
+    const at=timeMs(a.updatedAt||aFallback),bt=timeMs(b.updatedAt||bFallback);
+    if(bt>at)return deepClone(b);if(at>bt)return deepClone(a);
+    return stateFingerprint(b)>stateFingerprint(a)?deepClone(b):deepClone(a);
   }
-  function saveCache(){normalize();storageSet(KEY,JSON.stringify(state))}
+  function mergeCloudStates(remoteRaw,localRaw){
+    const remote=normalizeState(deepClone(remoteRaw||defaultState()));
+    const local=normalizeState(deepClone(localRaw||defaultState()));
+    const localMonth=local.billing.selectedMonth||todayMonth();
+    const merged=defaultState();
+    merged.roomCode=ROOM_CODE;
+    merged.updatedAt=laterIso(remote.updatedAt,local.updatedAt);
+    merged.updatedBy=timeMs(local.updatedAt)>=timeMs(remote.updatedAt)?local.updatedBy:remote.updatedBy;
+    merged.settings=timeMs(local.updatedAt)>=timeMs(remote.updatedAt)?deepClone(local.settings):deepClone(remote.settings);
+    merged._sync={...defaultSyncMeta(),...remote._sync,...local._sync};
+    merged._sync.presenceUpdatedAt=mergeTimestampMaps(remote._sync.presenceUpdatedAt,local._sync.presenceUpdatedAt);
+    merged._sync.deletedMembers=mergeTimestampMaps(remote._sync.deletedMembers,local._sync.deletedMembers);
+    merged._sync.deletedSchedules=mergeTimestampMaps(remote._sync.deletedSchedules,local._sync.deletedSchedules);
+    merged._sync.deletedBillingPeople={};
+    const monthDeleteKeys=new Set([...Object.keys(remote._sync.deletedBillingPeople||{}),...Object.keys(local._sync.deletedBillingPeople||{})]);
+    monthDeleteKeys.forEach(month=>merged._sync.deletedBillingPeople[month]=mergeTimestampMaps(remote._sync.deletedBillingPeople?.[month],local._sync.deletedBillingPeople?.[month]));
+
+    const rm=new Map(remote.members.map(x=>[x.id,x])),lm=new Map(local.members.map(x=>[x.id,x]));
+    for(const id of new Set([...rm.keys(),...lm.keys()])){
+      const entity=chooseNewer(rm.get(id),lm.get(id),remote.updatedAt,local.updatedAt);
+      const deletedAt=merged._sync.deletedMembers[id]||"";
+      if(entity&&timeMs(deletedAt)<timeMs(entity.updatedAt||merged.updatedAt))merged.members.push(entity);
+    }
+    for(const m of merged.members){
+      const rt=remote._sync.presenceUpdatedAt?.[m.id]||remote.updatedAt,lt=local._sync.presenceUpdatedAt?.[m.id]||local.updatedAt;
+      merged.presence[m.id]=timeMs(lt)>=timeMs(rt)?(local.presence[m.id]!==false):(remote.presence[m.id]!==false);
+    }
+
+    const rs=new Map(remote.schedules.map(x=>[x.weekStart,x])),ls=new Map(local.schedules.map(x=>[x.weekStart,x]));
+    for(const week of new Set([...rs.keys(),...ls.keys()])){
+      const entity=chooseNewer(rs.get(week),ls.get(week),remote.updatedAt,local.updatedAt);
+      if(entity&&timeMs(merged._sync.deletedSchedules[week]||"")<timeMs(entity.updatedAt||merged.updatedAt))merged.schedules.push(entity);
+    }
+    merged.schedules.sort((a,b)=>a.weekStart.localeCompare(b.weekStart));
+
+    const rbm=new Map(remote.billing.months.map(x=>[x.month,x])),lbm=new Map(local.billing.months.map(x=>[x.month,x]));
+    for(const month of new Set([...rbm.keys(),...lbm.keys()])){
+      const rb=rbm.get(month),lb=lbm.get(month);
+      if(!rb){merged.billing.months.push(deepClone(lb));continue}
+      if(!lb){merged.billing.months.push(deepClone(rb));continue}
+      const base=chooseNewer(rb,lb,remote.updatedAt,local.updatedAt)||{};
+      const out={...base,month,people:[],fieldUpdatedAt:{}};
+      for(const field of ["electricity","water","closed"]){
+        const rt=Object.prototype.hasOwnProperty.call(rb.fieldUpdatedAt||{},field)?rb.fieldUpdatedAt[field]:(rb.updatedAt||remote.updatedAt);
+        const lt=Object.prototype.hasOwnProperty.call(lb.fieldUpdatedAt||{},field)?lb.fieldUpdatedAt[field]:(lb.updatedAt||local.updatedAt);
+        out[field]=timeMs(lt)>=timeMs(rt)?lb[field]:rb[field];
+        out.fieldUpdatedAt[field]=laterIso(rt,lt);
+      }
+      const rp=new Map(rb.people.map(x=>[billPersonKey(x),x])),lp=new Map(lb.people.map(x=>[billPersonKey(x),x]));
+      const deleted=merged._sync.deletedBillingPeople[month]||{};
+      for(const key of new Set([...rp.keys(),...lp.keys()])){
+        const r=rp.get(key),l=lp.get(key),person=chooseNewer(r,l,rb.updatedAt,lb.updatedAt);
+        if(!person)continue;
+        const entityTime=person.updatedAt||out.updatedAt||merged.updatedAt;
+        if(timeMs(deleted[key]||"")>=timeMs(entityTime))continue;
+        if(r&&l){
+          person.days={};person.dayUpdatedAt={};
+          for(const day of new Set([...Object.keys(r.days||{}),...Object.keys(l.days||{})])){
+            const rt=r.dayUpdatedAt?.[day]||r.updatedAt||rb.updatedAt||remote.updatedAt;
+            const lt=l.dayUpdatedAt?.[day]||l.updatedAt||lb.updatedAt||local.updatedAt;
+            person.days[day]=timeMs(lt)>=timeMs(rt)?!!l.days?.[day]:!!r.days?.[day];
+            person.dayUpdatedAt[day]=laterIso(rt,lt);
+          }
+          person.updatedAt=laterIso(r.updatedAt,l.updatedAt);
+        }
+        out.people.push(person);
+      }
+      out.updatedAt=laterIso(rb.updatedAt,lb.updatedAt);
+      merged.billing.months.push(out);
+    }
+    merged.billing.months.sort((a,b)=>a.month.localeCompare(b.month));
+    merged.billing.selectedMonth=localMonth;
+    merged._pendingSync=local._pendingSync;
+    return normalizeState(merged);
+  }
+  function touchMember(m){m.updatedAt=nowIso();return m.updatedAt}
+  function touchPresence(id){const t=nowIso();state._sync.presenceUpdatedAt[id]=t;return t}
+  function touchSchedule(s){s.updatedAt=nowIso();return s.updatedAt}
+  function touchBillField(b,field){const t=nowIso();b.fieldUpdatedAt||={};b.fieldUpdatedAt[field]=t;b.updatedAt=t;return t}
+  function touchBillPerson(b,p,days=[]){const t=nowIso();p.updatedAt=t;p.dayUpdatedAt||={};days.forEach(d=>p.dayUpdatedAt[String(d)]=t);b.updatedAt=t;return t}
+
+  function markStateChanged(){
+    state.updatedAt=nowIso();state.updatedBy=DEVICE_ID;state.roomCode=ROOM_CODE;state._pendingSync=true;
+    syncInfo.dirty=true;syncInfo.lastLocalEditAt=Date.now();
+  }
+  function saveCache(){normalize();storageSet(KEY,JSON.stringify(state));saveLocalUi()}
+  function announceLocalChange(){try{roomChannel?.postMessage({type:"changed",deviceId:DEVICE_ID,updatedAt:state.updatedAt})}catch{}}
   function persist(message=""){
-    normalize();markStateChanged();saveCache();
-    renderAll();queueRemoteSave();
+    normalize();markStateChanged();saveCache();renderAll();announceLocalChange();queueRemoteSave();
     if(message)toast(message);
   }
-  function queueRemoteSave(delay=650){
-    clearTimeout(saveTimer);
-    saveTimer=setTimeout(()=>saveRemote(false),delay);
+  function queueRemoteSave(delay=500){clearTimeout(saveTimer);saveTimer=setTimeout(()=>saveRemote(false),delay)}
+  function publicState(){
+    normalize();const payload=deepClone(state);payload.roomCode=ROOM_CODE;payload.updatedAt=payload.updatedAt||nowIso();payload.updatedBy=payload.updatedBy||DEVICE_ID;payload._pendingSync=false;
+    if(payload.billing)delete payload.billing.selectedMonth;
+    return payload;
   }
-  function publicState(){normalize();return {...state,roomCode:ROOM_CODE,updatedAt:state.updatedAt||new Date().toISOString(),updatedBy:state.updatedBy||DEVICE_ID,_pendingSync:false}}
   function setSyncMode(mode,text){
-    ["#cleanSyncButton","#billSyncButton"].forEach(id=>{const e=$(id);if(!e)return;e.classList.toggle("syncing",mode==="syncing");e.classList.toggle("offline",mode==="offline")});
+    ["#cleanSyncButton","#billSyncButton"].forEach(id=>{const e=$(id);if(!e)return;e.classList.toggle("syncing",mode==="syncing");e.classList.toggle("offline",mode==="offline");e.setAttribute("aria-busy",mode==="syncing"?"true":"false");if(syncInfo.lastCloudAt)e.title=`${text} · Lần cuối ${syncInfo.lastCloudAt.toLocaleTimeString("vi-VN")}`});
     setSyncText(text);
   }
   function getRemoteData(timeoutMs=9000){
     if(!APP_SCRIPT_URL||!ROOM_CODE)return Promise.resolve({ok:false,error:"missing-config"});
     return new Promise(resolve=>{
-      const cb="room_cb_"+Date.now()+"_"+Math.floor(Math.random()*99999);
-      const script=document.createElement("script");let finished=false;
+      const cb="room_cb_"+Date.now()+"_"+Math.floor(Math.random()*99999),script=document.createElement("script");let finished=false;
       const finish=result=>{if(finished)return;finished=true;clearTimeout(timeout);try{delete window[cb]}catch{};script.remove();resolve(result)};
       const timeout=setTimeout(()=>finish({ok:false,error:"timeout"}),timeoutMs);
-      window[cb]=res=>finish(res&&res.ok?{ok:true,data:res.data||null,serverTime:res.serverTime||null}:{ok:false,error:res?.error||"invalid-response"});
+      window[cb]=res=>finish(res&&res.ok?{ok:true,data:res.data||null,serverTime:res.serverTime||null,revision:res.revision||0}:{ok:false,error:res?.error||"invalid-response"});
       script.onerror=()=>finish({ok:false,error:"network"});
       script.src=`${APP_SCRIPT_URL}?action=load&roomCode=${encodeURIComponent(ROOM_CODE)}&callback=${cb}&_=${Date.now()}`;
       document.body.appendChild(script);
     });
   }
-  function markCloudVerified(remoteData){
-    state._pendingSync=false;syncInfo.dirty=false;syncInfo.saveAttempts=0;
-    syncInfo.lastFingerprint=stateFingerprint(remoteData||state);syncInfo.lastCloudAt=new Date();saveCache();
-    setSyncMode("online","Đã đồng bộ");
-  }
   function applyCloudState(remoteData){
-    const currentMonth=state.billing?.selectedMonth;
-    state={...defaultState(),...remoteData,settings:{...defaultState().settings,...(remoteData.settings||{})},billing:remoteData.billing||defaultState().billing,presence:remoteData.presence||{},_pendingSync:false};
-    normalize();state.roomCode=ROOM_CODE;
-    if(currentMonth&&state.billing.months.some(x=>x.month===currentMonth))state.billing.selectedMonth=currentMonth;
-    syncInfo.lastFingerprint=stateFingerprint(state);syncInfo.dirty=false;syncInfo.lastCloudAt=new Date();saveCache();
+    const currentMonth=state.billing?.selectedMonth||loadLocalUi().selectedMonth||todayMonth();
+    state=normalizeState({...defaultState(),...deepClone(remoteData||{}),billing:deepClone(remoteData?.billing||defaultState().billing),_pendingSync:false});
+    state.billing.selectedMonth=currentMonth;state.roomCode=ROOM_CODE;syncInfo.lastFingerprint=stateFingerprint(state);syncInfo.dirty=false;syncInfo.lastCloudAt=new Date();syncInfo.lastError="";saveCache();
     if(selectedScheduleId&&!state.schedules.some(s=>s.id===selectedScheduleId))selectedScheduleId=state.schedules.at(-1)?.id||null;
     const bill=currentBill(false);if(activeBillPersonId&&!bill?.people?.some(p=>p.id===activeBillPersonId))activeBillPersonId=bill?.people?.[0]?.id||null;
     renderAll();
   }
   function hasCachedData(){return !!(state.members?.length||state.schedules?.length||state.billing?.months?.length)}
-  async function verifyRemoteSave(expectedAt,show=false){
+  function sleep(ms){return new Promise(r=>setTimeout(r,ms))}
+  async function verifyRemoteSave(expected,show=false){
     if(syncInfo.verifying)return false;
-    syncInfo.verifying=true;setSyncMode("syncing","Đang xác nhận…");
-    const result=await getRemoteData(7000);syncInfo.verifying=false;
-    if(!result.ok){syncInfo.dirty=true;setSyncMode("offline","Chưa xác nhận");if(show)toast("Đã lưu trên máy, chưa xác nhận được dữ liệu chung");return false}
-    const remote=result.data||{};
-    const exact=stateFingerprint(remote)===stateFingerprint(state);
-    const sameWrite=remote.updatedBy===DEVICE_ID&&timeMs(remote.updatedAt)>=timeMs(expectedAt);
-    if(exact||sameWrite){markCloudVerified(remote);if(show)toast("Đã lưu lên dữ liệu chung");return true}
-    const remoteNewer=timeMs(remote.updatedAt)>timeMs(state.updatedAt);
-    if(remoteNewer&&!syncInfo.dirty){applyCloudState(remote);setSyncMode("online","Đã nhận dữ liệu mới");return true}
-    syncInfo.dirty=true;setSyncMode("offline","Chưa đồng bộ xong");
-    if(syncInfo.saveAttempts<2){syncInfo.saveAttempts++;queueRemoteSave(1000)}
-    if(show)toast("Thay đổi vẫn được giữ trên máy và sẽ thử đồng bộ lại");
+    syncInfo.verifying=true;
+    const delays=[650,1100,1900,3000];
+    for(let i=0;i<delays.length;i++){
+      setSyncMode("syncing",`Đang xác nhận ${i+1}/${delays.length}…`);await sleep(delays[i]);
+      const result=await getRemoteData(7500);
+      if(!result.ok){syncInfo.lastError=result.error||"verify-failed";continue}
+      const remote=result.data||{},matchedWrite=remote?._sync?.lastWriteId===expected.writeId,matchedData=stateFingerprint(remote)===expected.fingerprint;
+      if(matchedWrite||matchedData){
+        const newerLocal=timeMs(state.updatedAt)>timeMs(expected.updatedAt);
+        if(newerLocal){state=mergeCloudStates(remote,state);state._pendingSync=true;syncInfo.dirty=true;saveCache();renderAll();queueRemoteSave(350)}
+        else{applyCloudState(remote);state._pendingSync=false;syncInfo.dirty=false;saveCache()}
+        syncInfo.saveAttempts=0;syncInfo.verifying=false;setSyncMode(newerLocal?"syncing":"online",newerLocal?"Đã lưu, còn thay đổi mới":"Đã đồng bộ");
+        if(show)toast(newerLocal?"Đã lưu bản trước; đang đồng bộ thay đổi mới":"Đã đồng bộ dữ liệu giữa các máy");
+        return true;
+      }
+    }
+    syncInfo.verifying=false;syncInfo.dirty=true;state._pendingSync=true;saveCache();syncInfo.saveAttempts++;
+    setSyncMode(navigator.onLine?"offline":"offline",navigator.onLine?"Chưa xác nhận":"Mất kết nối");
+    queueRemoteSave(Math.min(15000,2500+syncInfo.saveAttempts*1800));
+    if(show)toast("Dữ liệu vẫn an toàn trên máy; hệ thống sẽ tự thử lại");
     return false;
   }
-  function saveRemote(show=true){
-    if(!APP_SCRIPT_URL||!ROOM_CODE)return Promise.resolve(false);
-    if(syncInfo.saving){syncInfo.pendingSave=true;return Promise.resolve(false)}
-    syncInfo.saving=true;syncInfo.pendingSave=false;setSyncMode("syncing","Đang lưu chung…");
-    const payload=publicState(),expectedAt=payload.updatedAt;
-    return fetch(APP_SCRIPT_URL,{method:"POST",mode:"no-cors",headers:{"Content-Type":"text/plain;charset=utf-8"},body:JSON.stringify({action:"save",roomCode:ROOM_CODE,pageUrl:location.href.split("#")[0],deviceId:DEVICE_ID,data:payload})})
-      .then(()=>{clearTimeout(verifyTimer);verifyTimer=setTimeout(()=>verifyRemoteSave(expectedAt,show),1300);return true})
-      .catch(()=>{syncInfo.dirty=true;setSyncMode("offline","Mất kết nối");if(show)toast("Đã lưu trên máy; sẽ tự đồng bộ khi có mạng");return false})
-      .finally(()=>{syncInfo.saving=false;if(syncInfo.pendingSave){syncInfo.pendingSave=false;queueRemoteSave(500)}});
+  async function saveRemote(show=true){
+    if(!APP_SCRIPT_URL||!ROOM_CODE||!navigator.onLine){setSyncMode("offline","Mất kết nối");return false}
+    if(syncInfo.saving||syncInfo.verifying){syncInfo.pendingSave=true;return false}
+    syncInfo.saving=true;syncInfo.pendingSave=false;setSyncMode("syncing","Đang hợp nhất dữ liệu…");
+    try{
+      const preflight=await getRemoteData(6500);
+      if(preflight.ok&&preflight.data){
+        const selectedMonth=state.billing.selectedMonth;
+        state=mergeCloudStates(preflight.data,state);state.billing.selectedMonth=selectedMonth;
+        state.updatedAt=nowIso();state.updatedBy=DEVICE_ID;state._pendingSync=true;syncInfo.dirty=true;saveCache();renderAll();
+      }
+      const writeId=uid(),payload=publicState();payload._sync={...defaultSyncMeta(),...(payload._sync||{}),lastWriteId:writeId};payload.updatedAt=nowIso();payload.updatedBy=DEVICE_ID;
+      state.updatedAt=payload.updatedAt;state.updatedBy=DEVICE_ID;state._sync.lastWriteId=writeId;state._pendingSync=true;saveCache();
+      const expected={writeId,updatedAt:payload.updatedAt,fingerprint:stateFingerprint(payload)};
+      setSyncMode("syncing","Đang gửi dữ liệu chung…");
+      await fetch(APP_SCRIPT_URL,{method:"POST",mode:"no-cors",cache:"no-store",headers:{"Content-Type":"text/plain;charset=utf-8"},body:JSON.stringify({action:"save",roomCode:ROOM_CODE,pageUrl:location.href.split("#")[0],deviceId:DEVICE_ID,writeId,data:payload})});
+      syncInfo.saving=false;
+      const ok=await verifyRemoteSave(expected,show);
+      if(syncInfo.pendingSave){syncInfo.pendingSave=false;queueRemoteSave(350)}
+      return ok;
+    }catch(err){
+      syncInfo.saving=false;syncInfo.dirty=true;state._pendingSync=true;syncInfo.lastError=String(err?.message||err);saveCache();setSyncMode("offline",navigator.onLine?"Lỗi máy chủ":"Mất kết nối");queueRemoteSave(4500);if(show)toast("Đã lưu trên máy; sẽ tự đồng bộ lại");return false;
+    }
   }
   async function loadRemote({initial=false,force=false,silent=false}={}){
-    if(!APP_SCRIPT_URL||!ROOM_CODE)return false;
-    if(syncInfo.loading)return false;
-    if(!initial&&!force&&(syncInfo.dirty||syncInfo.saving||syncInfo.verifying||Date.now()-syncInfo.lastLocalEditAt<LOCAL_EDIT_GRACE_MS))return false;
-    syncInfo.loading=true;if(!silent)setSyncMode("syncing",initial?"Đang tải dữ liệu chung…":"Đang làm mới…");
+    if(!APP_SCRIPT_URL||!ROOM_CODE||!navigator.onLine)return false;
+    if(syncInfo.loading||syncInfo.saving||syncInfo.verifying)return false;
+    if(!initial&&!force&&(syncInfo.dirty||state._pendingSync||Date.now()-syncInfo.lastLocalEditAt<LOCAL_EDIT_GRACE_MS))return false;
+    syncInfo.loading=true;if(!silent)setSyncMode("syncing",initial?"Đang tải dữ liệu chung…":"Đang lấy dữ liệu mới…");
     const result=await getRemoteData();syncInfo.loading=false;
-    if(!result.ok){setSyncMode("offline",initial?"Dùng dữ liệu trên máy":"Mất kết nối");return false}
+    if(!result.ok){syncInfo.lastError=result.error||"load-failed";setSyncMode("offline",initial?"Dùng dữ liệu trên máy":"Mất kết nối");return false}
     const remote=result.data;
     if(!remote||!Object.keys(remote).length){
       if(hasCachedData()){syncInfo.dirty=true;state._pendingSync=true;saveCache();queueRemoteSave(100)}
-      setSyncMode("online",hasCachedData()?"Đang tạo dữ liệu chung…":"Đã kết nối");return true;
+      else setSyncMode("online","Đã kết nối");
+      return true;
     }
-    const localPending=syncInfo.dirty||state._pendingSync;
-    const remoteMs=timeMs(remote.updatedAt),localMs=timeMs(state.updatedAt);
-    if(initial){
-      if(localPending&&localMs>remoteMs){renderAll();queueRemoteSave(100);setSyncMode("syncing","Đang đưa thay đổi lên chung…");return true}
-      applyCloudState(remote);setSyncMode("online","Đã đồng bộ");return true;
-    }
-    if(localPending){setSyncMode("syncing","Đang chờ lưu thay đổi…");return false}
-    if(force||remoteMs>localMs||(remoteMs===localMs&&stateFingerprint(remote)!==stateFingerprint(state))){applyCloudState(remote);setSyncMode("online","Đã nhận dữ liệu mới")}
-    else setSyncMode("online","Đã đồng bộ");
-    return true;
+    if(syncInfo.dirty||state._pendingSync){queueRemoteSave(100);setSyncMode("syncing","Đang hợp nhất thay đổi…");return true}
+    if(force||stateFingerprint(remote)!==stateFingerprint(state))applyCloudState(remote);
+    syncInfo.lastCloudAt=new Date();setSyncMode("online","Đã đồng bộ");return true;
   }
   async function forceCloudSync(){
-    if(syncInfo.dirty||state._pendingSync){const expected=state.updatedAt;await saveRemote(false);await new Promise(r=>setTimeout(r,1600));const verified=await verifyRemoteSave(expected,false);toast(verified?"Đã đồng bộ dữ liệu chung":"Đang giữ thay đổi trên máy và sẽ thử lại");return}
-    const ok=await loadRemote({force:true,silent:false});toast(ok?"Đã lấy dữ liệu chung mới nhất":"Không thể kết nối dữ liệu chung");
+    if(syncInfo.saving||syncInfo.verifying)return toast("Hệ thống đang đồng bộ…");
+    if(syncInfo.dirty||state._pendingSync){await saveRemote(true);return}
+    const ok=await loadRemote({force:true,silent:false});toast(ok?"Đã lấy dữ liệu mới nhất từ phòng P708":"Không thể kết nối dữ liệu chung");
   }
-  function startSyncLoop(){clearInterval(syncTimer);syncTimer=setInterval(()=>{if(document.hidden||syncInfo.dirty||state._pendingSync||syncInfo.saving||syncInfo.verifying)return;loadRemote({silent:true})},SYNC_INTERVAL_MS)}
+  function startSyncLoop(){clearInterval(syncTimer);syncTimer=setInterval(()=>{if(document.hidden||syncInfo.saving||syncInfo.verifying)return;if(syncInfo.dirty||state._pendingSync)queueRemoteSave(50);else loadRemote({silent:true})},SYNC_INTERVAL_MS)}
   async function startCloudMode(){
-    const overlay=$("#cloudOverlay");overlay?.classList.remove("show");overlay?.setAttribute("aria-hidden","true");
-    syncInfo.ready=true;renderAll();startSyncLoop();
-    await loadRemote({initial:true,force:true,silent:false});
+    const overlay=$("#cloudOverlay");overlay?.classList.add("show");overlay?.setAttribute("aria-hidden","false");
+    syncInfo.ready=true;startSyncLoop();await loadRemote({initial:true,force:true,silent:false});renderAll();
+    overlay?.classList.remove("show");overlay?.setAttribute("aria-hidden","true");
   }
   function setSyncText(t){
     ["#cleanSync","#billSync"].forEach(id=>{const e=$(id);if(e)e.textContent=t});
-    const h=$("#homeSyncText");if(h)h.textContent=t.includes("Mất")||t.includes("Lỗi")||t.includes("Chưa")?"Thao tác vẫn dùng được; hệ thống sẽ tự đồng bộ khi có mạng":"Mọi thiết bị đang dùng chung dữ liệu phòng P708";
+    const h=$("#homeSyncText");if(h){const bad=t.includes("Mất")||t.includes("Lỗi")||t.includes("Chưa");h.textContent=bad?"Dữ liệu đang giữ an toàn trên máy và sẽ tự đồng bộ lại":`Phòng ${ROOM_CODE} · ${t}${syncInfo.lastCloudAt?` lúc ${syncInfo.lastCloudAt.toLocaleTimeString("vi-VN")}`:""}`}
   }
 
   function go(page){location.hash=page==="home"?"":page;showPage(page)}
@@ -494,20 +635,20 @@
   function closeModal(id){$("#"+id).classList.remove("show")}
 
   /* Members & cleaning */
-  function addMember(){const input=$("#cleanMemberName"),name=input.value.trim().replace(/\s+/g," ");if(!name)return toast("Nhập tên thành viên");if(state.members.some(m=>m.name.toLowerCase()===name.toLowerCase()))return toast("Tên này đã có");const m={id:uid(),name,createdAt:new Date().toISOString()};state.members.push(m);state.presence[m.id]=true;input.value="";persist("Đã thêm thành viên")}
-  function removeMember(id){const m=state.members.find(x=>x.id===id);if(!m||!confirm(`Xóa ${m.name} khỏi danh sách thành viên?`))return;state.members=state.members.filter(x=>x.id!==id);delete state.presence[id];persist("Đã xóa thành viên")}
-  function togglePresence(id){state.presence[id]=state.presence[id]===false;persist()}
-  function setAllPresence(v){state.members.forEach(m=>state.presence[m.id]=v);persist()}
+  function addMember(){const input=$("#cleanMemberName"),name=input.value.trim().replace(/\s+/g," ");if(!name)return toast("Nhập tên thành viên");if(state.members.some(m=>m.name.toLowerCase()===name.toLowerCase()))return toast("Tên này đã có");const t=nowIso(),m={id:uid(),name,createdAt:t,updatedAt:t};state.members.push(m);state.presence[m.id]=true;state._sync.presenceUpdatedAt[m.id]=t;delete state._sync.deletedMembers[m.id];input.value="";persist("Đã thêm thành viên")}
+  function removeMember(id){const m=state.members.find(x=>x.id===id);if(!m||!confirm(`Xóa ${m.name} khỏi danh sách thành viên?`))return;state.members=state.members.filter(x=>x.id!==id);delete state.presence[id];state._sync.deletedMembers[id]=nowIso();persist("Đã xóa thành viên")}
+  function togglePresence(id){state.presence[id]=state.presence[id]===false;touchPresence(id);persist()}
+  function setAllPresence(v){state.members.forEach(m=>{state.presence[m.id]=v;touchPresence(m.id)});persist()}
   function nextMonday(){const d=new Date();d.setHours(0,0,0,0);const day=d.getDay();d.setDate(d.getDate()+(day===0?1:8-day));return d}
   function weekRange(v){const s=parseDate(v),e=addDays(s,6);const f=d=>new Intl.DateTimeFormat("vi-VN",{day:"2-digit",month:"2-digit",year:"numeric"}).format(d);return `${f(s)} – ${f(e)}`}
   function historicalPoints(memberId,beforeWeek="9999-99-99"){return state.schedules.filter(s=>s.weekStart<beforeWeek).reduce((sum,s)=>sum+s.assignments.filter(a=>a.personId===memberId&&!a.cut).reduce((z,a)=>z+(state.settings.weights[a.taskId]||3),0),0)}
-  function createSchedule(){const week=$("#cleanWeek").value;if(!week)return toast("Chọn tuần bắt đầu");const people=state.members.filter(m=>state.presence[m.id]!==false);if(!people.length)return toast("Chưa có thành viên có mặt");let tasks=[...TASKS];const absent=state.members.length-people.length;if(absent===1)tasks=tasks.filter(t=>t.id!=="rac");const loads=Object.fromEntries(people.map(m=>[m.id,{points:historicalPoints(m.id,week),weekPoints:0,count:0}]));const assignments=tasks.slice().sort((a,b)=>b.w-a.w).map(task=>{const chosen=people.slice().sort((a,b)=>(loads[a.id].points+loads[a.id].weekPoints)-(loads[b.id].points+loads[b.id].weekPoints)||loads[a.id].count-loads[b.id].count)[0];loads[chosen.id].weekPoints+=task.w;loads[chosen.id].count++;return {taskId:task.id,task:task.name,personId:chosen.id,personName:chosen.name,completed:false,cut:false}});if(absent===1)assignments.push({taskId:"rac",task:"Vứt rác, bình nước",personId:null,personName:"Tạm cắt",completed:false,cut:true});const old=state.schedules.find(s=>s.weekStart===week);if(old&&!confirm("Tuần này đã có lịch. Ghi đè?"))return;const schedule={id:old?.id||uid(),weekStart:week,createdAt:old?.createdAt||new Date().toISOString(),assignments,absentNames:state.members.filter(m=>state.presence[m.id]===false).map(m=>m.name)};const i=state.schedules.findIndex(s=>s.weekStart===week);if(i>=0)state.schedules[i]=schedule;else state.schedules.push(schedule);state.schedules.sort((a,b)=>a.weekStart.localeCompare(b.weekStart));selectedScheduleId=schedule.id;persist("Đã tạo lịch công bằng")}
+  function createSchedule(){const week=$("#cleanWeek").value;if(!week)return toast("Chọn tuần bắt đầu");const people=state.members.filter(m=>state.presence[m.id]!==false);if(!people.length)return toast("Chưa có thành viên có mặt");let tasks=[...TASKS];const absent=state.members.length-people.length;if(absent===1)tasks=tasks.filter(t=>t.id!=="rac");const loads=Object.fromEntries(people.map(m=>[m.id,{points:historicalPoints(m.id,week),weekPoints:0,count:0}]));const assignments=tasks.slice().sort((a,b)=>b.w-a.w).map(task=>{const chosen=people.slice().sort((a,b)=>(loads[a.id].points+loads[a.id].weekPoints)-(loads[b.id].points+loads[b.id].weekPoints)||loads[a.id].count-loads[b.id].count)[0];loads[chosen.id].weekPoints+=task.w;loads[chosen.id].count++;return {taskId:task.id,task:task.name,personId:chosen.id,personName:chosen.name,completed:false,cut:false}});if(absent===1)assignments.push({taskId:"rac",task:"Vứt rác, bình nước",personId:null,personName:"Tạm cắt",completed:false,cut:true});const old=state.schedules.find(s=>s.weekStart===week);if(old&&!confirm("Tuần này đã có lịch. Ghi đè?"))return;const t=nowIso(),schedule={id:old?.id||uid(),weekStart:week,createdAt:old?.createdAt||t,updatedAt:t,assignments,absentNames:state.members.filter(m=>state.presence[m.id]===false).map(m=>m.name)};const i=state.schedules.findIndex(s=>s.weekStart===week);if(i>=0)state.schedules[i]=schedule;else state.schedules.push(schedule);delete state._sync.deletedSchedules[week];state.schedules.sort((a,b)=>a.weekStart.localeCompare(b.weekStart));selectedScheduleId=schedule.id;persist("Đã tạo lịch công bằng")}
   function currentSchedule(){if(!selectedScheduleId&&state.schedules.length)selectedScheduleId=state.schedules[state.schedules.length-1].id;return state.schedules.find(s=>s.id===selectedScheduleId)||null}
   function selectSchedule(id){selectedScheduleId=id;const s=currentSchedule();if(s)$("#cleanWeek").value=s.weekStart;renderCleaning()}
-  function toggleTaskDone(i,checked){const s=currentSchedule();if(!s||!s.assignments[i]||s.assignments[i].cut)return;s.assignments[i].completed=Boolean(checked);persist(checked?"Đã đánh dấu hoàn thành":"Đã bỏ đánh dấu hoàn thành")}
-  function deleteCurrentSchedule(){const s=currentSchedule();if(!s)return toast("Chưa có lịch để xóa");if(!confirm("Xóa lịch tuần này?"))return;state.schedules=state.schedules.filter(x=>x.id!==s.id);selectedScheduleId=state.schedules.at(-1)?.id||null;persist("Đã xóa lịch")}
+  function toggleTaskDone(i,checked){const s=currentSchedule();if(!s||!s.assignments[i]||s.assignments[i].cut)return;s.assignments[i].completed=Boolean(checked);touchSchedule(s);persist(checked?"Đã đánh dấu hoàn thành":"Đã bỏ đánh dấu hoàn thành")}
+  function deleteCurrentSchedule(){const s=currentSchedule();if(!s)return toast("Chưa có lịch để xóa");if(!confirm("Xóa lịch tuần này?"))return;state._sync.deletedSchedules[s.weekStart]=nowIso();state.schedules=state.schedules.filter(x=>x.id!==s.id);selectedScheduleId=state.schedules.at(-1)?.id||null;persist("Đã xóa lịch")}
   function openManual(){const s=currentSchedule();if(!s)return toast("Hãy tạo lịch trước");$("#manualFields").innerHTML=TASKS.map(task=>{const a=s.assignments.find(x=>x.taskId===task.id);return `<div class="field"><label>${task.emoji} ${esc(task.name)}</label><select data-manual-task="${task.id}"><option value="__CUT__" ${a?.cut?"selected":""}>Tạm cắt</option>${state.members.map(m=>`<option value="${m.id}" ${a?.personId===m.id?"selected":""}>${esc(m.name)}</option>`).join("")}</select></div>`}).join("");$("#manualModal").classList.add("show")}
-  function saveManualSchedule(){const s=currentSchedule();if(!s)return;const assignments=TASKS.map(task=>{const v=document.querySelector(`[data-manual-task="${task.id}"]`).value;if(v==="__CUT__")return {taskId:task.id,task:task.name,personId:null,personName:"Tạm cắt",completed:false,cut:true};const m=state.members.find(x=>x.id===v);return {taskId:task.id,task:task.name,personId:m?.id||null,personName:m?.name||"Không rõ",completed:false,cut:!m}});s.assignments=assignments;closeModal("manualModal");persist("Đã lưu phân công")}
+  function saveManualSchedule(){const s=currentSchedule();if(!s)return;const assignments=TASKS.map(task=>{const v=document.querySelector(`[data-manual-task="${task.id}"]`).value;if(v==="__CUT__")return {taskId:task.id,task:task.name,personId:null,personName:"Tạm cắt",completed:false,cut:true};const m=state.members.find(x=>x.id===v);return {taskId:task.id,task:task.name,personId:m?.id||null,personName:m?.name||"Không rõ",completed:false,cut:!m}});s.assignments=assignments;touchSchedule(s);closeModal("manualModal");persist("Đã lưu phân công")}
   function scheduleText(){const s=currentSchedule();if(!s)return "";return [`📌 LỊCH TRỰC NHẬT`, `🗓️ ${weekRange(s.weekStart)}`,s.absentNames?.length?`🚫 Vắng: ${s.absentNames.join(", ")}`:"✅ Không có người vắng","",...s.assignments.map(a=>`${TASKS.find(t=>t.id===a.taskId)?.emoji||"•"} ${a.task}: ${a.personName}${a.completed?" ✅":""}`)].join("\n")}
   function copyText(text,msg){if(!text)return toast("Không có nội dung");navigator.clipboard?.writeText(text).then(()=>toast(msg)).catch(()=>{const t=document.createElement("textarea");t.value=text;document.body.appendChild(t);t.select();document.execCommand("copy");t.remove();toast(msg)})}
   function copySchedule(){copyText(scheduleText(),"Đã copy lịch")}
@@ -531,29 +672,31 @@
   }
 
   /* Billing */
-  function currentBill(create=true){normalize();const month=state.billing.selectedMonth;let b=state.billing.months.find(x=>x.month===month);if(!b&&create){const days=monthDays(month);const allDays=Object.fromEntries(Array.from({length:days},(_,i)=>[String(i+1),true]));b={id:uid(),month,electricity:0,water:0,closed:false,people:state.members.map(m=>({id:uid(),memberId:m.id,name:m.name,days:{...allDays}}))};state.billing.months.push(b);markStateChanged();saveCache();if(syncInfo.ready)queueRemoteSave()}return b||null}
-  function stayCount(p,b=currentBill()){const n=monthDays(b.month);let c=0;for(let d=1;d<=n;d++)if(p.days?.[String(d)])c++;return c}
+  function currentBill(create=false){normalize();const month=state.billing.selectedMonth;let b=state.billing.months.find(x=>x.month===month);return b||null}
+  function emptyBill(month=state.billing.selectedMonth||todayMonth()){return {id:`preview-${month}`,month,electricity:0,water:0,closed:false,people:[],updatedAt:"",fieldUpdatedAt:{electricity:"",water:"",closed:""}}}
+  function ensureCurrentBill(){let b=currentBill(false);if(b)return b;const t=nowIso();b={id:uid(),month:state.billing.selectedMonth||todayMonth(),electricity:0,water:0,closed:false,people:[],updatedAt:t,fieldUpdatedAt:{electricity:"",water:"",closed:""}};state.billing.months.push(b);state._sync.deletedBillingPeople[b.month]||={};return b}
+  function stayCount(p,b=currentBill(false)||emptyBill()){const n=monthDays(b.month);let c=0;for(let d=1;d<=n;d++)if(p?.days?.[String(d)])c++;return c}
   function allocate(total,people,b){total=Math.max(0,Math.round(Number(total)||0));const rows=people.map((p,i)=>({id:p.id,i,days:stayCount(p,b),base:0,frac:0}));const totalDays=rows.reduce((s,r)=>s+r.days,0);if(!totalDays||!total)return Object.fromEntries(rows.map(r=>[r.id,0]));let used=0;rows.forEach(r=>{const exact=total*r.days/totalDays;r.base=Math.floor(exact);r.frac=exact-r.base;used+=r.base});rows.sort((a,z)=>z.frac-a.frac||z.days-a.days||a.i-z.i);for(let k=0;k<total-used;k++)rows[k%rows.length].base++;return Object.fromEntries(rows.map(r=>[r.id,r.base]))}
-  function billCalc(){const b=currentBill(),people=b.people||[],totalDays=people.reduce((s,p)=>s+stayCount(p,b),0),electric=allocate(b.electricity,people,b),water=allocate(b.water,people,b);return {b,people,totalDays,electric,water,electricRate:totalDays?b.electricity/totalDays:0,waterRate:totalDays?b.water/totalDays:0}}
-  function setBillMonth(v){if(!/^\d{4}-\d{2}$/.test(v||""))return;state.billing.selectedMonth=v;const b=currentBill(true);activeBillPersonId=b.people[0]?.id||null;persist()}
-  function updateBill(kind,v){const b=currentBill();if(b.closed)return toast("Tháng đã chốt sổ");b[kind]=Math.max(0,Math.round(Number(v)||0));persist()}
-  function syncBillingMembers(){const b=currentBill();if(b.closed)return toast("Tháng đã chốt sổ");const n=monthDays(b.month),all=Object.fromEntries(Array.from({length:n},(_,i)=>[String(i+1),true]));let added=0;state.members.forEach(m=>{if(!b.people.some(p=>p.memberId===m.id||p.name.toLowerCase()===m.name.toLowerCase())){b.people.push({id:uid(),memberId:m.id,name:m.name,days:{...all}});added++}});activeBillPersonId=activeBillPersonId||b.people[0]?.id||null;persist(added?`Đã thêm ${added} thành viên`:"Không có thành viên mới")}
+  function billCalc(source=currentBill(false)||emptyBill()){const b=source,people=b.people||[],totalDays=people.reduce((s,p)=>s+stayCount(p,b),0),electric=allocate(b.electricity,people,b),water=allocate(b.water,people,b);return {b,people,totalDays,electric,water,electricRate:totalDays?b.electricity/totalDays:0,waterRate:totalDays?b.water/totalDays:0}}
+  function setBillMonth(v){if(!/^\d{4}-\d{2}$/.test(v||""))return;state.billing.selectedMonth=v;saveLocalUi();const b=currentBill(false);activeBillPersonId=b?.people?.[0]?.id||null;renderHome();renderBilling()}
+  function updateBill(kind,v){const b=ensureCurrentBill();if(b.closed)return toast("Tháng đã chốt sổ");b[kind]=Math.max(0,Math.round(Number(v)||0));touchBillField(b,kind);persist()}
+  function syncBillingMembers(){const b=ensureCurrentBill();if(b.closed)return toast("Tháng đã chốt sổ");const n=monthDays(b.month),all=Object.fromEntries(Array.from({length:n},(_,i)=>[String(i+1),true]));let added=0;state.members.forEach(m=>{if(!b.people.some(p=>p.memberId===m.id||p.name.toLowerCase()===m.name.toLowerCase())){const t=nowIso(),p={id:uid(),memberId:m.id,name:m.name,days:{...all},updatedAt:t,dayUpdatedAt:Object.fromEntries(Object.keys(all).map(d=>[d,t]))};b.people.push(p);delete state._sync.deletedBillingPeople[b.month]?.[billPersonKey(p)];added++}});b.updatedAt=nowIso();activeBillPersonId=activeBillPersonId||b.people[0]?.id||null;persist(added?`Đã thêm ${added} thành viên`:"Danh sách đã đầy đủ")}
   function openAddBillingPerson(){$("#billNewPersonName").value="";$("#memberModal").classList.add("show");setTimeout(()=>$("#billNewPersonName").focus(),80)}
-  function addBillingPerson(){const name=$("#billNewPersonName").value.trim().replace(/\s+/g," "),b=currentBill();if(!name)return toast("Nhập tên người");if(b.closed)return toast("Tháng đã chốt sổ");if(b.people.some(p=>p.name.toLowerCase()===name.toLowerCase()))return toast("Tên này đã có");const p={id:uid(),memberId:null,name,days:{}};b.people.push(p);activeBillPersonId=p.id;closeModal("memberModal");persist("Đã thêm người/khách")}
-  function activeBillPerson(){const b=currentBill();if(!activeBillPersonId||!b.people.some(p=>p.id===activeBillPersonId))activeBillPersonId=b.people[0]?.id||null;return b.people.find(p=>p.id===activeBillPersonId)||null}
+  function addBillingPerson(){const name=$("#billNewPersonName").value.trim().replace(/\s+/g," "),b=ensureCurrentBill();if(!name)return toast("Nhập tên người");if(b.closed)return toast("Tháng đã chốt sổ");if(b.people.some(p=>p.name.toLowerCase()===name.toLowerCase()))return toast("Tên này đã có");const t=nowIso(),p={id:uid(),memberId:null,name,days:{},updatedAt:t,dayUpdatedAt:{}};b.people.push(p);b.updatedAt=t;delete state._sync.deletedBillingPeople[b.month]?.[billPersonKey(p)];activeBillPersonId=p.id;closeModal("memberModal");persist("Đã thêm người/khách")}
+  function activeBillPerson(b=currentBill(false)){if(!b)return null;if(!activeBillPersonId||!b.people.some(p=>p.id===activeBillPersonId))activeBillPersonId=b.people[0]?.id||null;return b.people.find(p=>p.id===activeBillPersonId)||null}
   function selectBillPerson(id){activeBillPersonId=id;renderBilling()}
-  function removeActiveBillingPerson(){const b=currentBill(),p=activeBillPerson();if(!p)return;if(b.closed)return toast("Tháng đã chốt sổ");if(!confirm(`Xóa ${p.name} khỏi tháng này?`))return;b.people=b.people.filter(x=>x.id!==p.id);activeBillPersonId=b.people[0]?.id||null;persist("Đã xóa khỏi bảng tháng")}
-  function toggleBillDay(day){const b=currentBill(),p=activeBillPerson();if(!p)return toast("Chọn người trước");if(b.closed)return toast("Tháng đã chốt sổ — bấm Mở khóa để chỉnh sửa");p.days[String(day)]=!p.days?.[String(day)];persist()}
+  function removeActiveBillingPerson(){const b=currentBill(false),p=activeBillPerson(b);if(!b||!p)return;if(b.closed)return toast("Tháng đã chốt sổ");if(!confirm(`Xóa ${p.name} khỏi tháng này?`))return;state._sync.deletedBillingPeople[b.month]||={};state._sync.deletedBillingPeople[b.month][billPersonKey(p)]=nowIso();b.people=b.people.filter(x=>x.id!==p.id);b.updatedAt=nowIso();activeBillPersonId=b.people[0]?.id||null;persist("Đã xóa khỏi bảng tháng")}
+  function toggleBillDay(day){const b=currentBill(false),p=activeBillPerson(b);if(!p)return toast("Chọn người trước");if(b.closed)return toast("Tháng đã chốt sổ — bấm Mở khóa để chỉnh sửa");p.days[String(day)]=!p.days?.[String(day)];touchBillPerson(b,p,[day]);persist()}
   function dateDay(v,b){if(!v)return null;const [y,m,d]=v.split("-").map(Number),[by,bm]=b.month.split("-").map(Number);return y===by&&m===bm?d:null}
-  function applyStayRange(value){const b=currentBill(),p=activeBillPerson();if(!p)return toast("Chọn người trước");if(b.closed)return toast("Tháng đã chốt sổ");let from=dateDay($("#stayFrom").value,b),to=dateDay($("#stayTo").value,b);if(!from||!to)return toast("Chọn ngày bắt đầu và ngày cuối");if(from>to)[from,to]=[to,from];for(let d=from;d<=to;d++)p.days[String(d)]=value;persist(value?`Đã đánh dấu ở từ ngày ${from} đến ${to}`:`Đã đánh dấu vắng từ ngày ${from} đến ${to}`)}
-  function presetStay(mode){const b=currentBill(),p=activeBillPerson();if(!p)return toast("Chọn người trước");if(b.closed)return toast("Tháng đã chốt sổ");const [y,m]=b.month.split("-").map(Number),n=monthDays(b.month);p.days={};for(let d=1;d<=n;d++){const dow=new Date(y,m-1,d).getDay();p.days[String(d)]=mode==="all"||(mode==="weekdays"&&dow!==0&&dow!==6)}persist(mode==="all"?"Đã chọn ở cả tháng":mode==="weekdays"?"Đã chọn Thứ 2–Thứ 6":"Đã bỏ chọn toàn bộ")}
-  function toggleBillClosed(){const b=currentBill();if(!b.closed){const c=billCalc();if(!c.totalDays)return toast("Chưa có ngày ở để chốt");if(!confirm("Chốt sổ tháng này và khóa chỉnh sửa?"))return;b.closed=true;persist("Đã chốt sổ tháng")}else{if(!confirm("Mở khóa tháng để chỉnh sửa?"))return;b.closed=false;persist("Đã mở khóa tháng")}}
+  function applyStayRange(value){const b=currentBill(false),p=activeBillPerson(b);if(!p)return toast("Chọn người trước");if(b.closed)return toast("Tháng đã chốt sổ");let from=dateDay($("#stayFrom").value,b),to=dateDay($("#stayTo").value,b);if(!from||!to)return toast("Chọn ngày bắt đầu và ngày cuối");if(from>to)[from,to]=[to,from];const changed=[];for(let d=from;d<=to;d++){p.days[String(d)]=value;changed.push(d)}touchBillPerson(b,p,changed);persist(value?`Đã đánh dấu ở từ ngày ${from} đến ${to}`:`Đã đánh dấu vắng từ ngày ${from} đến ${to}`)}
+  function presetStay(mode){const b=currentBill(false),p=activeBillPerson(b);if(!p)return toast("Chọn người trước");if(b.closed)return toast("Tháng đã chốt sổ");const [y,m]=b.month.split("-").map(Number),n=monthDays(b.month),changed=[];p.days={};for(let d=1;d<=n;d++){const dow=new Date(y,m-1,d).getDay();p.days[String(d)]=mode==="all"||(mode==="weekdays"&&dow!==0&&dow!==6);changed.push(d)}touchBillPerson(b,p,changed);persist(mode==="all"?"Đã chọn ở cả tháng":mode==="weekdays"?"Đã chọn Thứ 2–Thứ 6":"Đã bỏ chọn toàn bộ")}
+  function toggleBillClosed(){const b=currentBill(false);if(!b)return toast("Chưa có dữ liệu tháng này");if(!b.closed){const c=billCalc(b);if(!c.totalDays)return toast("Chưa có ngày ở để chốt");if(!confirm("Chốt sổ tháng này và khóa chỉnh sửa?"))return;b.closed=true;touchBillField(b,"closed");persist("Đã chốt sổ tháng")}else{if(!confirm("Mở khóa tháng để chỉnh sửa?"))return;b.closed=false;touchBillField(b,"closed");persist("Đã mở khóa tháng")}}
   function billingText(){const c=billCalc();return [`⚡💧 TIỀN ĐIỆN NƯỚC ${monthLabel(c.b.month).toUpperCase()}`,`Tổng ngày-người: ${c.totalDays}`,`Điện: ${money(c.b.electricity)} · Nước: ${money(c.b.water)}`,"",...c.people.map(p=>`• ${p.name}: ${stayCount(p,c.b)} ngày · ${money(c.electric[p.id]+c.water[p.id])}`),"",`TỔNG: ${money(c.b.electricity+c.b.water)}`].join("\n")}
   function copyBilling(){copyText(billingText(),"Đã copy bảng tiền")}
   function downloadBillingCsv(){const c=billCalc();const rows=[["Tên người","Số ngày ở","Tiền điện","Tiền nước","Tổng cộng"],...c.people.map(p=>[p.name,stayCount(p,c.b),c.electric[p.id],c.water[p.id],c.electric[p.id]+c.water[p.id]]),["TỔNG",c.totalDays,c.b.electricity,c.b.water,c.b.electricity+c.b.water]];const csv="\ufeff"+rows.map(r=>r.map(v=>`"${String(v).replaceAll('"','""')}"`).join(",")).join("\n");const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([csv],{type:"text/csv;charset=utf-8"}));a.download=`dien-nuoc-${c.b.month}.csv`;a.click();URL.revokeObjectURL(a.href);toast("Đã tải CSV")}
   function renderBilling(){
     normalize();
-    const c=billCalc(),b=c.b,p=activeBillPerson();
+    const c=billCalc(),b=c.b,p=activeBillPerson(currentBill(false));
     $("#billMonth").value=b.month;
     $("#billElectricity").value=b.electricity||"";
     $("#billWater").value=b.water||"";
@@ -584,7 +727,7 @@
     $("#billingTable").innerHTML=`<table><thead><tr><th>Tên người</th><th>Ngày ở</th><th>Tiền điện</th><th>Tiền nước</th><th>Tổng cộng</th></tr></thead><tbody>${rows}</tbody><tfoot><tr class="total-row"><td data-label="Tổng">TỔNG</td><td data-label="Ngày ở">${c.totalDays}</td><td data-label="Tiền điện">${money(b.electricity)}</td><td data-label="Tiền nước">${money(b.water)}</td><td data-label="Tổng cộng">${money(b.electricity+b.water)}</td></tr></tfoot></table>`;
   }
 
-  function renderHome(){normalize();const b=currentBill();const presentCount=state.members.filter(m=>state.presence[m.id]!==false).length;const set=(id,value)=>{const el=$(id);if(el)el.textContent=value};set("#homeMemberCount",`${state.members.length} thành viên`);set("#homeWeekCount",`${state.schedules.length} tuần đã lưu`);set("#homeBillingMonth",monthLabel(b.month));set("#homeBillingPeople",`${b.people.length} người`);set("#appStatMembers",state.members.length);set("#appStatPresent",presentCount);set("#appStatSchedules",state.schedules.length);set("#appStatBill",money((b?.electricity||0)+(b?.water||0)))}
+  function renderHome(){normalize();const b=currentBill(false)||emptyBill();const presentCount=state.members.filter(m=>state.presence[m.id]!==false).length;const set=(id,value)=>{const el=$(id);if(el)el.textContent=value};set("#homeMemberCount",`${state.members.length} thành viên`);set("#homeWeekCount",`${state.schedules.length} tuần đã lưu`);set("#homeBillingMonth",monthLabel(b.month));set("#homeBillingPeople",`${b.people.length} người`);set("#appStatMembers",state.members.length);set("#appStatPresent",presentCount);set("#appStatSchedules",state.schedules.length);set("#appStatBill",money((b?.electricity||0)+(b?.water||0)))}
   function renderAll(){renderHome();renderCleaning();renderBilling()}
 
   $("#cleanMemberName").addEventListener("keydown",e=>{if(e.key==="Enter")addMember()});
@@ -600,9 +743,12 @@
   renderAll();
   showPage(location.hash.replace("#","")||"home");
   startCloudMode();
-  window.addEventListener("online",()=>{setSyncMode("syncing","Đang kết nối lại…");forceCloudSync()});
+  roomChannel?.addEventListener("message",e=>{if(e.data?.deviceId===DEVICE_ID)return;if(!syncInfo.dirty&&!state._pendingSync)loadRemote({force:true,silent:true})});
+  window.addEventListener("storage",e=>{if(e.key===KEY&&e.newValue&&!syncInfo.dirty){try{const incoming=normalizeState(JSON.parse(e.newValue));if(timeMs(incoming.updatedAt)>timeMs(state.updatedAt)){state=incoming;renderAll()}}catch{}}});
+  window.addEventListener("online",()=>{setSyncMode("syncing","Đang kết nối lại…");if(syncInfo.dirty||state._pendingSync)queueRemoteSave(50);else loadRemote({force:true,silent:true})});
   window.addEventListener("offline",()=>setSyncMode("offline","Mất kết nối"));
-  document.addEventListener("visibilitychange",()=>{if(!document.hidden&&!syncInfo.dirty)loadRemote({silent:true})});
+  window.addEventListener("beforeunload",()=>{try{roomChannel?.close()}catch{}});
+  document.addEventListener("visibilitychange",()=>{if(!document.hidden){if(syncInfo.dirty||state._pendingSync)queueRemoteSave(50);else loadRemote({force:true,silent:true})}});
 </script>
 </body>
 </html>
