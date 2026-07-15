@@ -339,7 +339,14 @@
   const KEY="cleaning_shared_apps_script_v2";
   const LEGACY_KEY="cleaning_shared_apps_script_v1";
   const LOCAL_UI_KEY="P708_LOCAL_UI_V2";
-  const APP_SCRIPT_URL="https://script.google.com/macros/s/AKfycbyN2pgFG6Kc-FKEplyGG8jhvWYCcK5oqcXnWXyWjaAHD_9eAwSSrt5wrokExCSLY-Mg5g/exec";
+  const FIREBASE_CONFIG={
+    apiKey:"REPLACE_FIREBASE_API_KEY",
+    authDomain:"REPLACE_PROJECT.firebaseapp.com",
+    projectId:"REPLACE_PROJECT_ID",
+    storageBucket:"REPLACE_PROJECT.firebasestorage.app",
+    messagingSenderId:"REPLACE_MESSAGING_SENDER_ID",
+    appId:"REPLACE_FIREBASE_APP_ID"
+  };
   const ROOM_CODE="P708";
   const SYNC_SCHEMA_VERSION=2;
   const $=s=>document.querySelector(s);
@@ -352,6 +359,7 @@
   const LOCAL_EDIT_GRACE_MS=1800;
   let state=loadState(),selectedScheduleId=null,activeBillPersonId=null,saveTimer=null,syncTimer=null;
   let syncInfo={ready:false,loading:false,saving:false,verifying:false,dirty:false,pendingSave:false,lastFingerprint:"",lastCloudAt:null,lastLocalEditAt:0,saveAttempts:0,lastError:""};
+  let realtimeEngine=null;
   const roomChannel="BroadcastChannel" in window?new BroadcastChannel(`p708-${ROOM_CODE}`):null;
 
   function todayMonth(){const d=new Date();return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}`}
@@ -510,121 +518,141 @@
   }
   function saveCache(){normalize();storageSet(KEY,JSON.stringify(state));saveLocalUi()}
   function announceLocalChange(){try{roomChannel?.postMessage({type:"changed",deviceId:DEVICE_ID,updatedAt:state.updatedAt})}catch{}}
-  function persist(message=""){
-    normalize();markStateChanged();saveCache();renderAll();announceLocalChange();queueRemoteSave();
-    if(message)toast(message);
+
+  function toSyncShape(source){
+    const s=normalizeState(deepClone(source||defaultState()));
+    return {
+      members:Object.fromEntries(s.members.map(m=>[m.id,deepClone(m)])),
+      presence:deepClone(s.presence||{}),
+      schedules:Object.fromEntries(s.schedules.map(item=>[item.weekStart,deepClone(item)])),
+      billingMonths:Object.fromEntries(s.billing.months.map(month=>[
+        month.month,
+        {
+          month:month.month,
+          electricity:Number(month.electricity)||0,
+          water:Number(month.water)||0,
+          closed:!!month.closed,
+          updatedAt:month.updatedAt||"",
+          fieldUpdatedAt:deepClone(month.fieldUpdatedAt||{}),
+          people:Object.fromEntries((month.people||[]).map(person=>[billPersonKey(person),deepClone(person)]))
+        }
+      ])),
+      settings:deepClone(s.settings||defaultState().settings)
+    };
   }
-  function queueRemoteSave(delay=500){clearTimeout(saveTimer);saveTimer=setTimeout(()=>saveRemote(false),delay)}
-  function publicState(){
-    normalize();const payload=deepClone(state);payload.roomCode=ROOM_CODE;payload.updatedAt=payload.updatedAt||nowIso();payload.updatedBy=payload.updatedBy||DEVICE_ID;payload._pendingSync=false;
-    if(payload.billing)delete payload.billing.selectedMonth;
-    return payload;
-  }
-  function setSyncMode(mode,text){
-    ["#cleanSyncButton","#billSyncButton"].forEach(id=>{const e=$(id);if(!e)return;e.classList.toggle("syncing",mode==="syncing");e.classList.toggle("offline",mode==="offline");e.setAttribute("aria-busy",mode==="syncing"?"true":"false");if(syncInfo.lastCloudAt)e.title=`${text} · Lần cuối ${syncInfo.lastCloudAt.toLocaleTimeString("vi-VN")}`});
-    setSyncText(text);
-  }
-  function getRemoteData(timeoutMs=9000){
-    if(!APP_SCRIPT_URL||!ROOM_CODE)return Promise.resolve({ok:false,error:"missing-config"});
-    return new Promise(resolve=>{
-      const cb="room_cb_"+Date.now()+"_"+Math.floor(Math.random()*99999),script=document.createElement("script");let finished=false;
-      const finish=result=>{if(finished)return;finished=true;clearTimeout(timeout);try{delete window[cb]}catch{};script.remove();resolve(result)};
-      const timeout=setTimeout(()=>finish({ok:false,error:"timeout"}),timeoutMs);
-      window[cb]=res=>finish(res&&res.ok?{ok:true,data:res.data||null,serverTime:res.serverTime||null,revision:res.revision||0}:{ok:false,error:res?.error||"invalid-response"});
-      script.onerror=()=>finish({ok:false,error:"network"});
-      script.src=`${APP_SCRIPT_URL}?action=load&roomCode=${encodeURIComponent(ROOM_CODE)}&callback=${cb}&_=${Date.now()}`;
-      document.body.appendChild(script);
+
+  function fromSyncShape(shape){
+    const selectedMonth=state.billing?.selectedMonth||loadLocalUi().selectedMonth||todayMonth();
+    const months=Object.values(shape?.billingMonths||{}).map(month=>({
+      ...deepClone(month),
+      people:Object.values(month?.people||{}).map(deepClone)
+    }));
+    return normalizeState({
+      ...defaultState(),
+      members:Object.values(shape?.members||{}).map(deepClone),
+      presence:deepClone(shape?.presence||{}),
+      schedules:Object.values(shape?.schedules||{}).map(deepClone),
+      billing:{selectedMonth,months},
+      settings:{...defaultState().settings,...deepClone(shape?.settings||{})},
+      updatedAt:nowIso(),
+      updatedBy:"firestore",
+      roomCode:ROOM_CODE,
+      _sync:defaultSyncMeta(),
+      _pendingSync:false
     });
   }
-  function applyCloudState(remoteData){
-    const currentMonth=state.billing?.selectedMonth||loadLocalUi().selectedMonth||todayMonth();
-    state=normalizeState({...defaultState(),...deepClone(remoteData||{}),billing:deepClone(remoteData?.billing||defaultState().billing),_pendingSync:false});
-    state.billing.selectedMonth=currentMonth;state.roomCode=ROOM_CODE;syncInfo.lastFingerprint=stateFingerprint(state);syncInfo.dirty=false;syncInfo.lastCloudAt=new Date();syncInfo.lastError="";saveCache();
-    if(selectedScheduleId&&!state.schedules.some(s=>s.id===selectedScheduleId))selectedScheduleId=state.schedules.at(-1)?.id||null;
-    const bill=currentBill(false);if(activeBillPersonId&&!bill?.people?.some(p=>p.id===activeBillPersonId))activeBillPersonId=bill?.people?.[0]?.id||null;
-    renderAll();
-  }
+
   function hasCachedData(){return !!(state.members?.length||state.schedules?.length||state.billing?.months?.length)}
-  function sleep(ms){return new Promise(r=>setTimeout(r,ms))}
-  async function verifyRemoteSave(expected,show=false){
-    if(syncInfo.verifying)return false;
-    syncInfo.verifying=true;
-    const delays=[650,1100,1900,3000];
-    for(let i=0;i<delays.length;i++){
-      setSyncMode("syncing",`Đang xác nhận ${i+1}/${delays.length}…`);await sleep(delays[i]);
-      const result=await getRemoteData(7500);
-      if(!result.ok){syncInfo.lastError=result.error||"verify-failed";continue}
-      const remote=result.data||{},matchedWrite=remote?._sync?.lastWriteId===expected.writeId,matchedData=stateFingerprint(remote)===expected.fingerprint;
-      if(matchedWrite||matchedData){
-        const newerLocal=timeMs(state.updatedAt)>timeMs(expected.updatedAt);
-        if(newerLocal){state=mergeCloudStates(remote,state);state._pendingSync=true;syncInfo.dirty=true;saveCache();renderAll();queueRemoteSave(350)}
-        else{applyCloudState(remote);state._pendingSync=false;syncInfo.dirty=false;saveCache()}
-        syncInfo.saveAttempts=0;syncInfo.verifying=false;setSyncMode(newerLocal?"syncing":"online",newerLocal?"Đã lưu, còn thay đổi mới":"Đã đồng bộ");
-        if(show)toast(newerLocal?"Đã lưu bản trước; đang đồng bộ thay đổi mới":"Đã đồng bộ dữ liệu giữa các máy");
-        return true;
-      }
-    }
-    syncInfo.verifying=false;syncInfo.dirty=true;state._pendingSync=true;saveCache();syncInfo.saveAttempts++;
-    setSyncMode(navigator.onLine?"offline":"offline",navigator.onLine?"Chưa xác nhận":"Mất kết nối");
-    queueRemoteSave(Math.min(15000,2500+syncInfo.saveAttempts*1800));
-    if(show)toast("Dữ liệu vẫn an toàn trên máy; hệ thống sẽ tự thử lại");
-    return false;
+
+  function setSyncMode(mode,text){
+    ["#cleanSyncButton","#billSyncButton"].forEach(id=>{
+      const e=$(id);if(!e)return;
+      e.classList.toggle("syncing",mode==="syncing");
+      e.classList.toggle("offline",mode==="offline");
+      e.setAttribute("aria-busy",mode==="syncing"?"true":"false");
+      if(syncInfo.lastCloudAt)e.title=`${text} · Lần cuối ${syncInfo.lastCloudAt.toLocaleTimeString("vi-VN")}`;
+    });
+    setSyncText(text);
   }
+
+  function persist(message=""){
+    normalize();markStateChanged();saveCache();renderAll();announceLocalChange();
+    const nextShape=toSyncShape(state);
+    if(realtimeEngine){
+      realtimeEngine.recordShape(nextShape).catch(error=>{
+        syncInfo.lastError=String(error?.message||error);
+        setSyncMode("offline","Đã lưu trên máy — sẽ thử lại");
+      });
+    }
+    if(message)toast(message);
+  }
+
   async function saveRemote(show=true){
-    if(!APP_SCRIPT_URL||!ROOM_CODE||!navigator.onLine){setSyncMode("offline","Mất kết nối");return false}
-    if(syncInfo.saving||syncInfo.verifying){syncInfo.pendingSave=true;return false}
-    syncInfo.saving=true;syncInfo.pendingSave=false;setSyncMode("syncing","Đang hợp nhất dữ liệu…");
-    try{
-      const preflight=await getRemoteData(6500);
-      if(preflight.ok&&preflight.data){
-        const selectedMonth=state.billing.selectedMonth;
-        state=mergeCloudStates(preflight.data,state);state.billing.selectedMonth=selectedMonth;
-        state.updatedAt=nowIso();state.updatedBy=DEVICE_ID;state._pendingSync=true;syncInfo.dirty=true;saveCache();renderAll();
-      }
-      const writeId=uid(),payload=publicState();payload._sync={...defaultSyncMeta(),...(payload._sync||{}),lastWriteId:writeId};payload.updatedAt=nowIso();payload.updatedBy=DEVICE_ID;
-      state.updatedAt=payload.updatedAt;state.updatedBy=DEVICE_ID;state._sync.lastWriteId=writeId;state._pendingSync=true;saveCache();
-      const expected={writeId,updatedAt:payload.updatedAt,fingerprint:stateFingerprint(payload)};
-      setSyncMode("syncing","Đang gửi dữ liệu chung…");
-      await fetch(APP_SCRIPT_URL,{method:"POST",mode:"no-cors",cache:"no-store",headers:{"Content-Type":"text/plain;charset=utf-8"},body:JSON.stringify({action:"save",roomCode:ROOM_CODE,pageUrl:location.href.split("#")[0],deviceId:DEVICE_ID,writeId,data:payload})});
-      syncInfo.saving=false;
-      const ok=await verifyRemoteSave(expected,show);
-      if(syncInfo.pendingSave){syncInfo.pendingSave=false;queueRemoteSave(350)}
-      return ok;
-    }catch(err){
-      syncInfo.saving=false;syncInfo.dirty=true;state._pendingSync=true;syncInfo.lastError=String(err?.message||err);saveCache();setSyncMode("offline",navigator.onLine?"Lỗi máy chủ":"Mất kết nối");queueRemoteSave(4500);if(show)toast("Đã lưu trên máy; sẽ tự đồng bộ lại");return false;
-    }
+    if(!realtimeEngine){setSyncMode("offline","Chưa cấu hình Firestore");return false}
+    const ok=await realtimeEngine.flush();
+    if(show)toast(ok?"Đã đồng bộ dữ liệu":"Dữ liệu đã giữ trên máy và sẽ tự thử lại");
+    return ok;
   }
-  async function loadRemote({initial=false,force=false,silent=false}={}){
-    if(!APP_SCRIPT_URL||!ROOM_CODE||!navigator.onLine)return false;
-    if(syncInfo.loading||syncInfo.saving||syncInfo.verifying)return false;
-    if(!initial&&!force&&(syncInfo.dirty||state._pendingSync||Date.now()-syncInfo.lastLocalEditAt<LOCAL_EDIT_GRACE_MS))return false;
-    syncInfo.loading=true;if(!silent)setSyncMode("syncing",initial?"Đang tải dữ liệu chung…":"Đang lấy dữ liệu mới…");
-    const result=await getRemoteData();syncInfo.loading=false;
-    if(!result.ok){syncInfo.lastError=result.error||"load-failed";setSyncMode("offline",initial?"Dùng dữ liệu trên máy":"Mất kết nối");return false}
-    const remote=result.data;
-    if(!remote||!Object.keys(remote).length){
-      if(hasCachedData()){syncInfo.dirty=true;state._pendingSync=true;saveCache();queueRemoteSave(100)}
-      else setSyncMode("online","Đã kết nối");
-      return true;
-    }
-    if(syncInfo.dirty||state._pendingSync){queueRemoteSave(100);setSyncMode("syncing","Đang hợp nhất thay đổi…");return true}
-    if(force||stateFingerprint(remote)!==stateFingerprint(state))applyCloudState(remote);
-    syncInfo.lastCloudAt=new Date();setSyncMode("online","Đã đồng bộ");return true;
+
+  async function loadRemote({force=false}={}){
+    if(!realtimeEngine)return false;
+    return force?realtimeEngine.forceSync():realtimeEngine.flush();
   }
+
+  function queueRemoteSave(){if(realtimeEngine)void realtimeEngine.recordShape(toSyncShape(state))}
+  function startSyncLoop(){}
+
   async function forceCloudSync(){
-    if(syncInfo.saving||syncInfo.verifying)return toast("Hệ thống đang đồng bộ…");
-    if(syncInfo.dirty||state._pendingSync){await saveRemote(true);return}
-    const ok=await loadRemote({force:true,silent:false});toast(ok?"Đã lấy dữ liệu mới nhất từ phòng P708":"Không thể kết nối dữ liệu chung");
+    if(!realtimeEngine)return toast("Chưa cấu hình Firebase");
+    setSyncMode("syncing","Đang đồng bộ ngay…");
+    const ok=await realtimeEngine.forceSync();
+    toast(ok?"Đã lấy dữ liệu mới nhất":"Không thể kết nối máy chủ");
   }
-  function startSyncLoop(){clearInterval(syncTimer);syncTimer=setInterval(()=>{if(document.hidden||syncInfo.saving||syncInfo.verifying)return;if(syncInfo.dirty||state._pendingSync)queueRemoteSave(50);else loadRemote({silent:true})},SYNC_INTERVAL_MS)}
+
   async function startCloudMode(){
     const overlay=$("#cloudOverlay");overlay?.classList.add("show");overlay?.setAttribute("aria-hidden","false");
-    syncInfo.ready=true;startSyncLoop();await loadRemote({initial:true,force:true,silent:false});renderAll();
-    overlay?.classList.remove("show");overlay?.setAttribute("aria-hidden","true");
+    try{
+      const {createP708SyncEngine}=await import("./p708-sync-engine.js");
+      realtimeEngine=createP708SyncEngine({
+        firebaseConfig:FIREBASE_CONFIG,
+        roomCode:ROOM_CODE,
+        deviceId:DEVICE_ID,
+        initialShape:toSyncShape(state),
+        restoreUnsynced:!!state._pendingSync,
+        hasMeaningfulLocalData:hasCachedData(),
+        onShape:(shape,meta)=>{
+          state=fromSyncShape(shape);
+          state._pendingSync=meta.pending>0;
+          syncInfo.dirty=meta.pending>0;
+          syncInfo.lastCloudAt=new Date();
+          saveCache();
+          if(selectedScheduleId&&!state.schedules.some(s=>s.id===selectedScheduleId))selectedScheduleId=state.schedules.at(-1)?.id||null;
+          const bill=currentBill(false);if(activeBillPersonId&&!bill?.people?.some(p=>p.id===activeBillPersonId))activeBillPersonId=bill?.people?.[0]?.id||null;
+          renderAll();
+        },
+        onStatus:status=>{
+          syncInfo.lastError=status.error?String(status.error?.message||status.error):"";
+          syncInfo.dirty=status.pending>0;
+          state._pendingSync=status.pending>0;
+          if(status.mode==="online")syncInfo.lastCloudAt=new Date();
+          setSyncMode(status.mode,status.text);
+          saveCache();
+        }
+      });
+      await realtimeEngine.start();
+      syncInfo.ready=true;
+    }catch(error){
+      syncInfo.lastError=String(error?.message||error);
+      setSyncMode("offline",error?.message||"Không thể khởi động đồng bộ");
+      toast("Cần điền FIREBASE_CONFIG trước khi dùng đồng bộ real-time");
+    }finally{
+      overlay?.classList.remove("show");overlay?.setAttribute("aria-hidden","true");
+    }
   }
+
   function setSyncText(t){
     ["#cleanSync","#billSync"].forEach(id=>{const e=$(id);if(e)e.textContent=t});
-    const h=$("#homeSyncText");if(h){const bad=t.includes("Mất")||t.includes("Lỗi")||t.includes("Chưa");h.textContent=bad?"Dữ liệu đang giữ an toàn trên máy và sẽ tự đồng bộ lại":`Phòng ${ROOM_CODE} · ${t}${syncInfo.lastCloudAt?` lúc ${syncInfo.lastCloudAt.toLocaleTimeString("vi-VN")}`:""}`}
+    const h=$("#homeSyncText");if(h){const bad=t.includes("Mất")||t.includes("Lỗi")||t.includes("Chưa")||t.includes("ngoại tuyến");h.textContent=bad?"Dữ liệu đang giữ an toàn trên máy và sẽ tự đồng bộ lại":`Phòng ${ROOM_CODE} · ${t}${syncInfo.lastCloudAt?` lúc ${syncInfo.lastCloudAt.toLocaleTimeString("vi-VN")}`:""}`}
   }
 
   function go(page){location.hash=page==="home"?"":page;showPage(page)}
@@ -743,12 +771,12 @@
   renderAll();
   showPage(location.hash.replace("#","")||"home");
   startCloudMode();
-  roomChannel?.addEventListener("message",e=>{if(e.data?.deviceId===DEVICE_ID)return;if(!syncInfo.dirty&&!state._pendingSync)loadRemote({force:true,silent:true})});
+  roomChannel?.addEventListener("message",e=>{if(e.data?.deviceId===DEVICE_ID)return;if(realtimeEngine)void realtimeEngine.forceSync()});
   window.addEventListener("storage",e=>{if(e.key===KEY&&e.newValue&&!syncInfo.dirty){try{const incoming=normalizeState(JSON.parse(e.newValue));if(timeMs(incoming.updatedAt)>timeMs(state.updatedAt)){state=incoming;renderAll()}}catch{}}});
-  window.addEventListener("online",()=>{setSyncMode("syncing","Đang kết nối lại…");if(syncInfo.dirty||state._pendingSync)queueRemoteSave(50);else loadRemote({force:true,silent:true})});
+  window.addEventListener("online",()=>{setSyncMode("syncing","Đang kết nối lại…");if(realtimeEngine)void realtimeEngine.flush()});
   window.addEventListener("offline",()=>setSyncMode("offline","Mất kết nối"));
   window.addEventListener("beforeunload",()=>{try{roomChannel?.close()}catch{}});
-  document.addEventListener("visibilitychange",()=>{if(!document.hidden){if(syncInfo.dirty||state._pendingSync)queueRemoteSave(50);else loadRemote({force:true,silent:true})}});
+  document.addEventListener("visibilitychange",()=>{if(!document.hidden&&realtimeEngine)void realtimeEngine.forceSync()});
 </script>
 </body>
 </html>
