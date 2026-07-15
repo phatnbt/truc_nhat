@@ -175,7 +175,7 @@
     .sync-pill.syncing .sync-dot{background:var(--amber);animation:syncBlink .85s ease-in-out infinite}
     .sync-pill.offline .sync-dot{background:var(--red)}
     @keyframes syncBlink{0%,100%{opacity:.35;transform:scale(.82)}50%{opacity:1;transform:scale(1.14)}}
-    .cloud-overlay{position:fixed;inset:0;z-index:120;display:none;align-items:center;justify-content:center;padding:20px;background:rgba(244,247,252,.82);backdrop-filter:blur(16px)}
+    .cloud-overlay{position:fixed;inset:0;z-index:120;display:none;align-items:center;justify-content:center;padding:20px;background:rgba(244,247,252,.82);backdrop-filter:blur(16px);pointer-events:none}
     .cloud-overlay.show{display:flex}
     .cloud-loader{width:min(360px,100%);padding:28px;border-radius:26px;background:#fff;border:1px solid var(--line);box-shadow:0 28px 80px rgba(15,23,42,.18);text-align:center}
     .cloud-icon{width:64px;height:64px;margin:0 auto 16px;border-radius:22px;display:grid;place-items:center;font-size:30px;background:linear-gradient(135deg,var(--blue-soft),var(--purple-soft));animation:cloudFloat 1.8s ease-in-out infinite}
@@ -195,6 +195,13 @@
         <div class="brand-mark">🏠</div>
         <h1>Quản lý phòng P708</h1>
         <p>Một nơi đơn giản để chia lịch trực nhật và tính tiền điện, nước minh bạch theo số ngày ở thực tế.</p>
+        <div class="surface-note">✨ Dữ liệu dùng chung · thao tác tức thì · tự đồng bộ giữa các thiết bị</div>
+      </div>
+      <div class="app-stats">
+        <div class="app-stat"><span>Thành viên</span><b id="appStatMembers">0</b></div>
+        <div class="app-stat"><span>Người có mặt</span><b id="appStatPresent">0</b></div>
+        <div class="app-stat"><span>Tuần trực</span><b id="appStatSchedules">0</b></div>
+        <div class="app-stat"><span>Tổng hóa đơn</span><b id="appStatBill">0 đ</b></div>
       </div>
       <div class="home-grid">
         <article class="card home-service" style="--service-soft:#eff6ff;--service-color:#2563eb">
@@ -310,7 +317,7 @@
     <div class="modal-card"><div class="card-head"><div><h3>Chỉnh phân công</h3><p>Chọn người phụ trách cho từng việc.</p></div><button class="icon-btn" onclick="closeModal('manualModal')">✕</button></div><div class="modal-grid" id="manualFields"></div><div class="modal-actions"><button class="btn" onclick="closeModal('manualModal')">Hủy</button><button class="btn primary" onclick="saveManualSchedule()">Lưu thay đổi</button></div></div>
   </div>
 
-  <div class="cloud-overlay show" id="cloudOverlay">
+  <div class="cloud-overlay" id="cloudOverlay" aria-hidden="true">
     <div class="cloud-loader">
       <div class="cloud-icon">☁️</div>
       <h3>Đang tải dữ liệu chung</h3>
@@ -330,16 +337,19 @@
     {id:"rac",name:"Vứt rác, bình nước",emoji:"🗑️",w:2}
   ];
   const KEY="cleaning_shared_apps_script_v1";
-  const APP_SCRIPT_URL="https://script.google.com/macros/s/AKfycbzYXjhxCs_ICoVMFQcm9QB42XJ79aoR3YdJxdM6HQjlAadoB--TdsnYneNYCWVN4MJZAQ/exec";
+  const APP_SCRIPT_URL="https://script.google.com/macros/s/AKfycbz4R8VkZO073bjly8KIwoJF2Vkg2cehS4b_DH7BCMaUN9nR3f0heMeLDc-NTcer3EdiXQ/exec";
   const ROOM_CODE="P708";
   const $=s=>document.querySelector(s);
-  const DEVICE_ID=localStorage.getItem("P708_DEVICE_ID")||uid();
-  localStorage.setItem("P708_DEVICE_ID",DEVICE_ID);
-  const SYNC_INTERVAL_MS=5000;
-  let state=loadState(),selectedScheduleId=null,activeBillPersonId=null,saveTimer=null,syncTimer=null;
-  let syncInfo={ready:false,loading:false,saving:false,dirty:false,pendingSave:false,lastFingerprint:"",lastCloudAt:null};
-
   function uid(){return crypto.randomUUID?crypto.randomUUID():Date.now().toString(36)+Math.random().toString(36).slice(2)}
+  function storageGet(key){try{return localStorage.getItem(key)}catch{return null}}
+  function storageSet(key,value){try{localStorage.setItem(key,value);return true}catch{return false}}
+  function getDeviceId(){const old=storageGet("P708_DEVICE_ID");if(old)return old;const id=uid();storageSet("P708_DEVICE_ID",id);return id}
+  const DEVICE_ID=getDeviceId();
+  const SYNC_INTERVAL_MS=5000;
+  const LOCAL_EDIT_GRACE_MS=4500;
+  let state=loadState(),selectedScheduleId=null,activeBillPersonId=null,saveTimer=null,syncTimer=null,verifyTimer=null;
+  let syncInfo={ready:false,loading:false,saving:false,verifying:false,dirty:false,pendingSave:false,lastFingerprint:"",lastCloudAt:null,lastLocalEditAt:0,saveAttempts:0};
+
   function todayMonth(){const d=new Date();return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}`}
   function dateValue(d){return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`}
   function parseDate(v){const [y,m,d]=v.split("-").map(Number);return new Date(y,m-1,d)}
@@ -348,14 +358,15 @@
   function money(v){return new Intl.NumberFormat("vi-VN").format(Math.round(Number(v)||0))+" đ"}
   function monthLabel(v){if(!/^\d{4}-\d{2}$/.test(v||""))return v;const [y,m]=v.split("-");return `Tháng ${Number(m)}/${y}`}
   function monthDays(v){const [y,m]=v.split("-").map(Number);return new Date(y,m,0).getDate()}
-  function toast(msg){const el=$("#toast");el.textContent=msg;el.classList.add("show");clearTimeout(toast.t);toast.t=setTimeout(()=>el.classList.remove("show"),1800)}
-  function defaultState(){return {members:[],presence:{},schedules:[],billing:{selectedMonth:todayMonth(),months:[]},settings:{weights:Object.fromEntries(TASKS.map(t=>[t.id,t.w]))}}}
-  function loadState(){try{const raw=localStorage.getItem(KEY);if(!raw)return defaultState();const p=JSON.parse(raw);return {...defaultState(),...p,settings:{...defaultState().settings,...(p.settings||{})},billing:p.billing||defaultState().billing,presence:p.presence||{}}}catch{return defaultState()}}
-  function normalize(){state.members||=[];state.schedules||=[];state.presence||={};state.billing||={selectedMonth:todayMonth(),months:[]};state.billing.selectedMonth||=todayMonth();state.billing.months||=[];state.settings||={};state.settings.weights||=Object.fromEntries(TASKS.map(t=>[t.id,t.w]));state.members.forEach(m=>state.presence[m.id]??=true);state.billing.months.forEach(b=>{b.people||=[];b.electricity=Number(b.electricity)||0;b.water=Number(b.water)||0;b.closed=!!b.closed;b.people.forEach(p=>p.days||={})})}
+  function toast(msg){const el=$("#toast");if(!el)return;el.textContent=msg;el.classList.add("show");clearTimeout(toast.t);toast.t=setTimeout(()=>el.classList.remove("show"),2100)}
+  function defaultState(){return {members:[],presence:{},schedules:[],billing:{selectedMonth:todayMonth(),months:[]},settings:{weights:Object.fromEntries(TASKS.map(t=>[t.id,t.w]))},updatedAt:"",updatedBy:"",_pendingSync:false}}
+  function loadState(){try{const raw=storageGet(KEY);if(!raw)return defaultState();const p=JSON.parse(raw);return {...defaultState(),...p,settings:{...defaultState().settings,...(p.settings||{})},billing:p.billing||defaultState().billing,presence:p.presence||{}}}catch{return defaultState()}}
+  function normalize(){state.members||=[];state.schedules||=[];state.presence||={};state.billing||={selectedMonth:todayMonth(),months:[]};state.billing.selectedMonth||=todayMonth();state.billing.months||=[];state.settings||={};state.settings.weights||=Object.fromEntries(TASKS.map(t=>[t.id,t.w]));state.members.forEach(m=>state.presence[m.id]??=true);state.billing.months.forEach(b=>{b.people||=[];b.electricity=Number(b.electricity)||0;b.water=Number(b.water)||0;b.closed=!!b.closed;b.people.forEach(p=>p.days||={})});state._pendingSync=!!state._pendingSync}
+  function timeMs(v){const n=Date.parse(v||"");return Number.isFinite(n)?n:0}
   function stateFingerprint(data){
     try{
       const clone=JSON.parse(JSON.stringify(data||{}));
-      delete clone.updatedAt;delete clone.updatedBy;delete clone.roomCode;
+      delete clone.updatedAt;delete clone.updatedBy;delete clone.roomCode;delete clone.serverSavedAt;delete clone._pendingSync;
       return JSON.stringify(clone);
     }catch{return ""}
   }
@@ -363,154 +374,116 @@
     state.updatedAt=new Date().toISOString();
     state.updatedBy=DEVICE_ID;
     state.roomCode=ROOM_CODE;
+    state._pendingSync=true;
     syncInfo.dirty=true;
+    syncInfo.lastLocalEditAt=Date.now();
   }
+  function saveCache(){normalize();storageSet(KEY,JSON.stringify(state))}
   function persist(message=""){
-    normalize();markStateChanged();
-    localStorage.setItem(KEY,JSON.stringify(state));
+    normalize();markStateChanged();saveCache();
     renderAll();queueRemoteSave();
     if(message)toast(message);
   }
-  function queueRemoteSave(){
+  function queueRemoteSave(delay=650){
     clearTimeout(saveTimer);
-    saveTimer=setTimeout(()=>saveRemote(false),550);
+    saveTimer=setTimeout(()=>saveRemote(false),delay);
   }
-  function publicState(){
-    normalize();
-    return {...state,roomCode:ROOM_CODE,updatedAt:state.updatedAt||new Date().toISOString(),updatedBy:state.updatedBy||DEVICE_ID};
-  }
+  function publicState(){normalize();return {...state,roomCode:ROOM_CODE,updatedAt:state.updatedAt||new Date().toISOString(),updatedBy:state.updatedBy||DEVICE_ID,_pendingSync:false}}
   function setSyncMode(mode,text){
-    ["#cleanSyncButton","#billSyncButton"].forEach(id=>{
-      const e=$(id);if(!e)return;
-      e.classList.toggle("syncing",mode==="syncing");
-      e.classList.toggle("offline",mode==="offline");
-    });
+    ["#cleanSyncButton","#billSyncButton"].forEach(id=>{const e=$(id);if(!e)return;e.classList.toggle("syncing",mode==="syncing");e.classList.toggle("offline",mode==="offline")});
     setSyncText(text);
   }
-  function saveRemote(show=true){
-    if(!APP_SCRIPT_URL||!ROOM_CODE)return Promise.resolve(false);
-    if(syncInfo.saving){syncInfo.pendingSave=true;return Promise.resolve(false)}
-    syncInfo.saving=true;syncInfo.pendingSave=false;
-    setSyncMode("syncing","Đang lưu chung…");
-    const payload=publicState();
-    return fetch(APP_SCRIPT_URL,{method:"POST",mode:"no-cors",headers:{"Content-Type":"text/plain;charset=utf-8"},body:JSON.stringify({action:"save",roomCode:ROOM_CODE,pageUrl:location.href.split("#")[0],deviceId:DEVICE_ID,data:payload})})
-      .then(()=>{
-        syncInfo.dirty=false;
-        syncInfo.lastFingerprint=stateFingerprint(payload);
-        syncInfo.lastCloudAt=new Date();
-        setSyncMode("online","Đã đồng bộ");
-        if(show)toast("Đã lưu lên dữ liệu chung của phòng");
-        return true;
-      })
-      .catch(()=>{
-        syncInfo.dirty=true;
-        setSyncMode("offline","Mất kết nối");
-        if(show)toast("Chưa kết nối được dữ liệu chung");
-        return false;
-      })
-      .finally(()=>{
-        syncInfo.saving=false;
-        if(syncInfo.pendingSave){syncInfo.pendingSave=false;queueRemoteSave()}
-      });
-  }
-  function applyCloudState(remoteData){
-    state={...defaultState(),...remoteData,settings:{...defaultState().settings,...(remoteData.settings||{})},billing:remoteData.billing||defaultState().billing,presence:remoteData.presence||{}};
-    normalize();
-    state.roomCode=ROOM_CODE;
-    syncInfo.lastFingerprint=stateFingerprint(state);
-    syncInfo.dirty=false;
-    syncInfo.lastCloudAt=new Date();
-    localStorage.setItem(KEY,JSON.stringify(state));
-    selectedScheduleId=state.schedules.at(-1)?.id||null;
-    const bill=currentBill(false);
-    activeBillPersonId=bill?.people?.[0]?.id||null;
-    renderAll();
-  }
-  function hasCachedData(){
-    return !!(state.members?.length||state.schedules?.length||state.billing?.months?.length);
-  }
-  function loadRemote({initial=false,force=false,silent=false}={}){
-    if(!APP_SCRIPT_URL||!ROOM_CODE)return Promise.resolve(false);
-    if(syncInfo.loading)return Promise.resolve(false);
-    syncInfo.loading=true;
-    if(!silent)setSyncMode("syncing",initial?"Đang tải dữ liệu chung…":"Đang làm mới…");
+  function getRemoteData(timeoutMs=9000){
+    if(!APP_SCRIPT_URL||!ROOM_CODE)return Promise.resolve({ok:false,error:"missing-config"});
     return new Promise(resolve=>{
-      const cb="room_cb_"+Date.now()+"_"+Math.floor(Math.random()*9999);
-      const script=document.createElement("script");
-      let finished=false;
-      const finish=ok=>{
-        if(finished)return;finished=true;
-        clearTimeout(timeout);syncInfo.loading=false;
-        try{delete window[cb]}catch{}
-        script.remove();resolve(ok);
-      };
-      const timeout=setTimeout(()=>{
-        if(initial){normalize();renderAll()}
-        setSyncMode("offline","Mất kết nối");
-        finish(false);
-      },12000);
-      window[cb]=res=>{
-        try{
-          if(res?.ok&&res.data){
-            const remoteFingerprint=stateFingerprint(res.data);
-            const shouldApply=initial||force||(!syncInfo.dirty&&!syncInfo.saving&&remoteFingerprint!==syncInfo.lastFingerprint);
-            if(shouldApply)applyCloudState(res.data);
-            syncInfo.lastFingerprint=remoteFingerprint||syncInfo.lastFingerprint;
-            setSyncMode("online","Đã đồng bộ");
-            finish(true);
-          }else if(initial&&hasCachedData()){
-            renderAll();
-            saveRemote(false);
-            setSyncMode("online","Đang tạo dữ liệu chung…");
-            finish(true);
-          }else{
-            if(initial){state=defaultState();normalize();renderAll();saveRemote(false)}
-            setSyncMode("online","Đã kết nối");
-            finish(true);
-          }
-        }catch{
-          if(initial){normalize();renderAll()}
-          setSyncMode("offline","Lỗi đồng bộ");
-          finish(false);
-        }
-      };
-      script.onerror=()=>{
-        if(initial){normalize();renderAll()}
-        setSyncMode("offline","Mất kết nối");
-        finish(false);
-      };
+      const cb="room_cb_"+Date.now()+"_"+Math.floor(Math.random()*99999);
+      const script=document.createElement("script");let finished=false;
+      const finish=result=>{if(finished)return;finished=true;clearTimeout(timeout);try{delete window[cb]}catch{};script.remove();resolve(result)};
+      const timeout=setTimeout(()=>finish({ok:false,error:"timeout"}),timeoutMs);
+      window[cb]=res=>finish(res&&res.ok?{ok:true,data:res.data||null,serverTime:res.serverTime||null}:{ok:false,error:res?.error||"invalid-response"});
+      script.onerror=()=>finish({ok:false,error:"network"});
       script.src=`${APP_SCRIPT_URL}?action=load&roomCode=${encodeURIComponent(ROOM_CODE)}&callback=${cb}&_=${Date.now()}`;
       document.body.appendChild(script);
     });
   }
-  function wait(ms){return new Promise(resolve=>setTimeout(resolve,ms))}
-  async function forceCloudSync(){
-    if(syncInfo.dirty){
-      const saved=await saveRemote(false);
-      if(saved)await wait(1200);
+  function markCloudVerified(remoteData){
+    state._pendingSync=false;syncInfo.dirty=false;syncInfo.saveAttempts=0;
+    syncInfo.lastFingerprint=stateFingerprint(remoteData||state);syncInfo.lastCloudAt=new Date();saveCache();
+    setSyncMode("online","Đã đồng bộ");
+  }
+  function applyCloudState(remoteData){
+    const currentMonth=state.billing?.selectedMonth;
+    state={...defaultState(),...remoteData,settings:{...defaultState().settings,...(remoteData.settings||{})},billing:remoteData.billing||defaultState().billing,presence:remoteData.presence||{},_pendingSync:false};
+    normalize();state.roomCode=ROOM_CODE;
+    if(currentMonth&&state.billing.months.some(x=>x.month===currentMonth))state.billing.selectedMonth=currentMonth;
+    syncInfo.lastFingerprint=stateFingerprint(state);syncInfo.dirty=false;syncInfo.lastCloudAt=new Date();saveCache();
+    if(selectedScheduleId&&!state.schedules.some(s=>s.id===selectedScheduleId))selectedScheduleId=state.schedules.at(-1)?.id||null;
+    const bill=currentBill(false);if(activeBillPersonId&&!bill?.people?.some(p=>p.id===activeBillPersonId))activeBillPersonId=bill?.people?.[0]?.id||null;
+    renderAll();
+  }
+  function hasCachedData(){return !!(state.members?.length||state.schedules?.length||state.billing?.months?.length)}
+  async function verifyRemoteSave(expectedAt,show=false){
+    if(syncInfo.verifying)return false;
+    syncInfo.verifying=true;setSyncMode("syncing","Đang xác nhận…");
+    const result=await getRemoteData(7000);syncInfo.verifying=false;
+    if(!result.ok){syncInfo.dirty=true;setSyncMode("offline","Chưa xác nhận");if(show)toast("Đã lưu trên máy, chưa xác nhận được dữ liệu chung");return false}
+    const remote=result.data||{};
+    const exact=stateFingerprint(remote)===stateFingerprint(state);
+    const sameWrite=remote.updatedBy===DEVICE_ID&&timeMs(remote.updatedAt)>=timeMs(expectedAt);
+    if(exact||sameWrite){markCloudVerified(remote);if(show)toast("Đã lưu lên dữ liệu chung");return true}
+    const remoteNewer=timeMs(remote.updatedAt)>timeMs(state.updatedAt);
+    if(remoteNewer&&!syncInfo.dirty){applyCloudState(remote);setSyncMode("online","Đã nhận dữ liệu mới");return true}
+    syncInfo.dirty=true;setSyncMode("offline","Chưa đồng bộ xong");
+    if(syncInfo.saveAttempts<2){syncInfo.saveAttempts++;queueRemoteSave(1000)}
+    if(show)toast("Thay đổi vẫn được giữ trên máy và sẽ thử đồng bộ lại");
+    return false;
+  }
+  function saveRemote(show=true){
+    if(!APP_SCRIPT_URL||!ROOM_CODE)return Promise.resolve(false);
+    if(syncInfo.saving){syncInfo.pendingSave=true;return Promise.resolve(false)}
+    syncInfo.saving=true;syncInfo.pendingSave=false;setSyncMode("syncing","Đang lưu chung…");
+    const payload=publicState(),expectedAt=payload.updatedAt;
+    return fetch(APP_SCRIPT_URL,{method:"POST",mode:"no-cors",headers:{"Content-Type":"text/plain;charset=utf-8"},body:JSON.stringify({action:"save",roomCode:ROOM_CODE,pageUrl:location.href.split("#")[0],deviceId:DEVICE_ID,data:payload})})
+      .then(()=>{clearTimeout(verifyTimer);verifyTimer=setTimeout(()=>verifyRemoteSave(expectedAt,show),1300);return true})
+      .catch(()=>{syncInfo.dirty=true;setSyncMode("offline","Mất kết nối");if(show)toast("Đã lưu trên máy; sẽ tự đồng bộ khi có mạng");return false})
+      .finally(()=>{syncInfo.saving=false;if(syncInfo.pendingSave){syncInfo.pendingSave=false;queueRemoteSave(500)}});
+  }
+  async function loadRemote({initial=false,force=false,silent=false}={}){
+    if(!APP_SCRIPT_URL||!ROOM_CODE)return false;
+    if(syncInfo.loading)return false;
+    if(!initial&&!force&&(syncInfo.dirty||syncInfo.saving||syncInfo.verifying||Date.now()-syncInfo.lastLocalEditAt<LOCAL_EDIT_GRACE_MS))return false;
+    syncInfo.loading=true;if(!silent)setSyncMode("syncing",initial?"Đang tải dữ liệu chung…":"Đang làm mới…");
+    const result=await getRemoteData();syncInfo.loading=false;
+    if(!result.ok){setSyncMode("offline",initial?"Dùng dữ liệu trên máy":"Mất kết nối");return false}
+    const remote=result.data;
+    if(!remote||!Object.keys(remote).length){
+      if(hasCachedData()){syncInfo.dirty=true;state._pendingSync=true;saveCache();queueRemoteSave(100)}
+      setSyncMode("online",hasCachedData()?"Đang tạo dữ liệu chung…":"Đã kết nối");return true;
     }
-    const ok=await loadRemote({force:true,silent:false});
-    toast(ok?"Đã lấy dữ liệu chung mới nhất":"Không thể kết nối dữ liệu chung");
+    const localPending=syncInfo.dirty||state._pendingSync;
+    const remoteMs=timeMs(remote.updatedAt),localMs=timeMs(state.updatedAt);
+    if(initial){
+      if(localPending&&localMs>remoteMs){renderAll();queueRemoteSave(100);setSyncMode("syncing","Đang đưa thay đổi lên chung…");return true}
+      applyCloudState(remote);setSyncMode("online","Đã đồng bộ");return true;
+    }
+    if(localPending){setSyncMode("syncing","Đang chờ lưu thay đổi…");return false}
+    if(force||remoteMs>localMs||(remoteMs===localMs&&stateFingerprint(remote)!==stateFingerprint(state))){applyCloudState(remote);setSyncMode("online","Đã nhận dữ liệu mới")}
+    else setSyncMode("online","Đã đồng bộ");
+    return true;
   }
-  function startSyncLoop(){
-    clearInterval(syncTimer);
-    syncTimer=setInterval(()=>{
-      if(document.hidden||syncInfo.dirty||syncInfo.saving)return;
-      loadRemote({silent:true});
-    },SYNC_INTERVAL_MS);
+  async function forceCloudSync(){
+    if(syncInfo.dirty||state._pendingSync){const expected=state.updatedAt;await saveRemote(false);await new Promise(r=>setTimeout(r,1600));const verified=await verifyRemoteSave(expected,false);toast(verified?"Đã đồng bộ dữ liệu chung":"Đang giữ thay đổi trên máy và sẽ thử lại");return}
+    const ok=await loadRemote({force:true,silent:false});toast(ok?"Đã lấy dữ liệu chung mới nhất":"Không thể kết nối dữ liệu chung");
   }
+  function startSyncLoop(){clearInterval(syncTimer);syncTimer=setInterval(()=>{if(document.hidden||syncInfo.dirty||state._pendingSync||syncInfo.saving||syncInfo.verifying)return;loadRemote({silent:true})},SYNC_INTERVAL_MS)}
   async function startCloudMode(){
-    const overlay=$("#cloudOverlay");
-    const ok=await loadRemote({initial:true,force:true});
-    syncInfo.ready=true;
-    overlay?.classList.remove("show");
-    startSyncLoop();
-    if(ok)setSyncMode("online","Đã đồng bộ");
+    const overlay=$("#cloudOverlay");overlay?.classList.remove("show");overlay?.setAttribute("aria-hidden","true");
+    syncInfo.ready=true;renderAll();startSyncLoop();
+    await loadRemote({initial:true,force:true,silent:false});
   }
   function setSyncText(t){
     ["#cleanSync","#billSync"].forEach(id=>{const e=$(id);if(e)e.textContent=t});
-    const h=$("#homeSyncText");
-    if(h)h.textContent=t.includes("Mất")||t.includes("Lỗi")?"Đang dùng bộ nhớ đệm — sẽ tự đồng bộ khi có mạng":"Mọi thiết bị đang dùng chung dữ liệu phòng P708";
+    const h=$("#homeSyncText");if(h)h.textContent=t.includes("Mất")||t.includes("Lỗi")||t.includes("Chưa")?"Thao tác vẫn dùng được; hệ thống sẽ tự đồng bộ khi có mạng":"Mọi thiết bị đang dùng chung dữ liệu phòng P708";
   }
 
   function go(page){location.hash=page==="home"?"":page;showPage(page)}
@@ -531,7 +504,7 @@
   function createSchedule(){const week=$("#cleanWeek").value;if(!week)return toast("Chọn tuần bắt đầu");const people=state.members.filter(m=>state.presence[m.id]!==false);if(!people.length)return toast("Chưa có thành viên có mặt");let tasks=[...TASKS];const absent=state.members.length-people.length;if(absent===1)tasks=tasks.filter(t=>t.id!=="rac");const loads=Object.fromEntries(people.map(m=>[m.id,{points:historicalPoints(m.id,week),weekPoints:0,count:0}]));const assignments=tasks.slice().sort((a,b)=>b.w-a.w).map(task=>{const chosen=people.slice().sort((a,b)=>(loads[a.id].points+loads[a.id].weekPoints)-(loads[b.id].points+loads[b.id].weekPoints)||loads[a.id].count-loads[b.id].count)[0];loads[chosen.id].weekPoints+=task.w;loads[chosen.id].count++;return {taskId:task.id,task:task.name,personId:chosen.id,personName:chosen.name,completed:false,cut:false}});if(absent===1)assignments.push({taskId:"rac",task:"Vứt rác, bình nước",personId:null,personName:"Tạm cắt",completed:false,cut:true});const old=state.schedules.find(s=>s.weekStart===week);if(old&&!confirm("Tuần này đã có lịch. Ghi đè?"))return;const schedule={id:old?.id||uid(),weekStart:week,createdAt:old?.createdAt||new Date().toISOString(),assignments,absentNames:state.members.filter(m=>state.presence[m.id]===false).map(m=>m.name)};const i=state.schedules.findIndex(s=>s.weekStart===week);if(i>=0)state.schedules[i]=schedule;else state.schedules.push(schedule);state.schedules.sort((a,b)=>a.weekStart.localeCompare(b.weekStart));selectedScheduleId=schedule.id;persist("Đã tạo lịch công bằng")}
   function currentSchedule(){if(!selectedScheduleId&&state.schedules.length)selectedScheduleId=state.schedules[state.schedules.length-1].id;return state.schedules.find(s=>s.id===selectedScheduleId)||null}
   function selectSchedule(id){selectedScheduleId=id;const s=currentSchedule();if(s)$("#cleanWeek").value=s.weekStart;renderCleaning()}
-  function toggleTaskDone(i){const s=currentSchedule();if(!s||s.assignments[i].cut)return;s.assignments[i].completed=!s.assignments[i].completed;persist()}
+  function toggleTaskDone(i,checked){const s=currentSchedule();if(!s||!s.assignments[i]||s.assignments[i].cut)return;s.assignments[i].completed=Boolean(checked);persist(checked?"Đã đánh dấu hoàn thành":"Đã bỏ đánh dấu hoàn thành")}
   function deleteCurrentSchedule(){const s=currentSchedule();if(!s)return toast("Chưa có lịch để xóa");if(!confirm("Xóa lịch tuần này?"))return;state.schedules=state.schedules.filter(x=>x.id!==s.id);selectedScheduleId=state.schedules.at(-1)?.id||null;persist("Đã xóa lịch")}
   function openManual(){const s=currentSchedule();if(!s)return toast("Hãy tạo lịch trước");$("#manualFields").innerHTML=TASKS.map(task=>{const a=s.assignments.find(x=>x.taskId===task.id);return `<div class="field"><label>${task.emoji} ${esc(task.name)}</label><select data-manual-task="${task.id}"><option value="__CUT__" ${a?.cut?"selected":""}>Tạm cắt</option>${state.members.map(m=>`<option value="${m.id}" ${a?.personId===m.id?"selected":""}>${esc(m.name)}</option>`).join("")}</select></div>`}).join("");$("#manualModal").classList.add("show")}
   function saveManualSchedule(){const s=currentSchedule();if(!s)return;const assignments=TASKS.map(task=>{const v=document.querySelector(`[data-manual-task="${task.id}"]`).value;if(v==="__CUT__")return {taskId:task.id,task:task.name,personId:null,personName:"Tạm cắt",completed:false,cut:true};const m=state.members.find(x=>x.id===v);return {taskId:task.id,task:task.name,personId:m?.id||null,personName:m?.name||"Không rõ",completed:false,cut:!m}});s.assignments=assignments;closeModal("manualModal");persist("Đã lưu phân công")}
@@ -550,7 +523,7 @@
     else {
       const doneCount=s.assignments.filter(a=>!a.cut&&a.completed).length;
       const totalCount=s.assignments.filter(a=>!a.cut).length;
-      box.innerHTML=`<div class="schedule-card"><div class="schedule-title"><div><h3>${weekRange(s.weekStart)}</h3><p>${s.absentNames?.length?`Vắng: ${esc(s.absentNames.join(", "))}`:"Tất cả thành viên có mặt"}</p></div><span class="mini-tag">${doneCount}/${totalCount} đã xong</span></div><div class="meta-strip"><span class="meta-chip">👥 ${presentCount} có mặt</span><span class="meta-chip">🏠 ${absentCount} vắng</span><span class="meta-chip">🧽 ${totalCount} công việc</span></div><div class="table-wrap"><table><thead><tr><th>Công việc</th><th>Phụ trách</th><th>Hoàn thành</th></tr></thead><tbody>${s.assignments.map((a,i)=>`<tr class="${a.completed?"done-row":""}"><td class="task-name" data-label="Công việc">${TASKS.find(t=>t.id===a.taskId)?.emoji||""} ${esc(a.task)}</td><td class="${a.cut?"cut-text":"person-name"}" data-label="Phụ trách">${esc(a.personName)}</td><td data-label="Hoàn thành">${a.cut?"—":`<label class="done-check"><input type="checkbox" ${a.completed?"checked":""} onchange="toggleTaskDone(${i})"> ${a.completed?"Đã xong":"Chưa xong"}</label>`}</td></tr>`).join("")}</tbody></table></div></div>`;
+      box.innerHTML=`<div class="schedule-card"><div class="schedule-title"><div><h3>${weekRange(s.weekStart)}</h3><p>${s.absentNames?.length?`Vắng: ${esc(s.absentNames.join(", "))}`:"Tất cả thành viên có mặt"}</p></div><span class="mini-tag">${doneCount}/${totalCount} đã xong</span></div><div class="meta-strip"><span class="meta-chip">👥 ${presentCount} có mặt</span><span class="meta-chip">🏠 ${absentCount} vắng</span><span class="meta-chip">🧽 ${totalCount} công việc</span></div><div class="table-wrap"><table><thead><tr><th>Công việc</th><th>Phụ trách</th><th>Hoàn thành</th></tr></thead><tbody>${s.assignments.map((a,i)=>`<tr class="${a.completed?"done-row":""}"><td class="task-name" data-label="Công việc">${TASKS.find(t=>t.id===a.taskId)?.emoji||""} ${esc(a.task)}</td><td class="${a.cut?"cut-text":"person-name"}" data-label="Phụ trách">${esc(a.personName)}</td><td data-label="Hoàn thành">${a.cut?"—":`<label class="done-check"><input type="checkbox" ${a.completed?"checked":""} onchange="toggleTaskDone(${i},this.checked)"> ${a.completed?"Đã xong":"Chưa xong"}</label>`}</td></tr>`).join("")}</tbody></table></div></div>`;
     }
     $("#cleanHistory").innerHTML=state.schedules.length
       ? [...state.schedules].reverse().map(x=>`<button class="history-btn ${x.id===selectedScheduleId?"active":""}" onclick="selectSchedule('${x.id}')">${weekRange(x.weekStart)}</button>`).join("")
@@ -558,7 +531,7 @@
   }
 
   /* Billing */
-  function currentBill(create=true){normalize();const month=state.billing.selectedMonth;let b=state.billing.months.find(x=>x.month===month);if(!b&&create){const days=monthDays(month);const allDays=Object.fromEntries(Array.from({length:days},(_,i)=>[String(i+1),true]));b={id:uid(),month,electricity:0,water:0,closed:false,people:state.members.map(m=>({id:uid(),memberId:m.id,name:m.name,days:{...allDays}}))};state.billing.months.push(b);markStateChanged();localStorage.setItem(KEY,JSON.stringify(state));if(syncInfo.ready)queueRemoteSave()}return b||null}
+  function currentBill(create=true){normalize();const month=state.billing.selectedMonth;let b=state.billing.months.find(x=>x.month===month);if(!b&&create){const days=monthDays(month);const allDays=Object.fromEntries(Array.from({length:days},(_,i)=>[String(i+1),true]));b={id:uid(),month,electricity:0,water:0,closed:false,people:state.members.map(m=>({id:uid(),memberId:m.id,name:m.name,days:{...allDays}}))};state.billing.months.push(b);markStateChanged();saveCache();if(syncInfo.ready)queueRemoteSave()}return b||null}
   function stayCount(p,b=currentBill()){const n=monthDays(b.month);let c=0;for(let d=1;d<=n;d++)if(p.days?.[String(d)])c++;return c}
   function allocate(total,people,b){total=Math.max(0,Math.round(Number(total)||0));const rows=people.map((p,i)=>({id:p.id,i,days:stayCount(p,b),base:0,frac:0}));const totalDays=rows.reduce((s,r)=>s+r.days,0);if(!totalDays||!total)return Object.fromEntries(rows.map(r=>[r.id,0]));let used=0;rows.forEach(r=>{const exact=total*r.days/totalDays;r.base=Math.floor(exact);r.frac=exact-r.base;used+=r.base});rows.sort((a,z)=>z.frac-a.frac||z.days-a.days||a.i-z.i);for(let k=0;k<total-used;k++)rows[k%rows.length].base++;return Object.fromEntries(rows.map(r=>[r.id,r.base]))}
   function billCalc(){const b=currentBill(),people=b.people||[],totalDays=people.reduce((s,p)=>s+stayCount(p,b),0),electric=allocate(b.electricity,people,b),water=allocate(b.water,people,b);return {b,people,totalDays,electric,water,electricRate:totalDays?b.electricity/totalDays:0,waterRate:totalDays?b.water/totalDays:0}}
@@ -570,7 +543,7 @@
   function activeBillPerson(){const b=currentBill();if(!activeBillPersonId||!b.people.some(p=>p.id===activeBillPersonId))activeBillPersonId=b.people[0]?.id||null;return b.people.find(p=>p.id===activeBillPersonId)||null}
   function selectBillPerson(id){activeBillPersonId=id;renderBilling()}
   function removeActiveBillingPerson(){const b=currentBill(),p=activeBillPerson();if(!p)return;if(b.closed)return toast("Tháng đã chốt sổ");if(!confirm(`Xóa ${p.name} khỏi tháng này?`))return;b.people=b.people.filter(x=>x.id!==p.id);activeBillPersonId=b.people[0]?.id||null;persist("Đã xóa khỏi bảng tháng")}
-  function toggleBillDay(day){const b=currentBill(),p=activeBillPerson();if(!p)return toast("Chọn người trước");if(b.closed)return toast("Tháng đã chốt sổ");p.days[String(day)]=!p.days?.[String(day)];persist()}
+  function toggleBillDay(day){const b=currentBill(),p=activeBillPerson();if(!p)return toast("Chọn người trước");if(b.closed)return toast("Tháng đã chốt sổ — bấm Mở khóa để chỉnh sửa");p.days[String(day)]=!p.days?.[String(day)];persist()}
   function dateDay(v,b){if(!v)return null;const [y,m,d]=v.split("-").map(Number),[by,bm]=b.month.split("-").map(Number);return y===by&&m===bm?d:null}
   function applyStayRange(value){const b=currentBill(),p=activeBillPerson();if(!p)return toast("Chọn người trước");if(b.closed)return toast("Tháng đã chốt sổ");let from=dateDay($("#stayFrom").value,b),to=dateDay($("#stayTo").value,b);if(!from||!to)return toast("Chọn ngày bắt đầu và ngày cuối");if(from>to)[from,to]=[to,from];for(let d=from;d<=to;d++)p.days[String(d)]=value;persist(value?`Đã đánh dấu ở từ ngày ${from} đến ${to}`:`Đã đánh dấu vắng từ ngày ${from} đến ${to}`)}
   function presetStay(mode){const b=currentBill(),p=activeBillPerson();if(!p)return toast("Chọn người trước");if(b.closed)return toast("Tháng đã chốt sổ");const [y,m]=b.month.split("-").map(Number),n=monthDays(b.month);p.days={};for(let d=1;d<=n;d++){const dow=new Date(y,m-1,d).getDay();p.days[String(d)]=mode==="all"||(mode==="weekdays"&&dow!==0&&dow!==6)}persist(mode==="all"?"Đã chọn ở cả tháng":mode==="weekdays"?"Đã chọn Thứ 2–Thứ 6":"Đã bỏ chọn toàn bộ")}
@@ -596,7 +569,7 @@
     for(let i=0;i<lead;i++)cells+='<span class="day-cell blank"></span>';
     for(let d=1;d<=n;d++){
       const dow=new Date(y,m-1,d).getDay(),stay=!!p?.days?.[String(d)],isToday=today.getFullYear()===y&&today.getMonth()+1===m&&today.getDate()===d;
-      cells+=`<button class="day-cell ${stay?"stay":""} ${dow===0||dow===6?"weekend":""} ${isToday?"today":""}" onclick="toggleBillDay(${d})" ${!p||b.closed?"disabled":""}><span class="day-num">${d}</span><span class="day-state">${stay?"✓ Có ở":"Vắng"}</span></button>`;
+      cells+=`<button class="day-cell ${stay?"stay":""} ${dow===0||dow===6?"weekend":""} ${isToday?"today":""}" onclick="toggleBillDay(${d})" ${!p?"disabled":""}><span class="day-num">${d}</span><span class="day-state">${stay?"✓ Có ở":"Vắng"}</span></button>`;
     }
     $("#billCalendar").innerHTML=cells;
     $("#billPersonSummary").innerHTML=p?`<b>${esc(p.name)}</b><span>${stayCount(p,b)} ngày · ${money(c.electric[p.id]+c.water[p.id])}</span>`:'<b>Chưa chọn người</b><span>0 ngày</span>';
@@ -611,7 +584,7 @@
     $("#billingTable").innerHTML=`<table><thead><tr><th>Tên người</th><th>Ngày ở</th><th>Tiền điện</th><th>Tiền nước</th><th>Tổng cộng</th></tr></thead><tbody>${rows}</tbody><tfoot><tr class="total-row"><td data-label="Tổng">TỔNG</td><td data-label="Ngày ở">${c.totalDays}</td><td data-label="Tiền điện">${money(b.electricity)}</td><td data-label="Tiền nước">${money(b.water)}</td><td data-label="Tổng cộng">${money(b.electricity+b.water)}</td></tr></tfoot></table>`;
   }
 
-  function renderHome(){normalize();const b=currentBill();const presentCount=state.members.filter(m=>state.presence[m.id]!==false).length;$("#homeMemberCount").textContent=`${state.members.length} thành viên`;$("#homeWeekCount").textContent=`${state.schedules.length} tuần đã lưu`;$("#homeBillingMonth").textContent=monthLabel(b.month);$("#homeBillingPeople").textContent=`${b.people.length} người`;$("#appStatMembers").textContent=state.members.length;$("#appStatPresent").textContent=presentCount;$("#appStatSchedules").textContent=state.schedules.length;$("#appStatBill").textContent=money((b?.electricity||0)+(b?.water||0))}
+  function renderHome(){normalize();const b=currentBill();const presentCount=state.members.filter(m=>state.presence[m.id]!==false).length;const set=(id,value)=>{const el=$(id);if(el)el.textContent=value};set("#homeMemberCount",`${state.members.length} thành viên`);set("#homeWeekCount",`${state.schedules.length} tuần đã lưu`);set("#homeBillingMonth",monthLabel(b.month));set("#homeBillingPeople",`${b.people.length} người`);set("#appStatMembers",state.members.length);set("#appStatPresent",presentCount);set("#appStatSchedules",state.schedules.length);set("#appStatBill",money((b?.electricity||0)+(b?.water||0)))}
   function renderAll(){renderHome();renderCleaning();renderBilling()}
 
   $("#cleanMemberName").addEventListener("keydown",e=>{if(e.key==="Enter")addMember()});
@@ -624,6 +597,7 @@
 
   normalize();
   $("#cleanWeek").value=dateValue(nextMonday());
+  renderAll();
   showPage(location.hash.replace("#","")||"home");
   startCloudMode();
   window.addEventListener("online",()=>{setSyncMode("syncing","Đang kết nối lại…");forceCloudSync()});
