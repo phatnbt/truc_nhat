@@ -4,6 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta name="theme-color" content="#2563eb" />
+  <meta name="p708-build" content="2026-07-31-ios-install-fix-2" />
   <meta name="application-name" content="P708" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="default" />
@@ -746,9 +747,18 @@
 
   function queueRemoteSave(){if(realtimeEngine)void realtimeEngine.recordShape(toSyncShape(state))}
 
-  function isPwaStandalone(){return window.matchMedia?.("(display-mode: standalone)")?.matches||window.navigator.standalone===true}
-  function isIosDevice(){return /iphone|ipad|ipod/i.test(navigator.userAgent||"")}
-  function isIosSafari(){const ua=navigator.userAgent||"";return isIosDevice()&&/safari/i.test(ua)&&!/crios|fxios|edgios|opios|gsa/i.test(ua)}
+  function isAppleMobileDevice(){
+    const ua=navigator.userAgent||"";
+    return /iphone|ipad|ipod/i.test(ua)||(navigator.platform==="MacIntel"&&navigator.maxTouchPoints>1);
+  }
+  function isPwaStandalone(){
+    return window.navigator.standalone===true||Boolean(window.matchMedia?.("(display-mode: standalone)")?.matches);
+  }
+  function isIosDevice(){return isAppleMobileDevice()}
+  function isIosSafari(){
+    const ua=navigator.userAgent||"";
+    return isAppleMobileDevice()&&/safari/i.test(ua)&&!/crios|fxios|edgios|opios|gsa/i.test(ua);
+  }
   function updatePwaStatus(syncText=""){
     const online=navigator.onLine;
     const networkChip=$("#pwaNetworkChip"),networkText=$("#pwaNetworkText"),syncChip=$("#pwaSyncChip"),syncLabel=$("#pwaSyncText");
@@ -766,10 +776,17 @@
   function refreshInstallButton(){
     const btn=$("#pwaInstallButton"),dock=$("#pwaDock");
     if(!btn)return;
-    const canInstall=!isPwaStandalone()&&Boolean(deferredInstallPrompt||isIosDevice());
+    const ios=isAppleMobileDevice();
+    const standalone=isPwaStandalone();
+    // iPhone/iPad không phát beforeinstallprompt. Trong Safari phải luôn hiện nút hướng dẫn,
+    // trừ khi trang đang chạy thật sự ở chế độ ứng dụng đã cài.
+    const canInstall=ios?!standalone:Boolean(deferredInstallPrompt&&!standalone);
     btn.hidden=!canInstall;
-    if(dock)dock.classList.toggle("install-visible",canInstall);
-    if(canInstall)btn.textContent=isIosDevice()&&!deferredInstallPrompt?"＋ Thêm vào màn hình chính":"⬇ Cài ứng dụng";
+    if(dock){
+      dock.classList.toggle("install-visible",canInstall);
+      dock.setAttribute("aria-hidden",canInstall?"false":"true");
+    }
+    if(canInstall)btn.textContent=ios?"＋ Thêm vào màn hình chính":"⬇ Cài ứng dụng";
   }
   function showPwaGuide(){
     const steps=$("#pwaGuideSteps"),intro=$("#pwaGuideIntro");
@@ -805,7 +822,7 @@
     updatePwaStatus();refreshInstallButton();
     if(!("serviceWorker" in navigator)||location.protocol==="file:")return;
     try{
-      const registration=await navigator.serviceWorker.register("./sw.js",{scope:"./"});
+      const registration=await navigator.serviceWorker.register("./sw.js?v=20260731-2",{scope:"./"});
       if(registration.waiting)showPwaUpdate(registration.waiting);
       registration.addEventListener("updatefound",()=>{
         const worker=registration.installing;if(!worker)return;
@@ -817,6 +834,9 @@
   }
   window.addEventListener("beforeinstallprompt",event=>{event.preventDefault();deferredInstallPrompt=event;refreshInstallButton()});
   window.addEventListener("appinstalled",()=>{deferredInstallPrompt=null;refreshInstallButton();toast("Đã cài ứng dụng P708")});
+  window.addEventListener("pageshow",()=>refreshInstallButton());
+  window.addEventListener("orientationchange",()=>setTimeout(refreshInstallButton,120));
+  setTimeout(refreshInstallButton,350);
 
   function startSyncLoop(){}
 
