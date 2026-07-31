@@ -206,12 +206,13 @@
 
 
     /* Installable PWA */
-    .pwa-dock{position:fixed;left:18px;bottom:18px;z-index:72;display:flex;align-items:center;gap:7px;flex-wrap:wrap;max-width:min(720px,calc(100vw - 36px));padding:8px;border:1px solid rgba(228,232,240,.96);border-radius:18px;background:rgba(255,255,255,.9);backdrop-filter:blur(16px);box-shadow:0 14px 34px rgba(15,23,42,.14)}
+    .pwa-dock{position:fixed;left:18px;bottom:18px;z-index:72;display:none;align-items:center;gap:7px;flex-wrap:wrap;max-width:min(720px,calc(100vw - 36px));padding:8px;border:1px solid rgba(228,232,240,.96);border-radius:18px;background:rgba(255,255,255,.9);backdrop-filter:blur(16px);box-shadow:0 14px 34px rgba(15,23,42,.14)}
     .pwa-chip{min-height:34px;display:inline-flex;align-items:center;gap:7px;padding:7px 10px;border-radius:11px;background:#f8fafc;border:1px solid var(--line);font-size:11px;font-weight:850;color:#475467;white-space:nowrap}
     .pwa-chip i{width:8px;height:8px;border-radius:50%;background:var(--amber);box-shadow:0 0 0 3px rgba(217,119,6,.11)}
     .pwa-chip.online i{background:var(--green);box-shadow:0 0 0 3px rgba(22,163,74,.11)}
     .pwa-chip.offline{color:#991b1b;background:var(--red-soft);border-color:#fecaca}.pwa-chip.offline i{background:var(--red);box-shadow:0 0 0 3px rgba(220,38,38,.10)}
     .pwa-chip.pending{color:#9a3412;background:var(--amber-soft);border-color:#fed7aa}.pwa-chip.synced{color:#166534;background:var(--green-soft);border-color:#bbf7d0}
+    .pwa-dock.install-visible{display:flex}
     .pwa-install-btn{min-height:34px;padding:7px 11px;border-radius:11px;background:linear-gradient(135deg,var(--blue),var(--blue-dark));color:#fff;border:1px solid var(--blue);font-size:11px;font-weight:900;box-shadow:0 5px 14px rgba(37,99,235,.20)}
     .pwa-install-btn[hidden]{display:none!important}
     .pwa-update-banner{position:fixed;left:50%;top:18px;z-index:140;width:min(620px,calc(100vw - 28px));transform:translate(-50%,-18px);opacity:0;pointer-events:none;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 14px;border-radius:17px;background:#172033;color:#fff;box-shadow:0 18px 48px rgba(15,23,42,.28);transition:.2s}
@@ -220,7 +221,14 @@
     .pwa-guide-card{width:min(500px,100%);overflow:hidden;border-radius:24px;background:#fff;border:1px solid var(--line);box-shadow:0 28px 80px rgba(15,23,42,.3)}
     .pwa-guide-head{display:flex;justify-content:space-between;gap:12px;align-items:flex-start;padding:20px;border-bottom:1px solid var(--line)}.pwa-guide-head h3{margin:0;font-size:20px}.pwa-guide-head p{margin:6px 0 0;color:var(--muted);font-size:13px;line-height:1.55}
     .pwa-guide-body{padding:18px 20px}.pwa-guide-step{display:grid;grid-template-columns:34px 1fr;gap:11px;align-items:start;padding:11px 0;border-bottom:1px dashed var(--line)}.pwa-guide-step:last-child{border-bottom:0}.pwa-guide-step b:first-child{width:30px;height:30px;border-radius:10px;display:grid;place-items:center;background:var(--blue-soft);color:var(--blue-dark)}.pwa-guide-step span{color:#475467;font-size:13px;line-height:1.55}.pwa-guide-actions{display:flex;justify-content:flex-end;padding:0 20px 20px}
-    @media(max-width:640px){.pwa-dock{left:10px;right:10px;bottom:86px;max-width:none;justify-content:stretch}.pwa-chip{flex:1 1 calc(50% - 4px);justify-content:center}.pwa-install-btn{flex:1 1 100%}.pwa-update-banner{top:10px;align-items:flex-start}.pwa-update-banner .btn{padding:8px 10px}.pwa-guide-card{border-radius:20px}}
+    @media(max-width:640px){
+      /* Trên điện thoại chỉ hiện nút cài đặt khi có thể cài ứng dụng. */
+      .pwa-dock{left:10px;right:10px;bottom:86px;max-width:none;padding:8px;justify-content:stretch}
+      .pwa-install-btn{flex:1 1 100%;min-height:44px;font-size:13px}
+      .pwa-update-banner{top:10px;align-items:flex-start}
+      .pwa-update-banner .btn{padding:8px 10px}
+      .pwa-guide-card{border-radius:20px}
+    }
     @media print{.pwa-dock,.pwa-update-banner,.pwa-guide{display:none!important}}
 
   </style>
@@ -409,9 +417,7 @@
     </div>
   </div>
 
-  <div class="pwa-dock" id="pwaDock" aria-live="polite">
-    <span class="pwa-chip" id="pwaNetworkChip"><i></i><span id="pwaNetworkText">Đang kiểm tra mạng…</span></span>
-    <span class="pwa-chip" id="pwaSyncChip"><span>☁️</span><span id="pwaSyncText">Đang kiểm tra đồng bộ…</span></span>
+  <div class="pwa-dock" id="pwaDock">
     <button class="pwa-install-btn" id="pwaInstallButton" type="button" onclick="installPwa()" hidden>⬇ Cài ứng dụng</button>
   </div>
 
@@ -422,7 +428,7 @@
 
   <div class="pwa-guide" id="pwaIosGuide" role="dialog" aria-modal="true" aria-labelledby="pwaGuideTitle">
     <div class="pwa-guide-card">
-      <div class="pwa-guide-head"><div><h3 id="pwaGuideTitle">Cài P708 trên iPhone/iPad</h3><p id="pwaGuideIntro">iPhone yêu cầu cài ứng dụng từ menu Chia sẻ của Safari.</p></div><button class="icon-btn" type="button" onclick="closePwaGuide()" aria-label="Đóng">✕</button></div>
+      <div class="pwa-guide-head"><div><h3 id="pwaGuideTitle">Cài ứng dụng P708</h3><p id="pwaGuideIntro">Trên iPhone/iPad, hãy thêm ứng dụng từ menu Chia sẻ của Safari.</p></div><button class="icon-btn" type="button" onclick="closePwaGuide()" aria-label="Đóng">✕</button></div>
       <div class="pwa-guide-body" id="pwaGuideSteps"></div>
       <div class="pwa-guide-actions"><button class="btn primary" type="button" onclick="closePwaGuide()">Đã hiểu</button></div>
     </div>
@@ -758,10 +764,12 @@
     }
   }
   function refreshInstallButton(){
-    const btn=$("#pwaInstallButton");if(!btn)return;
-    if(isPwaStandalone()){btn.hidden=true;return}
-    btn.hidden=!(deferredInstallPrompt||isIosDevice());
-    btn.textContent=isIosDevice()&&!deferredInstallPrompt?"＋ Cài trên iPhone":"⬇ Cài ứng dụng";
+    const btn=$("#pwaInstallButton"),dock=$("#pwaDock");
+    if(!btn)return;
+    const canInstall=!isPwaStandalone()&&Boolean(deferredInstallPrompt||isIosDevice());
+    btn.hidden=!canInstall;
+    if(dock)dock.classList.toggle("install-visible",canInstall);
+    if(canInstall)btn.textContent=isIosDevice()&&!deferredInstallPrompt?"＋ Thêm vào màn hình chính":"⬇ Cài ứng dụng";
   }
   function showPwaGuide(){
     const steps=$("#pwaGuideSteps"),intro=$("#pwaGuideIntro");
