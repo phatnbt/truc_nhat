@@ -1,0 +1,67 @@
+{
+  "id": "./",
+  "name": "Quản lý phòng P708",
+  "short_name": "P708",
+  "description": "Lịch trực nhật và chia tiền điện nước cho phòng P708.",
+  "lang": "vi",
+  "dir": "ltr",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "display_override": [
+    "window-controls-overlay",
+    "standalone",
+    "minimal-ui"
+  ],
+  "background_color": "#f3f6fb",
+  "theme_color": "#2563eb",
+  "orientation": "any",
+  "categories": [
+    "utilities",
+    "productivity"
+  ],
+  "icons": [
+    {
+      "src": "./icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "./icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "./icons/icon-maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Lịch trực nhật",
+      "short_name": "Trực nhật",
+      "url": "./index.html#cleaning",
+      "icons": [
+        {
+          "src": "./icons/icon-192.png",
+          "sizes": "192x192"
+        }
+      ]
+    },
+    {
+      "name": "Điện và nước",
+      "short_name": "Điện nước",
+      "url": "./index.html#billing",
+      "icons": [
+        {
+          "src": "./icons/icon-192.png",
+          "sizes": "192x192"
+        }
+      ]
+    }
+  ]
+}
