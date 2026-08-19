@@ -1,6 +1,11 @@
 (()=>{
-  const AUTO_NOTIFY_KEY="P708_AUTO_NOTIFY_V2";
+  const style=document.createElement("link");
+  style.rel="stylesheet";
+  style.href="./mobile-notification-ui.css?v=20260819-7";
+  style.dataset.mobileNotifyUi="1";
+  if(!document.querySelector('link[data-mobile-notify-ui="1"]'))document.head.appendChild(style);
 
+  const AUTO_NOTIFY_KEY="P708_AUTO_NOTIFY_V2";
   const supportsNotifications=()=>"Notification" in window;
   const permissionState=()=>supportsNotifications()?Notification.permission:"unsupported";
 
