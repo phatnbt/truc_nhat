@@ -1,4 +1,13 @@
-const BOOT_VERSION = "20260819-6";
+const BOOT_VERSION = "20260819-7";
+
+function loadKpiPolish(){
+  if(document.querySelector('link[data-kpi-polish="1"]'))return;
+  const link=document.createElement("link");
+  link.rel="stylesheet";
+  link.href=`./kpi-polish.css?v=${BOOT_VERSION}`;
+  link.dataset.kpiPolish="1";
+  document.head.appendChild(link);
+}
 
 function showBootFailure(error){
   console.error("P708 boot failed", error);
@@ -17,6 +26,7 @@ function showBootFailure(error){
 }
 
 try{
+  loadKpiPolish();
   await import(`./app-loader.js?v=${BOOT_VERSION}`);
 }catch(error){
   showBootFailure(error);
