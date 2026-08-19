@@ -27,7 +27,7 @@ function bindStaticEvents(){
   window.addEventListener("hashchange",()=>showPage(location.hash.replace("#","")||"home"));window.addEventListener("online",()=>forceSync());window.addEventListener("offline",()=>{syncStatus={mode:"offline",text:"Mất kết nối · dữ liệu được giữ trên máy"};renderSync();});document.addEventListener("visibilitychange",()=>{if(!document.hidden)realtimeEngine?.forceSync().catch(()=>{});});
 }
 
-async function registerPwa(){if(!("serviceWorker" in navigator)||location.protocol==="file:")return;try{const reg=await navigator.serviceWorker.register("./sw.js?v=20260819-1",{scope:"./"});setTimeout(()=>reg.update().catch(()=>{}),1500);}catch(e){console.warn("PWA",e);}}
+async function registerPwa(){if(!("serviceWorker" in navigator)||location.protocol==="file:")return;try{const reg=await navigator.serviceWorker.register("./sw.js?v=20260819-2",{scope:"./"});setTimeout(()=>reg.update().catch(()=>{}),1500);}catch(e){console.warn("PWA",e);}}
 
 bindStaticEvents();
 $("#cleanWeek").value=dateValue(nextMonday());

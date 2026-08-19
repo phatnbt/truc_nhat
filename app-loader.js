@@ -1,15 +1,15 @@
-import { createP708SecureEngine } from "./p708-secure-sync-engine.js?v=20260819-1";
+import { createP708SecureEngine } from "./p708-secure-sync-engine.js?v=20260819-2";
 
 globalThis.createP708SecureEngine = createP708SecureEngine;
 
 const parts = [
-  "./app-core1.js?v=20260819-1",
-  "./app-core2.js?v=20260819-1",
-  "./app-actions1.js?v=20260819-1",
-  "./app-actions2.js?v=20260819-1",
-  "./app-dashboard.js?v=20260819-1",
-  "./app-render.js?v=20260819-1",
-  "./app-start.js?v=20260819-1"
+  "./app-core1.js?v=20260819-2",
+  "./app-core2.js?v=20260819-2",
+  "./app-actions1.js?v=20260819-2",
+  "./app-actions2.js?v=20260819-2",
+  "./app-dashboard.js?v=20260819-2",
+  "./app-render.js?v=20260819-2",
+  "./app-start.js?v=20260819-2"
 ];
 
 for (const src of parts) {
