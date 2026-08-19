@@ -1,0 +1,20 @@
+.hero-proof{display:none!important}
+.utility-preview{display:grid;gap:16px;height:100%}
+.utility-preview-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px}
+.utility-preview-head small{display:block;color:rgba(226,232,240,.72);font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.08em}
+.utility-preview-head strong{display:block;margin-top:5px;color:#fff;font-size:clamp(24px,3vw,34px);letter-spacing:-.04em}
+.utility-preview-trend{padding:6px 9px;border-radius:999px;background:rgba(255,255,255,.09);border:1px solid rgba(255,255,255,.12);font-size:11px;font-style:normal;color:#dbeafe;white-space:nowrap}
+.utility-preview-trend.up{color:#bbf7d0}.utility-preview-trend.down{color:#fecaca}
+.utility-chart{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:10px;align-items:end;min-height:170px}
+.utility-month{display:grid;grid-template-rows:1fr auto;gap:8px;min-width:0}
+.utility-bars{display:flex;align-items:end;justify-content:center;gap:4px;height:142px;padding:0 2px;border-bottom:1px solid rgba(255,255,255,.14)}
+.utility-bar{width:min(18px,42%);min-height:5px;border-radius:8px 8px 3px 3px;box-shadow:0 8px 20px rgba(15,23,42,.2);transition:height .35s ease,transform .2s ease}
+.utility-bar:hover{transform:translateY(-2px)}
+.utility-bar.electric{background:linear-gradient(180deg,#fde68a,#f59e0b)}
+.utility-bar.water{background:linear-gradient(180deg,#7dd3fc,#3b82f6)}
+.utility-label{text-align:center;color:rgba(226,232,240,.74);font-size:10px;font-weight:800;white-space:nowrap}
+.utility-legend{display:flex;align-items:center;gap:14px;flex-wrap:wrap;color:rgba(226,232,240,.78);font-size:10px}
+.utility-legend span{display:inline-flex;align-items:center;gap:6px}.utility-legend i{width:8px;height:8px;border-radius:3px;display:inline-block}.utility-legend .electric{background:#f59e0b}.utility-legend .water{background:#3b82f6}
+.utility-empty{grid-column:1/-1;align-self:center;text-align:center;color:rgba(226,232,240,.65);font-size:12px;line-height:1.5}
+@media(max-width:700px){.utility-chart{gap:6px;min-height:145px}.utility-bars{height:116px}.utility-bar{width:min(14px,43%)}.utility-preview-head strong{font-size:24px}}
+@media(prefers-reduced-motion:reduce){.utility-bar{transition:none}}

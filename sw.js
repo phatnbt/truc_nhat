@@ -1,10 +1,13 @@
-const CACHE_NAME="p708-manager-v5-free-landing-20260819-3";
+const CACHE_NAME="p708-manager-v5-free-landing-20260819-4";
 const APP_SHELL=[
   "./",
   "./index.html",
   "./styles.css",
   "./landing-ui.css",
+  "./utility-chart.css",
   "./app.js",
+  "./app-check-config.js",
+  "./app-check-init.js",
   "./app-loader.js",
   "./app-core1.js",
   "./app-core2.js",
@@ -12,6 +15,7 @@ const APP_SHELL=[
   "./app-actions2.js",
   "./app-dashboard.js",
   "./app-render.js",
+  "./home-enhancements.js",
   "./app-start.js",
   "./p708-secure-sync-engine.js",
   "./manifest.webmanifest",
