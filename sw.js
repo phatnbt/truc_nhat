@@ -1,4 +1,4 @@
-const CACHE_NAME="p708-manager-v5-free-landing-20260819-9";
+const CACHE_NAME="p708-manager-v5-free-landing-20260819-10";
 const APP_SHELL=[
   "./",
   "./index.html",
