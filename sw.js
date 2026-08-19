@@ -18,6 +18,7 @@ const APP_SHELL=[
   "./app-start.js",
   "./notification-enhancements.js",
   "./today-calendar.js",
+  "./mobile-install-bridge.js",
   "./mobile-install-guide.js",
   "./p708-secure-sync-engine.js",
   "./manifest.webmanifest",
