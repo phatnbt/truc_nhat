@@ -2,39 +2,19 @@ rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
-    function signedIn() {
-      return request.auth != null;
-    }
-
-    function configPath(roomId) {
-      return /databases/$(database)/documents/rooms/$(roomId)/security/config;
-    }
-
-    function accessPath(roomId, uid) {
-      return /databases/$(database)/documents/rooms/$(roomId)/access/$(uid);
-    }
-
+    function signedIn() { return request.auth != null; }
+    function configPath(roomId) { return /databases/$(database)/documents/rooms/$(roomId)/security/config; }
+    function accessPath(roomId, uid) { return /databases/$(database)/documents/rooms/$(roomId)/access/$(uid); }
     function isPrimaryAdmin(roomId) {
-      return signedIn()
-        && exists(configPath(roomId))
-        && get(configPath(roomId)).data.adminUid == request.auth.uid;
+      return signedIn() && exists(configPath(roomId)) && get(configPath(roomId)).data.adminUid == request.auth.uid;
     }
-
     function hasActiveAccess(roomId) {
-      return signedIn()
-        && exists(accessPath(roomId, request.auth.uid))
-        && get(accessPath(roomId, request.auth.uid)).data.active == true;
+      return signedIn() && exists(accessPath(roomId, request.auth.uid)) && get(accessPath(roomId, request.auth.uid)).data.active == true;
     }
-
     function isAdmin(roomId) {
-      return isPrimaryAdmin(roomId)
-        || (hasActiveAccess(roomId)
-          && get(accessPath(roomId, request.auth.uid)).data.role == 'admin');
+      return isPrimaryAdmin(roomId) || (hasActiveAccess(roomId) && get(accessPath(roomId, request.auth.uid)).data.role == 'admin');
     }
-
-    function ownMemberId(roomId) {
-      return get(accessPath(roomId, request.auth.uid)).data.memberId;
-    }
+    function ownMemberId(roomId) { return get(accessPath(roomId, request.auth.uid)).data.memberId; }
 
     match /rooms/{roomId} {
       allow read: if hasActiveAccess(roomId) || isPrimaryAdmin(roomId);
@@ -70,7 +50,6 @@ service cloud.firestore {
 
       match /memberData/{uid} {
         allow read: if hasActiveAccess(roomId) || isPrimaryAdmin(roomId);
-
         allow create: if isAdmin(roomId)
           || (signedIn()
             && uid == request.auth.uid
@@ -80,7 +59,6 @@ service cloud.firestore {
             && request.resource.data.keys().hasOnly([
               'memberId', 'presence', 'billingMonths', 'updatedBy', 'updatedAt'
             ]));
-
         allow update: if isAdmin(roomId)
           || (signedIn()
             && uid == request.auth.uid
@@ -90,7 +68,32 @@ service cloud.firestore {
             && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
               'memberId', 'presence', 'billingMonths', 'updatedBy', 'updatedAt'
             ]));
+        allow delete: if isAdmin(roomId);
+      }
 
+      match /taskSubmissions/{submissionId} {
+        allow read: if hasActiveAccess(roomId) || isPrimaryAdmin(roomId);
+        allow create: if signedIn()
+          && hasActiveAccess(roomId)
+          && request.resource.data.actorUid == request.auth.uid
+          && request.resource.data.memberId == ownMemberId(roomId)
+          && request.resource.data.roomCode == roomId
+          && request.resource.data.status == 'submitted'
+          && request.resource.data.keys().hasOnly([
+            'roomCode', 'actorUid', 'actorName', 'memberId', 'scheduleId',
+            'weekStart', 'taskId', 'taskName', 'status', 'submittedAt', 'updatedAt'
+          ]);
+        allow update: if isAdmin(roomId)
+          || (signedIn()
+            && hasActiveAccess(roomId)
+            && resource.data.actorUid == request.auth.uid
+            && resource.data.memberId == ownMemberId(roomId)
+            && request.resource.data.actorUid == resource.data.actorUid
+            && request.resource.data.memberId == resource.data.memberId
+            && request.resource.data.status == 'submitted'
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+              'status', 'submittedAt', 'updatedAt'
+            ]));
         allow delete: if isAdmin(roomId);
       }
 
@@ -104,6 +107,8 @@ service cloud.firestore {
             'roomCode', 'actorUid', 'actorName', 'actorEmail', 'role',
             'action', 'summary', 'targetMemberId', 'deviceId', 'createdAt'
           ]);
+        // Audit logs are immutable from browsers. 30-day cleanup is done by
+        // the privileged Cloud Function so members/admin UI cannot tamper with recent logs.
         allow update, delete: if false;
       }
     }

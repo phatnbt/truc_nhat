@@ -1,116 +1,70 @@
-# P708 Secure — phân quyền theo tài khoản Google
+# P708 Manager v5 — quản lý phòng + bảo mật tài khoản
 
-## Những gì đã nâng cấp
+## Nâng cấp chính
 
-- Đăng nhập bằng Google thay cho Anonymous Authentication.
-- Người đầu tiên thiết lập phòng sẽ nhận quyền **Trưởng phòng**.
-- Thành viên mới gửi yêu cầu tham gia; trưởng phòng duyệt và liên kết tài khoản với đúng tên trong phòng.
-- Thành viên thường chỉ được sửa:
-  - Trạng thái Có mặt/Vắng của chính mình.
-  - Các ngày ở của chính mình trong bảng điện nước.
-- Trưởng phòng được thêm/xóa thành viên, tạo/chỉnh lịch, nhập hóa đơn, chốt sổ và quản lý quyền.
-- Nút của người khác bị khóa cả ở giao diện lẫn Firestore Security Rules.
-- Xác nhận trước khi đánh dấu Vắng hoặc xóa nhiều ngày.
-- Có nút **Hoàn tác** trong 8,5 giây sau các thay đổi dễ nhấn nhầm.
-- Có nhật ký thay đổi dành cho trưởng phòng.
-- Dữ liệu cá nhân được tách vào `rooms/P708/memberData/{uid}` để Rules chặn sửa chéo tài khoản.
+- Dashboard dành cho trưởng phòng: số người có mặt, tiến độ trực, số tiền còn phải thu, yêu cầu chờ xử lý.
+- Thành viên có thể **Báo đã làm** công việc của chính mình; trưởng phòng **Xác nhận** hoặc **Yêu cầu làm lại**.
+- Thuật toán phân công tiếp tục cân bằng điểm lịch sử và ưu tiên tránh giao cùng một việc hai tuần liên tiếp.
+- Bảng điện nước có trạng thái **Đã đóng / Chưa đóng**, số đã thu và số còn thiếu.
+- Nhắc việc bằng Browser Notification khi người dùng mở/refresh ứng dụng và đã cấp quyền thông báo.
+- Nhật ký chỉ trưởng phòng xem; có nút dọn các log **cũ hơn 30 ngày**.
+- Quản trị tài khoản có nút **Xóa hoàn toàn**: xóa quyền, memberData, access request, task submissions, audit log của tài khoản và xóa luôn Firebase Authentication của dự án.
+- Code giao diện được tách thành `index.html`, `styles.css`, `app.js`, `p708-secure-sync-engine.js`.
 
-## 1. Bật đăng nhập Google
+## Lưu ý quan trọng về “xóa email hoàn toàn”
 
-Firebase Console → **Xác thực** → **Phương thức kết nối** → **Google** → Bật → chọn email hỗ trợ → Lưu.
+Nút **Xóa hoàn toàn** xóa tài khoản người khác khỏi Firebase Authentication của project P708 và xóa các document tài khoản chứa email/UID trong Firestore. Tên lịch sử trong lịch trực/hóa đơn vẫn được giữ để không làm sai dữ liệu sổ cũ. Không thể dùng nút này để xóa tài khoản trưởng phòng chính hoặc tài khoản đang đăng nhập.
 
-Anonymous có thể để bật hoặc tắt. Bản Secure không sử dụng Anonymous.
+## Chính sách nhật ký 30 ngày
 
-## 2. Thay Firestore Rules
+- Log mới hơn 30 ngày được giữ để truy vết.
+- Trưởng phòng có nút **Dọn log >30 ngày**.
+- Browser không có quyền xóa audit log trực tiếp. Việc dọn log chạy qua Cloud Function có quyền Admin SDK để tránh thành viên hoặc mã client sửa/xóa log gần đây.
 
-Firebase Console → **Cửa hàng lửa / Firestore** → **Quy tắc**.
+## Firestore / Authentication
 
-Xóa rules cũ, dán toàn bộ nội dung file `firestore-secure.rules`, sau đó bấm **Xuất bản**.
+Bật Google Sign-In trong Firebase Authentication và triển khai `firestore-secure.rules`.
 
-Rules cũ chỉ kiểm tra `request.auth != null` và không đủ an toàn. Bắt buộc dùng rules mới cùng bản Secure.
-
-## 3. Chạy thử trên máy
-
-Đặt hai file cùng thư mục:
+Mô hình dữ liệu:
 
 ```text
-index.html
-p708-secure-sync-engine.js
+rooms/P708
+rooms/P708/security/config
+rooms/P708/access/{uid}
+rooms/P708/accessRequests/{uid}
+rooms/P708/memberData/{uid}
+rooms/P708/taskSubmissions/{submissionId}
+rooms/P708/auditLogs/{logId}
 ```
 
-Mở CMD trong thư mục đó:
+## Cloud Functions
+
+Hai callable functions mới:
+
+- `deleteP708Account`: xóa hoàn toàn tài khoản người khác khỏi hệ thống P708.
+- `cleanupP708AuditLogs`: xóa audit log cũ hơn thời gian lưu trữ, tối thiểu 30 ngày.
+
+Project dùng Node.js 22.
+
+> Cloud Functions cần project Firebase ở gói hỗ trợ triển khai Functions (thường là Blaze). Nếu chưa nâng gói, phần Dashboard/lịch/điện nước vẫn hoạt động nhưng hai thao tác server-side “Xóa hoàn toàn” và “Dọn log >30 ngày” sẽ chưa chạy được.
+
+## Deploy
 
 ```bash
-py -m http.server 8080
-```
-
-Truy cập:
-
-```text
-http://localhost:8080/
-```
-
-## 4. Thiết lập trưởng phòng lần đầu
-
-1. Mở website và đăng nhập Google bằng tài khoản trưởng phòng.
-2. Khi thấy màn hình “Thiết lập trưởng phòng đầu tiên”, bấm **Nhận quyền trưởng phòng**.
-3. Thực hiện bước này trước khi chia link cho người khác.
-4. Vào nút tài khoản ở góc trên bên phải.
-5. Tại “Tài khoản đã cấp quyền”, liên kết tài khoản trưởng phòng với đúng tên thành viên nếu cần.
-
-## 5. Duyệt thành viên
-
-Quy trình của thành viên:
-
-1. Mở cùng đường link.
-2. Đăng nhập Google.
-3. Nhập tên trong phòng và gửi yêu cầu.
-
-Quy trình của trưởng phòng:
-
-1. Bấm nút tài khoản ở góc trên bên phải.
-2. Trong “Yêu cầu đang chờ”, chọn đúng tên thành viên.
-3. Chọn vai trò **Thành viên**.
-4. Bấm **Duyệt**.
-
-Sau khi duyệt, trang của thành viên sẽ tự mở. Người đó chỉ có thể sửa dữ liệu gắn với tên đã liên kết.
-
-## 6. Đưa lên Firebase Hosting
-
-Gói này đã có cấu trúc:
-
-```text
-public/
-  index.html
-  p708-secure-sync-engine.js
-firebase.json
-firestore-secure.rules
-```
-
-Nếu đã cài Firebase CLI:
-
-```bash
+npm install -g firebase-tools
 firebase login
 firebase use p708-room-manager
-firebase deploy --only hosting,firestore:rules
+cd functions && npm install && cd ..
+firebase deploy --only hosting,firestore:rules,functions
 ```
 
-Nếu dùng tên miền riêng, thêm tên miền đó tại Firebase Authentication → Settings → Authorized domains.
+Hosting hiện dùng thư mục root (`"public": "."`) và đã ignore `functions/**`, rules, README và các file cấu hình. Việc này sửa lỗi cấu hình cũ trỏ vào thư mục `public/` trong khi repo không có thư mục đó.
 
-## Mô hình dữ liệu
+## Kiểm tra trước khi chia link
 
-```text
-rooms/P708                          # dữ liệu chung, chỉ admin được ghi
-rooms/P708/security/config          # UID trưởng phòng đầu tiên
-rooms/P708/access/{uid}             # vai trò + memberId được liên kết
-rooms/P708/accessRequests/{uid}     # yêu cầu tham gia
-rooms/P708/memberData/{uid}         # có mặt + ngày ở của đúng tài khoản
-rooms/P708/auditLogs/{logId}        # nhật ký thao tác
-```
-
-## Lưu ý chuyển đổi từ bản cũ
-
-- Dữ liệu chung cũ tại `rooms/P708` vẫn được đọc lại.
-- Khi trưởng phòng đăng nhập lần đầu, bản Secure sẽ tiếp tục dùng payload hiện có.
-- Nếu Firestore chưa có dữ liệu nhưng máy trưởng phòng còn dữ liệu local, ứng dụng sẽ khởi tạo dữ liệu phòng từ máy đó.
-- Không tiếp tục phát hành file cũ dùng `p708-sync-engine.js`, vì file đó không có phân quyền theo thành viên.
+1. Đăng nhập tài khoản trưởng phòng trước và nhận quyền trưởng phòng.
+2. Tạo ít nhất một thành viên rồi duyệt một tài khoản member thử nghiệm.
+3. Kiểm tra member chỉ sửa được presence/ngày ở của chính mình.
+4. Tạo lịch, member bấm “Tôi đã làm”, admin xác nhận.
+5. Chốt một tháng điện nước và thử nút “Đã thu tiền”.
+6. Chỉ thử “Xóa hoàn toàn” bằng một tài khoản test, không dùng tài khoản thật ngay lần đầu.
