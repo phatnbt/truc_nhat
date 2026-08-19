@@ -1,0 +1,29 @@
+/* Mobile header + notification status for P708 */
+.nav-notify{display:inline-flex;align-items:center;justify-content:center;gap:7px;position:relative;white-space:nowrap}
+.nav-notify small{display:none}
+.nav-notify.notify-enabled{background:linear-gradient(135deg,#ecfdf3,#f0fdf4)!important;border-color:#bbf7d0!important;color:#15803d!important}
+.nav-notify.notify-enabled:after{content:"";width:7px;height:7px;border-radius:50%;background:#22c55e;box-shadow:0 0 0 4px rgba(34,197,94,.12)}
+.nav-notify.notify-blocked{background:#fff7ed!important;border-color:#fed7aa!important;color:#9a3412!important}
+
+@media (max-width:720px){
+  .home-shell{padding-top:max(10px,env(safe-area-inset-top))}
+  .landing-nav{min-height:68px;padding:8px 104px 8px 10px;border-radius:20px}
+  .brand-symbol{width:46px;height:46px;border-radius:15px;font-size:20px}
+  .brand-lockup b{font-size:14px}
+  .brand-lockup small{display:none}
+  .landing-nav-actions{position:absolute;right:60px;top:50%;transform:translateY(-50%);gap:6px}
+  .landing-nav-actions .live-status{display:none}
+  .nav-notify{width:42px;height:42px;min-height:42px!important;padding:0!important;border-radius:14px!important;font-size:0;box-shadow:0 8px 20px rgba(15,23,42,.08)!important}
+  .nav-notify>span{display:none}
+  .nav-notify:before{content:"🔔";font-size:19px;line-height:1}
+  .nav-notify.notify-enabled:after{position:absolute;right:5px;top:5px;width:8px;height:8px;box-shadow:0 0 0 3px rgba(34,197,94,.14)}
+  .account-fab{top:calc(env(safe-area-inset-top) + 13px);right:12px;width:42px;height:42px;max-width:42px;padding:4px;border-radius:14px;justify-content:center;box-shadow:0 8px 22px rgba(15,23,42,.12)}
+  .account-copy{display:none!important}
+  .account-avatar{width:32px;height:32px;min-width:32px}
+}
+
+@media (max-width:430px){
+  .landing-nav{padding-right:100px}
+  .landing-brand{gap:9px}
+  .brand-lockup b{font-size:13px}
+}
