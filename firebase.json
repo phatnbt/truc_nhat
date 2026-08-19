@@ -1,19 +1,26 @@
 {
+  "functions": {
+    "source": "functions",
+    "runtime": "nodejs22"
+  },
   "firestore": {
     "rules": "firestore-secure.rules"
   },
   "hosting": {
-    "public": "public",
+    "public": ".",
     "ignore": [
       "firebase.json",
-      "**/.*",
+      "firestore-secure.rules",
+      "README*.md",
+      "VALIDATION.json",
+      ".firebaserc*",
+      ".git/**",
+      ".github/**",
+      "functions/**",
       "**/node_modules/**"
     ],
     "rewrites": [
-      {
-        "source": "**",
-        "destination": "/index.html"
-      }
+      {"source": "**", "destination": "/index.html"}
     ]
   }
 }

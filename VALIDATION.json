@@ -1,22 +1,22 @@
 {
+  "build": "2026-08-19-manager-v5",
   "javascript_syntax": [
-    {
-      "file": "p708-secure-sync-engine.js",
-      "ok": true,
-      "stderr": ""
-    },
-    {
-      "file": "p708-inline-check.js",
-      "ok": true,
-      "stderr": ""
-    }
+    {"file": "app.js", "ok": true},
+    {"file": "p708-secure-sync-engine.js", "ok": true},
+    {"file": "functions/index.js", "ok": true}
   ],
   "required_files": [
-    "public/index.html",
-    "public/p708-secure-sync-engine.js",
+    "index.html",
+    "styles.css",
+    "app.js",
+    "p708-secure-sync-engine.js",
     "firestore-secure.rules",
     "firebase.json",
+    "functions/index.js",
+    "functions/package.json",
     "README_P708_SECURE.md"
   ],
-  "firebase_project_id": "p708-room-manager"
+  "firebase_project_id": "p708-room-manager",
+  "hosting_public": ".",
+  "audit_retention_days": 30
 }
