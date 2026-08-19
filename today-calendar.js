@@ -22,36 +22,26 @@
       border-color:#4f63f5!important;
       color:#166534;
     }
-    .day-cell.is-today:disabled{opacity:.94}
+    .day-cell.is-today:disabled{opacity:.96}
     .day-cell.is-today::before{
       content:"";
       position:absolute;
-      top:8px;
-      left:8px;
+      top:9px;
+      left:9px;
       width:8px;
       height:8px;
       border-radius:999px;
       background:#4f63f5;
       box-shadow:0 0 0 5px rgba(79,99,245,.12);
     }
-    .day-cell.is-today::after{
-      content:"Hôm nay";
-      position:absolute;
-      top:7px;
-      right:7px;
-      padding:3px 7px;
-      border-radius:999px;
-      background:#e8edff;
-      color:#3652d9;
-      font-size:9px;
-      font-weight:900;
-      line-height:1.2;
-      letter-spacing:.1px;
-      text-transform:none;
-    }
     @media(max-width:640px){
-      .day-cell.is-today::after{font-size:8px;padding:2px 5px;top:5px;right:5px}
-      .day-cell.is-today::before{width:6px;height:6px;top:6px;left:6px;box-shadow:0 0 0 4px rgba(79,99,245,.10)}
+      .day-cell.is-today::before{
+        width:6px;
+        height:6px;
+        top:7px;
+        left:7px;
+        box-shadow:0 0 0 4px rgba(79,99,245,.10);
+      }
     }
   `;
   if(!document.querySelector('style[data-today-calendar="1"]'))document.head.appendChild(style);
@@ -75,7 +65,7 @@
     if(!cell)return null;
     cell.classList.add("is-today");
     cell.setAttribute("aria-current","date");
-    cell.setAttribute("title",`Hôm nay · ${now.toLocaleDateString("vi-VN")}`);
+    cell.setAttribute("title",now.toLocaleDateString("vi-VN"));
     return cell;
   }
 
