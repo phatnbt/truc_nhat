@@ -11,7 +11,8 @@ const parts = [
   "./app-render.js?v=20260819-6",
   "./home-enhancements.js?v=20260819-6",
   "./app-start.js?v=20260819-6",
-  "./notification-enhancements.js?v=20260819-8"
+  "./notification-enhancements.js?v=20260819-8",
+  "./today-calendar.js?v=20260819-9"
 ];
 
 for (const src of parts) {
