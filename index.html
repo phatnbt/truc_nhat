@@ -11,7 +11,8 @@
   <link rel="manifest" href="./manifest.webmanifest">
   <link rel="icon" type="image/png" sizes="32x32" href="./icons/icon-32.png">
   <link rel="apple-touch-icon" sizes="192x192" href="./icons/icon-192.png">
-  <link rel="stylesheet" href="./styles.css?v=20260819-1">
+  <link rel="stylesheet" href="./styles.css?v=20260819-3">
+  <link rel="stylesheet" href="./landing-ui.css?v=20260819-3">
   <title>Quản lý phòng P708</title>
 </head>
 <body>
@@ -28,53 +29,99 @@
   </div>
 
   <main>
-    <section class="page active" id="page-home" data-page="home">
-      <div class="shell">
-        <header class="home-header">
-          <div>
-            <p class="eyebrow">P708 ROOM MANAGER</p>
-            <h1>Trung tâm quản lý phòng</h1>
-            <p class="lede">Theo dõi việc trực, tiền điện nước, thanh toán và những việc trưởng phòng cần xử lý trong một màn hình.</p>
+    <section class="page active home-landing" id="page-home" data-page="home">
+      <div class="home-aurora" aria-hidden="true"><i></i><i></i><i></i></div>
+      <div class="home-grid-overlay" aria-hidden="true"></div>
+      <div class="shell home-shell">
+        <nav class="landing-nav" aria-label="Điều hướng trang chủ">
+          <div class="landing-brand">
+            <span class="brand-symbol">P</span>
+            <span class="brand-lockup"><b>P708 Manager</b><small>Room operations, simplified.</small></span>
           </div>
-          <div class="header-actions">
-            <button class="btn soft" id="notificationButton" type="button">🔔 Bật nhắc việc</button>
-            <button class="btn" id="homeSyncButton" type="button">↻ Đồng bộ</button>
+          <div class="landing-nav-actions">
+            <span class="live-status" title="Dữ liệu tự đồng bộ với Firestore"><i></i><span id="homeSyncText">Đang kết nối dữ liệu…</span></span>
+            <button class="btn nav-notify" id="notificationButton" type="button">🔔 <span>Bật nhắc việc</span></button>
+          </div>
+        </nav>
+
+        <header class="hero-panel">
+          <div class="hero-copy">
+            <div class="hero-badge"><span class="pulse-dot"></span>P708 · Firebase Free Edition</div>
+            <h1>Quản lý phòng <span class="gradient-text">gọn hơn mỗi ngày.</span></h1>
+            <p class="hero-lede">Một nơi để trưởng phòng và thành viên cùng theo dõi trực nhật, ngày ở, điện nước, thanh toán và việc cần xử lý — rõ ràng trên mọi thiết bị.</p>
+            <div class="hero-actions">
+              <button class="btn primary hero-primary" data-go="cleaning" type="button">🧹 Xem lịch trực <span>→</span></button>
+              <button class="btn hero-secondary" data-go="billing" type="button">⚡ Điện & nước</button>
+            </div>
+            <div class="hero-proof" aria-label="Điểm nổi bật">
+              <span>● Realtime Firestore</span><span>● PWA trên điện thoại</span><span>● Spark plan miễn phí</span>
+            </div>
+          </div>
+          <div class="hero-visual" aria-hidden="true">
+            <div class="hero-glow"></div>
+            <div class="preview-shell">
+              <div class="preview-top"><span><i></i><i></i><i></i></span><b>P708 / hôm nay</b><em>LIVE</em></div>
+              <div class="preview-grid">
+                <div class="preview-card preview-large"><small>Phòng đang hoạt động</small><strong>Realtime</strong><p>Mọi thay đổi tự xuất hiện trên thiết bị khác.</p><div class="preview-wave"><i></i><i></i><i></i><i></i><i></i></div></div>
+                <div class="preview-card"><small>Lịch trực</small><strong>01</strong><p>Việc cần bạn xử lý</p></div>
+                <div class="preview-card"><small>Điện nước</small><strong>✓</strong><p>Theo dõi đã đóng</p></div>
+                <div class="preview-card preview-wide"><span class="preview-avatar">P</span><div><small>Trưởng phòng</small><strong>Quản lý tập trung</strong></div><span class="preview-online">Online</span></div>
+              </div>
+            </div>
           </div>
         </header>
 
-        <section class="dashboard-kpis" aria-label="Tổng quan phòng">
-          <article class="kpi-card"><span>Thành viên</span><b id="kpiMembers">0</b><small id="kpiPresent">0 có mặt</small></article>
-          <article class="kpi-card"><span>Trực tuần này</span><b id="kpiTasks">0/0</b><small id="kpiTaskHint">Chưa có lịch</small></article>
-          <article class="kpi-card"><span>Còn phải thu</span><b id="kpiUnpaid">0 đ</b><small id="kpiUnpaidPeople">0 người chưa đóng</small></article>
-          <article class="kpi-card"><span>Yêu cầu chờ</span><b id="kpiPending">0</b><small id="kpiPendingHint">Tài khoản / công việc</small></article>
+        <section class="dashboard-kpis bento-kpis" aria-label="Tổng quan phòng">
+          <article class="kpi-card kpi-blue"><span class="kpi-icon">👥</span><div><span>Thành viên</span><b id="kpiMembers">0</b><small id="kpiPresent">0 có mặt</small></div></article>
+          <article class="kpi-card kpi-purple"><span class="kpi-icon">🧹</span><div><span>Trực tuần này</span><b id="kpiTasks">0/0</b><small id="kpiTaskHint">Chưa có lịch</small></div></article>
+          <article class="kpi-card kpi-green"><span class="kpi-icon">💳</span><div><span>Còn phải thu</span><b id="kpiUnpaid">0 đ</b><small id="kpiUnpaidPeople">0 người chưa đóng</small></div></article>
+          <article class="kpi-card kpi-amber"><span class="kpi-icon">🔔</span><div><span>Yêu cầu chờ</span><b id="kpiPending">0</b><small id="kpiPendingHint">Tài khoản / công việc</small></div></article>
         </section>
 
-        <section class="dashboard-layout">
-          <article class="card action-card admin-only">
+        <section class="section-intro">
+          <div><p class="eyebrow">TODAY</p><h2>Những gì cần chú ý ngay</h2><p>Ưu tiên việc cần xử lý trước, phần còn lại để hệ thống tự theo dõi.</p></div>
+        </section>
+        <section class="dashboard-layout spotlight-grid">
+          <article class="card action-card spotlight-card admin-only">
             <div class="card-head"><div><p class="eyebrow">CẦN XỬ LÝ</p><h2>Việc của trưởng phòng</h2></div><span class="badge admin">👑 Quản trị</span></div>
             <div class="action-list" id="managerActionList"></div>
           </article>
-          <article class="card action-card">
+          <article class="card action-card spotlight-card">
             <div class="card-head"><div><p class="eyebrow">NHẮC VIỆC</p><h2 id="personalReminderTitle">Việc của bạn</h2></div><button class="btn small soft" id="refreshReminderButton" type="button">Làm mới</button></div>
             <div class="action-list" id="personalReminderList"></div>
           </article>
         </section>
 
-        <section class="module-grid">
-          <article class="module-card cleaning-card">
-            <div class="module-icon">🧹</div><div><h2>Lịch trực nhật</h2><p>Phân công công bằng, thành viên báo đã làm và trưởng phòng xác nhận.</p></div>
-            <button class="btn primary" data-go="cleaning" type="button">Mở lịch trực →</button>
-          </article>
-          <article class="module-card billing-card">
-            <div class="module-icon">⚡</div><div><h2>Điện & nước</h2><p>Chia theo ngày ở, chốt sổ và theo dõi ai đã đóng / chưa đóng.</p></div>
-            <button class="btn green" data-go="billing" type="button">Mở điện nước →</button>
-          </article>
-          <article class="module-card audit-card admin-only">
-            <div class="module-icon">🧾</div><div><h2>Nhật ký</h2><p>Lọc hoạt động và dọn nhật ký cũ hơn 30 ngày.</p></div>
-            <button class="btn" data-go="audit" type="button">Mở nhật ký →</button>
-          </article>
+        <section class="module-section">
+          <div class="section-intro module-intro"><div><p class="eyebrow">WORKSPACE</p><h2>Mọi việc phòng trong 3 khu vực</h2><p>Đi thẳng vào đúng việc cần làm, không phải tìm trong menu dài.</p></div></div>
+          <div class="module-grid bento-modules">
+            <article class="module-card cleaning-card feature-card">
+              <div class="feature-card-top"><div class="module-icon">🧹</div><span class="feature-number">01</span></div>
+              <div><h2>Lịch trực nhật</h2><p>Phân công công bằng, hạn chế lặp việc, thành viên báo hoàn thành và trưởng phòng xác nhận.</p></div>
+              <div class="feature-tags"><span>Công bằng</span><span>Xác nhận</span><span>Lịch sử</span></div>
+              <button class="btn primary" data-go="cleaning" type="button">Mở lịch trực <span>→</span></button>
+            </article>
+            <article class="module-card billing-card feature-card feature-card-tall">
+              <div class="feature-card-top"><div class="module-icon">⚡</div><span class="feature-number">02</span></div>
+              <div><h2>Điện & nước</h2><p>Chia tiền theo ngày ở thực tế, chốt sổ và biết ngay ai đã đóng hoặc còn thiếu.</p></div>
+              <div class="feature-meter"><span><i style="width:72%"></i></span><small>Minh bạch theo ngày-người</small></div>
+              <div class="feature-tags"><span>Ngày ở</span><span>Thanh toán</span><span>CSV</span></div>
+              <button class="btn green" data-go="billing" type="button">Mở điện nước <span>→</span></button>
+            </article>
+            <article class="module-card audit-card feature-card admin-only">
+              <div class="feature-card-top"><div class="module-icon">🧾</div><span class="feature-number">03</span></div>
+              <div><h2>Nhật ký</h2><p>Kiểm tra thay đổi theo thành viên và tự quản lý chính sách lưu nhật ký 30 ngày.</p></div>
+              <div class="feature-tags"><span>30 ngày</span><span>Bộ lọc</span><span>Quản trị</span></div>
+              <button class="btn" data-go="audit" type="button">Mở nhật ký <span>→</span></button>
+            </article>
+          </div>
         </section>
-        <p class="sync-footer" id="homeSyncText">Đang kết nối dữ liệu…</p>
+
+        <section class="landing-note">
+          <span class="landing-note-icon">☁️</span>
+          <div><b>Tự đồng bộ, không cần bấm nút.</b><p>Firestore lắng nghe thay đổi realtime; khi mạng trở lại hoặc bạn mở lại ứng dụng, dữ liệu tự kiểm tra và cập nhật.</p></div>
+          <span class="badge success">AUTO SYNC</span>
+        </section>
       </div>
     </section>
 
@@ -82,7 +129,7 @@
       <div class="shell">
         <header class="topbar">
           <div class="brand"><button class="icon-btn" data-go="home" type="button">←</button><div><h1>Lịch trực nhật</h1><p>Phân công công bằng · báo hoàn thành · xác nhận</p></div></div>
-          <div class="top-actions"><button class="btn soft" id="copyScheduleButton" type="button">📋 Copy lịch</button><button class="btn" id="cleanSyncButton" type="button">↻ Đồng bộ</button></div>
+          <div class="top-actions"><button class="btn soft" id="copyScheduleButton" type="button">📋 Copy lịch</button></div>
         </header>
         <div class="two-col">
           <aside class="card sidebar-card">
@@ -109,7 +156,7 @@
       <div class="shell">
         <header class="topbar">
           <div class="brand"><button class="icon-btn" data-go="home" type="button">←</button><div><h1>Điện & nước</h1><p>Ngày ở thực tế · chốt sổ · theo dõi thanh toán</p></div></div>
-          <div class="top-actions"><button class="btn soft" id="copyBillingButton" type="button">📋 Copy kết quả</button><button class="btn" id="billSyncButton" type="button">↻ Đồng bộ</button></div>
+          <div class="top-actions"><button class="btn soft" id="copyBillingButton" type="button">📋 Copy kết quả</button></div>
         </header>
         <div class="billing-layout">
           <aside class="billing-sidebar">
@@ -122,7 +169,7 @@
             </section>
             <section class="card compact-card">
               <div class="section-title"><span>2</span><h3>Chọn người</h3></div>
-              <div class="button-row admin-only"><button class="btn small soft" id="syncBillingMembersButton" type="button">Đồng bộ</button><button class="btn small primary" id="addBillingPersonButton" type="button">+ Thêm</button></div>
+              <div class="button-row admin-only"><button class="btn small soft" id="syncBillingMembersButton" type="button">Cập nhật danh sách</button><button class="btn small primary" id="addBillingPersonButton" type="button">+ Thêm</button></div>
               <div class="people-list" id="billPeopleList"></div>
             </section>
           </aside>
@@ -148,7 +195,7 @@
       <div class="shell">
         <header class="topbar">
           <div class="brand"><button class="icon-btn" data-go="home" type="button">←</button><div><h1>Nhật ký thay đổi</h1><p>Chỉ trưởng phòng được xem · chính sách lưu 30 ngày</p></div></div>
-          <div class="top-actions"><button class="btn danger admin-only" id="cleanupAuditButton" type="button">🧹 Dọn log &gt;30 ngày</button><button class="btn" id="auditSyncButton" type="button">↻ Làm mới</button></div>
+          <div class="top-actions"><button class="btn danger admin-only" id="cleanupAuditButton" type="button">🧹 Dọn log &gt;30 ngày</button></div>
         </header>
         <section class="card admin-only">
           <div class="card-body">
@@ -166,9 +213,9 @@
 
   <div class="modal" id="memberModal"><div class="modal-card"><div class="card-head"><div><h3>Thêm người/khách</h3><p>Người này chỉ xuất hiện trong hóa đơn tháng.</p></div><button class="icon-btn" data-close="memberModal" type="button">✕</button></div><div class="modal-body"><div class="field"><label>Tên người</label><input id="billNewPersonName" placeholder="Ví dụ: Khách A"></div></div><div class="modal-actions"><button class="btn" data-close="memberModal" type="button">Hủy</button><button class="btn primary" id="confirmAddBillingPersonButton" type="button">Thêm</button></div></div></div>
   <div class="modal" id="manualModal"><div class="modal-card"><div class="card-head"><div><h3>Chỉnh phân công</h3><p>Chọn người phụ trách từng việc.</p></div><button class="icon-btn" data-close="manualModal" type="button">✕</button></div><div class="modal-body" id="manualFields"></div><div class="modal-actions"><button class="btn" data-close="manualModal" type="button">Hủy</button><button class="btn primary" id="saveManualScheduleButton" type="button">Lưu</button></div></div></div>
-  <div class="modal" id="accessModal"><div class="modal-card access-modal-card"><div class="card-head"><div><h3>Tài khoản & phân quyền</h3><p>Xóa hoàn toàn sẽ xóa Firebase Authentication và dữ liệu tài khoản khỏi hệ thống P708.</p></div><button class="icon-btn" data-close="accessModal" type="button">✕</button></div><div id="accessModalBody"></div><div class="modal-actions"><button class="btn" id="signOutButton" type="button">Đăng xuất</button><button class="btn primary" data-close="accessModal" type="button">Đóng</button></div></div></div>
+  <div class="modal" id="accessModal"><div class="modal-card access-modal-card"><div class="card-head"><div><h3>Tài khoản & phân quyền</h3><p>Bản Free có thể xóa dữ liệu và quyền của tài khoản khỏi P708; Firebase Authentication của người khác được quản lý trong Firebase Console.</p></div><button class="icon-btn" data-close="accessModal" type="button">✕</button></div><div id="accessModalBody"></div><div class="modal-actions"><button class="btn" id="signOutButton" type="button">Đăng xuất</button><button class="btn primary" data-close="accessModal" type="button">Đóng</button></div></div></div>
 
   <div class="toast" id="toast"></div>
-  <script type="module" src="./app.js?v=20260819-1"></script>
+  <script type="module" src="./app.js?v=20260819-3"></script>
 </body>
 </html>
