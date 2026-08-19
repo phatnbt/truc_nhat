@@ -1,4 +1,15 @@
-const BOOT_VERSION = "20260819-7";
+const BOOT_VERSION = "20260819-11";
+
+globalThis.P708InstallPrompt = null;
+window.addEventListener("beforeinstallprompt",event=>{
+  event.preventDefault();
+  globalThis.P708InstallPrompt=event;
+  window.dispatchEvent(new Event("p708installpromptready"));
+});
+window.addEventListener("appinstalled",()=>{
+  globalThis.P708InstallPrompt=null;
+  window.dispatchEvent(new Event("p708appinstalled"));
+});
 
 function loadKpiPolish(){
   if(document.querySelector('link[data-kpi-polish="1"]'))return;

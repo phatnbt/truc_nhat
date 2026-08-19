@@ -1,4 +1,4 @@
-const CACHE_NAME="p708-manager-v5-free-landing-20260819-10";
+const CACHE_NAME="p708-manager-v5-free-landing-20260819-11";
 const APP_SHELL=[
   "./",
   "./index.html",
@@ -18,6 +18,8 @@ const APP_SHELL=[
   "./app-start.js",
   "./notification-enhancements.js",
   "./today-calendar.js",
+  "./mobile-install-bridge.js",
+  "./mobile-install-guide.js",
   "./p708-secure-sync-engine.js",
   "./manifest.webmanifest",
   "./offline.html",
