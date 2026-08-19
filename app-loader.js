@@ -9,6 +9,7 @@ const parts = [
   "./app-actions2.js?v=20260819-3",
   "./app-dashboard.js?v=20260819-3",
   "./app-render.js?v=20260819-3",
+  "./home-enhancements.js?v=20260819-4",
   "./app-start.js?v=20260819-3"
 ];
 
