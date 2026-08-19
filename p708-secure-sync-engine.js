@@ -6,10 +6,9 @@ import {
 } from "https://www.gstatic.com/firebasejs/12.16.0/firebase-auth.js";
 import {
   initializeFirestore, getFirestore, persistentLocalCache, persistentMultipleTabManager,
-  doc, collection, query, orderBy, limit, onSnapshot, runTransaction, serverTimestamp,
-  setDoc, deleteDoc, getDoc, increment
+  doc, collection, query, where, orderBy, limit, onSnapshot, runTransaction, serverTimestamp,
+  setDoc, deleteDoc, getDoc, getDocs, writeBatch, Timestamp, increment
 } from "https://www.gstatic.com/firebasejs/12.16.0/firebase-firestore.js";
-import { getFunctions, httpsCallable } from "https://www.gstatic.com/firebasejs/12.16.0/firebase-functions.js";
 
 const clone=value=>value==null?value:JSON.parse(JSON.stringify(value));
 const isObject=value=>value!==null&&typeof value==="object"&&!Array.isArray(value);
@@ -40,15 +39,13 @@ function memberAllowedOperation(operation,memberId,currentShape,nextShape){
 }
 function makeLogId(uid){const random=globalThis.crypto?.randomUUID?.()||Math.random().toString(36).slice(2);return `${Date.now()}-${uid}-${random}`;}
 function taskDocId(weekStart,taskId,memberId){return `${String(weekStart).replaceAll("/","-")}__${String(taskId).replaceAll("/","-")}__${String(memberId).replaceAll("/","-")}`;}
+function escapeRegExp(value){return String(value||"").replace(/[.*+?^${}()|[\]\\]/g,"\\$&");}
 
 export function createP708SecureEngine({firebaseConfig,roomCode,deviceId,initialShape,onShape,onStatus,onSession,onAdminData,onTaskData}){
   if(!firebaseConfig?.apiKey)throw new Error("Chưa cấu hình Firebase.");
   const appName="p708-secure-manager-v5";const app=getApps().some(x=>x.name===appName)?getApp(appName):initializeApp(firebaseConfig,appName);
   let db;try{db=initializeFirestore(app,{localCache:persistentLocalCache({tabManager:persistentMultipleTabManager()})});}catch{db=getFirestore(app);}
   const auth=getAuth(app),provider=new GoogleAuthProvider();provider.setCustomParameters({prompt:"select_account"});
-  const functions=getFunctions(app,"us-central1");
-  const deleteAccountCallable=httpsCallable(functions,"deleteP708Account");
-  const cleanupAuditCallable=httpsCallable(functions,"cleanupP708AuditLogs");
   const roomRef=doc(db,"rooms",roomCode),configRef=doc(db,"rooms",roomCode,"security","config");
   const accessCollection=collection(db,"rooms",roomCode,"access"),requestCollection=collection(db,"rooms",roomCode,"accessRequests"),memberDataCollection=collection(db,"rooms",roomCode,"memberData"),auditCollection=collection(db,"rooms",roomCode,"auditLogs"),taskCollection=collection(db,"rooms",roomCode,"taskSubmissions");
 
@@ -106,10 +103,71 @@ export function createP708SecureEngine({firebaseConfig,roomCode,deviceId,initial
   const submitTask=async({scheduleId,weekStart,taskId,taskName,memberId})=>{if(!user||!hasAccess())throw new Error("Chưa có quyền truy cập.");if(isAdmin())throw new Error("Trưởng phòng dùng nút xác nhận trực tiếp.");if(memberId!==access.memberId)throw new Error("Bạn chỉ được báo công việc của mình.");const id=taskDocId(weekStart,taskId,memberId);await setDoc(doc(taskCollection,id),{roomCode,actorUid:user.uid,actorName:access.displayName||user.displayName||user.email||"Thành viên",memberId,scheduleId,weekStart,taskId,taskName,status:"submitted",submittedAt:serverTimestamp(),updatedAt:serverTimestamp()},{merge:true});await writeAudit({action:"SUBMIT_TASK",summary:`Báo hoàn thành: ${taskName}`,targetMemberId:memberId});return {id};};
   const reviewTask=async({submissionId,status,note=""})=>{if(!isAdmin())throw new Error("Chỉ trưởng phòng được xác nhận.");if(!["approved","rejected"].includes(status))throw new Error("Trạng thái không hợp lệ.");const ref=doc(taskCollection,submissionId),old=await getDoc(ref);if(!old.exists())throw new Error("Không tìm thấy báo hoàn thành.");await setDoc(ref,{...old.data(),status,reviewNote:note,reviewedBy:user.uid,reviewedAt:serverTimestamp(),updatedAt:serverTimestamp()});await writeAudit({action:status==="approved"?"VERIFY_TASK":"REJECT_TASK",summary:`${status==="approved"?"Xác nhận":"Yêu cầu làm lại"}: ${old.data().taskName||"công việc"}`,targetMemberId:old.data().memberId||null});};
 
-  const deleteAccountCompletely=async targetUid=>{if(!isAdmin())throw new Error("Chỉ trưởng phòng được xóa tài khoản.");if(targetUid===user.uid)throw new Error("Không thể tự xóa tài khoản đang đăng nhập.");const result=await deleteAccountCallable({roomCode,targetUid});return result.data||{};};
-  const cleanupAuditLogs=async(retentionDays=30)=>{if(!isAdmin())throw new Error("Chỉ trưởng phòng được dọn nhật ký.");const result=await cleanupAuditCallable({roomCode,retentionDays});return result.data||{};};
+  const commitDeletes=async docs=>{
+    let deleted=0;
+    for(let i=0;i<docs.length;i+=400){
+      const batch=writeBatch(db),part=docs.slice(i,i+400);
+      part.forEach(item=>batch.delete(item.ref));
+      await batch.commit();deleted+=part.length;
+    }
+    return deleted;
+  };
+  const commitRedactions=async items=>{
+    let updated=0;
+    for(let i=0;i<items.length;i+=350){
+      const batch=writeBatch(db),part=items.slice(i,i+350);
+      part.forEach(item=>batch.set(item.ref,item.patch,{merge:true}));
+      await batch.commit();updated+=part.length;
+    }
+    return updated;
+  };
+  const deleteAccountFromRoom=async targetUid=>{
+    if(!isAdmin())throw new Error("Chỉ trưởng phòng được xóa tài khoản khỏi phòng.");
+    if(targetUid===user.uid)throw new Error("Không thể tự xóa tài khoản đang đăng nhập.");
+    const [configSnap,targetSnap]=await Promise.all([getDoc(configRef),getDoc(doc(accessCollection,targetUid))]);
+    if(configSnap.exists()&&configSnap.data()?.adminUid===targetUid)throw new Error("Không thể xóa tài khoản trưởng phòng chính.");
+    const target=targetSnap.exists()?targetSnap.data():{};
+    const targetEmail=String(target?.email||"").trim(),emailLower=targetEmail.toLowerCase(),targetMemberId=target?.memberId||null;
+    const label=target?.displayName||targetMemberId||"tài khoản đã chọn";
+
+    await Promise.all([
+      deleteDoc(doc(accessCollection,targetUid)).catch(()=>{}),
+      deleteDoc(doc(requestCollection,targetUid)).catch(()=>{}),
+      deleteDoc(doc(memberDataCollection,targetUid)).catch(()=>{})
+    ]);
+    accessByUid.delete(targetUid);memberDataByUid.delete(targetUid);
+
+    const taskSnap=await getDocs(query(taskCollection,where("actorUid","==",targetUid)));
+    const taskDeleted=await commitDeletes(taskSnap.docs);
+
+    const auditSnap=await getDocs(auditCollection),redactions=[];
+    const emailPattern=targetEmail?new RegExp(escapeRegExp(targetEmail),"gi"):null;
+    for(const logDoc of auditSnap.docs){
+      const data=logDoc.data()||{},summary=String(data.summary||""),actorEmail=String(data.actorEmail||"");
+      const actorMatches=data.actorUid===targetUid||(emailLower&&actorEmail.toLowerCase()===emailLower);
+      const summaryMatches=Boolean(emailLower&&summary.toLowerCase().includes(emailLower));
+      if(!actorMatches&&!summaryMatches)continue;
+      const patch={};
+      if(actorMatches)patch.actorEmail="";
+      if(emailLower&&String(data.actorName||"").toLowerCase()===emailLower)patch.actorName="Tài khoản đã xóa";
+      if(summaryMatches&&emailPattern)patch.summary=summary.replace(emailPattern,"[email đã xóa]");
+      if(Object.keys(patch).length)redactions.push({ref:logDoc.ref,patch});
+    }
+    const auditRedacted=await commitRedactions(redactions);
+    await writeAudit({action:"REMOVE_ACCOUNT",summary:`Xóa ${label} khỏi phòng (bản Free)`,targetMemberId:targetMemberId||null});
+    return {removed:true,taskDeleted,auditRedacted,targetMemberId,authDeleted:false};
+  };
+  const cleanupAuditLogs=async(retentionDays=30)=>{
+    if(!isAdmin())throw new Error("Chỉ trưởng phòng được dọn nhật ký.");
+    const days=Math.max(30,Math.min(365,Math.round(Number(retentionDays)||30)));
+    const cutoff=Timestamp.fromMillis(Date.now()-days*24*60*60*1000);
+    const snap=await getDocs(query(auditCollection,where("createdAt","<",cutoff)));
+    const deletedCount=await commitDeletes(snap.docs);
+    await writeAudit({action:"CLEANUP_AUDIT",summary:`Dọn ${deletedCount} nhật ký cũ hơn ${days} ngày`});
+    return {deletedCount,retentionDays:days,cutoff:new Date(cutoff.toMillis()).toISOString()};
+  };
   const forceSync=async()=>{if(!user||!hasAccess())return false;try{const snap=await getDoc(roomRef);if(snap.exists()){remoteShape=clone(snap.data()?.payload)||{};rebuild();}emitStatus("online","Đã đồng bộ");return true;}catch(e){emitStatus("offline","Không thể đồng bộ",{error:e});return false;}};
   const flush=forceSync;
   const stop=()=>{authUnsub?.();clearUserListeners();};
-  return {start,stop,signInGoogle,signOut,claimAdmin,requestAccess,cancelAccessRequest,approveRequest,updateAccess,revokeAccess,recordShape,submitTask,reviewTask,deleteAccountCompletely,cleanupAuditLogs,forceSync,flush};
+  return {start,stop,signInGoogle,signOut,claimAdmin,requestAccess,cancelAccessRequest,approveRequest,updateAccess,revokeAccess,recordShape,submitTask,reviewTask,deleteAccountFromRoom,cleanupAuditLogs,forceSync,flush};
 }
