@@ -13,6 +13,7 @@ const parts = [
   "./app-start.js?v=20260819-6",
   "./notification-enhancements.js?v=20260819-8",
   "./today-calendar.js?v=20260819-10",
+  "./mobile-install-bridge.js?v=20260819-11",
   "./mobile-install-guide.js?v=20260819-11"
 ];
 
