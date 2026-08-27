@@ -1,4 +1,4 @@
-const BOOT_VERSION = "20260827-3";
+const BOOT_VERSION = "20260827-4";
 
 globalThis.P708InstallPrompt = null;
 window.addEventListener("beforeinstallprompt",event=>{
@@ -38,7 +38,7 @@ function showBootFailure(error){
 
 try{
   loadKpiPolish();
-  await import(`./app-loader.js?v=${BOOT_VERSION}`);
+  await import(`./src/boot/app-loader.js?v=${BOOT_VERSION}`);
 }catch(error){
   showBootFailure(error);
 }
