@@ -156,7 +156,8 @@ service cloud.firestore {
       }
 
       match /memberData/{uid} {
-        allow read: if hasActiveAccess(roomId) || isPrimaryAdmin(roomId);
+        allow read: if isAdmin(roomId)
+          || (signedIn() && uid == request.auth.uid && hasActiveAccess(roomId));
         allow create: if isAdmin(roomId)
           || (signedIn()
             && uid == request.auth.uid
@@ -174,7 +175,11 @@ service cloud.firestore {
       }
 
       match /taskSubmissions/{submissionId} {
-        allow read: if hasActiveAccess(roomId) || isPrimaryAdmin(roomId);
+        allow read: if isAdmin(roomId)
+          || (signedIn()
+            && hasActiveAccess(roomId)
+            && resource.data.actorUid == request.auth.uid
+            && resource.data.memberId == ownMemberId(roomId));
         allow create: if signedIn()
           && hasActiveAccess(roomId)
           && validTaskIdentity(roomId)
