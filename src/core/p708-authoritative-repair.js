@@ -1,7 +1,7 @@
 import { getApps, getApp, initializeApp } from "https://www.gstatic.com/firebasejs/12.16.0/firebase-app.js";
 import { getAuth } from "https://www.gstatic.com/firebasejs/12.16.0/firebase-auth.js";
 import {
-  getFirestore, doc, collection, getDoc, getDocFromServer, getDocs,
+  getFirestore, doc, collection, getDocFromServer, getDocsFromServer,
   runTransaction, serverTimestamp, setDoc
 } from "https://www.gstatic.com/firebasejs/12.16.0/firebase-firestore.js";
 
@@ -27,6 +27,22 @@ function extractMemberData(shape,memberId,previous={}){
   };
 }
 
+function overlayMemberData(shape,memberDocs){
+  const output=clone(shape)||{};
+  output.members||={};output.presence||={};output.billingMonths||={};
+  for(const data of memberDocs||[]){
+    const memberId=data?.memberId;
+    if(!memberId||!output.members?.[memberId])continue;
+    if(typeof data.presence==="boolean")output.presence[memberId]=data.presence;
+    for(const [month,monthData] of Object.entries(data.billingMonths||{})){
+      const entry=memberPersonEntry(output,memberId,month);
+      if(!entry)continue;
+      output.billingMonths[month].people[entry[0]].days=clone(monthData?.days||{});
+    }
+  }
+  return output;
+}
+
 function auditId(uid){
   const random=globalThis.crypto?.randomUUID?.()||Math.random().toString(36).slice(2);
   return `${Date.now()}-${uid}-${random}`;
@@ -43,17 +59,24 @@ export function createP708AuthoritativeRepair({firebaseConfig,roomCode,deviceId}
   const auditCollection=collection(db,"rooms",roomCode,"auditLogs");
 
   async function readServer(){
-    const snap=await getDocFromServer(roomRef);
-    if(!snap.exists())return {revision:0,payload:{}};
-    const data=snap.data()||{};
-    return {revision:Number(data.revision)||0,payload:clone(data.payload)||{}};
+    const [roomSnap,memberSnap]=await Promise.all([
+      getDocFromServer(roomRef),
+      getDocsFromServer(memberDataCollection)
+    ]);
+    if(!roomSnap.exists())return {revision:0,payload:{}};
+    const data=roomSnap.data()||{};
+    const memberDocs=memberSnap.docs.map(item=>({uid:item.id,...item.data()}));
+    return {
+      revision:Number(data.revision)||0,
+      payload:overlayMemberData(clone(data.payload)||{},memberDocs)
+    };
   }
 
   async function commit(desiredShape,{expectedRevision=null,audit={}}={}){
     const user=auth.currentUser;
     if(!user)throw new Error("Phiên đăng nhập đã hết hạn. Hãy đăng nhập lại.");
     const desired=clone(desiredShape)||{};
-    const accessSnap=await getDocs(accessCollection);
+    const accessSnap=await getDocsFromServer(accessCollection);
     const accesses=accessSnap.docs.map(item=>({uid:item.id,...item.data()}));
     const ownAccess=accesses.find(item=>item.uid===user.uid&&item.active!==false)||null;
     if(!ownAccess||ownAccess.role!=="admin")throw new Error("Chỉ trưởng phòng được sửa dữ liệu trùng.");
