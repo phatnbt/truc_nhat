@@ -135,7 +135,7 @@ service cloud.firestore {
 
       match /access/{uid} {
         allow read: if signedIn() && (uid == request.auth.uid || isAdmin(roomId));
-        allow create: if isAdmin(roomId)
+        allow create: if (isAdmin(roomId) && !isPrimaryUid(roomId, uid))
           || (signedIn()
             && uid == request.auth.uid
             && willBePrimaryAdmin(roomId)
