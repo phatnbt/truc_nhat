@@ -1,7 +1,7 @@
 const { onCall, HttpsError } = require("firebase-functions/https");
 const { initializeApp, getApps } = require("firebase-admin/app");
 const { getAuth } = require("firebase-admin/auth");
-const { getFirestore, Timestamp } = require("firebase-admin/firestore");
+const { getFirestore, Timestamp, FieldValue } = require("firebase-admin/firestore");
 
 if (!getApps().length) initializeApp();
 const db = getFirestore();
@@ -38,6 +38,56 @@ async function deleteQueryInBatches(queryRef, batchSize = 350) {
   return deleted;
 }
 
+async function redactAuditIdentity(roomCode, targetUid, targetEmail) {
+  const email = String(targetEmail || "").trim();
+  const emailLower = email.toLowerCase();
+  const auditSnapshot = await db.collection(`rooms/${roomCode}/auditLogs`).get();
+  const updates = [];
+  for (const docSnap of auditSnapshot.docs) {
+    const data = docSnap.data() || {};
+    const actorEmail = String(data.actorEmail || "");
+    const summary = String(data.summary || "");
+    const actorMatches = data.actorUid === targetUid || (emailLower && actorEmail.toLowerCase() === emailLower);
+    const summaryMatches = Boolean(emailLower && summary.toLowerCase().includes(emailLower));
+    if (!actorMatches && !summaryMatches) continue;
+    const patch = {};
+    if (actorMatches) patch.actorEmail = "";
+    if (actorMatches && String(data.actorName || "").toLowerCase() === emailLower) patch.actorName = "Tài khoản đã xóa";
+    if (summaryMatches) patch.summary = summary.replace(new RegExp(email.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "gi"), "[email đã xóa]");
+    if (Object.keys(patch).length) updates.push({ ref: docSnap.ref, patch });
+  }
+  let updated = 0;
+  for (let i = 0; i < updates.length; i += 350) {
+    const batch = db.batch();
+    const part = updates.slice(i, i + 350);
+    part.forEach(item => batch.set(item.ref, item.patch, { merge: true }));
+    await batch.commit();
+    updated += part.length;
+  }
+  return updated;
+}
+
+function clone(value) {
+  return value == null ? value : JSON.parse(JSON.stringify(value));
+}
+
+function materializeMemberData(payload, memberData) {
+  const output = clone(payload) || {};
+  const memberId = memberData?.memberId;
+  if (!memberId) return output;
+  output.presence ||= {};
+  output.billingMonths ||= {};
+  if (typeof memberData.presence === "boolean") output.presence[memberId] = memberData.presence;
+  for (const [month, monthData] of Object.entries(memberData.billingMonths || {})) {
+    const people = output.billingMonths?.[month]?.people;
+    if (!people || typeof people !== "object") continue;
+    const entry = Object.entries(people).find(([, person]) => person?.memberId === memberId);
+    if (!entry) continue;
+    people[entry[0]].days = clone(monthData?.days || {});
+  }
+  return output;
+}
+
 exports.deleteP708Account = onCall({ region: "us-central1", timeoutSeconds: 60 }, async request => {
   const callerUid = request.auth?.uid;
   const roomCode = String(request.data?.roomCode || "").trim();
@@ -48,47 +98,45 @@ exports.deleteP708Account = onCall({ region: "us-central1", timeoutSeconds: 60 }
   if (config?.adminUid === targetUid) throw new HttpsError("failed-precondition", "Không thể xóa tài khoản trưởng phòng chính.");
 
   const accessRef = db.doc(`rooms/${roomCode}/access/${targetUid}`);
-  const accessSnap = await accessRef.get();
-  const target = accessSnap.exists ? accessSnap.data() : {};
-  const targetEmail = target?.email || "";
+  const requestRef = db.doc(`rooms/${roomCode}/accessRequests/${targetUid}`);
+  const memberDataRef = db.doc(`rooms/${roomCode}/memberData/${targetUid}`);
+  const roomRef = db.doc(`rooms/${roomCode}`);
 
-  await Promise.all([
-    accessRef.delete().catch(() => {}),
-    db.doc(`rooms/${roomCode}/accessRequests/${targetUid}`).delete().catch(() => {}),
-    db.doc(`rooms/${roomCode}/memberData/${targetUid}`).delete().catch(() => {})
-  ]);
+  const target = await db.runTransaction(async tx => {
+    const [accessSnap, memberSnap, roomSnap] = await Promise.all([
+      tx.get(accessRef), tx.get(memberDataRef), tx.get(roomRef)
+    ]);
+    const accessData = accessSnap.exists ? accessSnap.data() : {};
+    if (roomSnap.exists && memberSnap.exists) {
+      const payload = materializeMemberData(roomSnap.data()?.payload || {}, memberSnap.data());
+      tx.set(roomRef, {
+        schemaVersion: 5,
+        roomCode,
+        revision: FieldValue.increment(1),
+        payload,
+        lastAdminUid: callerUid,
+        lastDeviceId: "cloud-function",
+        updatedAt: FieldValue.serverTimestamp()
+      }, { merge: true });
+    }
+    tx.delete(accessRef);
+    tx.delete(requestRef);
+    tx.delete(memberDataRef);
+    return accessData || {};
+  });
 
+  const targetEmail = String(target?.email || "");
   const taskDeleted = await deleteQueryInBatches(
     db.collection(`rooms/${roomCode}/taskSubmissions`).where("actorUid", "==", targetUid)
   );
-
-  // Remove every audit document that can still expose the deleted account's email/identity.
-  // The room has 30-day retention, so a full scan stays intentionally bounded in practice.
-  const auditSnapshot = await db.collection(`rooms/${roomCode}/auditLogs`).get();
-  const auditRefs = auditSnapshot.docs.filter(docSnap => {
-    const data = docSnap.data() || {};
-    const summary = String(data.summary || "").toLowerCase();
-    const actorEmail = String(data.actorEmail || "").toLowerCase();
-    const email = String(targetEmail || "").toLowerCase();
-    return data.actorUid === targetUid
-      || (target?.memberId && data.targetMemberId === target.memberId)
-      || (email && actorEmail === email)
-      || (email && summary.includes(email));
-  }).map(docSnap => docSnap.ref);
-  let auditDeleted = 0;
-  for (let i = 0; i < auditRefs.length; i += 400) {
-    const batch = db.batch();
-    auditRefs.slice(i, i + 400).forEach(ref => batch.delete(ref));
-    await batch.commit();
-    auditDeleted += Math.min(400, auditRefs.length - i);
-  }
+  const auditRedacted = await redactAuditIdentity(roomCode, targetUid, targetEmail);
 
   let authDeleted = true;
   try {
     await auth.deleteUser(targetUid);
   } catch (error) {
     if (error?.code === "auth/user-not-found") authDeleted = false;
-    else throw new HttpsError("internal", "Không thể xóa Firebase Authentication của tài khoản.");
+    else throw new HttpsError("internal", "Dữ liệu phòng đã được gỡ nhưng chưa xóa được Firebase Authentication. Có thể gọi lại thao tác với cùng UID.");
   }
 
   await db.collection(`rooms/${roomCode}/auditLogs`).add({
@@ -104,7 +152,7 @@ exports.deleteP708Account = onCall({ region: "us-central1", timeoutSeconds: 60 }
     createdAt: Timestamp.now()
   });
 
-  return { deleted: true, authDeleted, taskDeleted, auditDeleted, targetMemberId: target?.memberId || null };
+  return { deleted: true, authDeleted, taskDeleted, auditRedacted, targetMemberId: target?.memberId || null };
 });
 
 exports.cleanupP708AuditLogs = onCall({ region: "us-central1", timeoutSeconds: 60 }, async request => {
