@@ -1,20 +1,21 @@
-import { createP708SecureEngine } from "./p708-secure-sync-engine.js?v=20260819-6";
+import { createP708SecureEngine } from "./p708-secure-sync-engine.js?v=20260827-1";
 
 globalThis.createP708SecureEngine = createP708SecureEngine;
 
 const parts = [
-  "./app-core1.js?v=20260819-6",
-  "./app-core2.js?v=20260819-6",
-  "./app-actions1.js?v=20260819-6",
-  "./app-actions2.js?v=20260819-6",
-  "./app-dashboard.js?v=20260819-6",
-  "./app-render.js?v=20260819-6",
-  "./home-enhancements.js?v=20260819-6",
-  "./app-start.js?v=20260819-6",
-  "./notification-enhancements.js?v=20260819-8",
-  "./today-calendar.js?v=20260819-10",
-  "./mobile-install-bridge.js?v=20260819-11",
-  "./mobile-install-guide.js?v=20260819-11"
+  "./app-core1.js?v=20260827-1",
+  "./app-core2.js?v=20260827-1",
+  "./app-actions1.js?v=20260827-1",
+  "./app-actions2.js?v=20260827-1",
+  "./app-dashboard.js?v=20260827-1",
+  "./app-render.js?v=20260827-1",
+  "./app-integrity-fixes.js?v=20260827-1",
+  "./home-enhancements.js?v=20260827-1",
+  "./app-start.js?v=20260827-1",
+  "./notification-enhancements.js?v=20260827-1",
+  "./today-calendar.js?v=20260827-1",
+  "./mobile-install-bridge.js?v=20260827-1",
+  "./mobile-install-guide.js?v=20260827-1"
 ];
 
 for (const src of parts) {
