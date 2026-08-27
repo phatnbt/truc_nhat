@@ -8,7 +8,7 @@
       "firebase.json",
       "firestore-secure.rules",
       "README*.md",
-      "VALIDATION.json",
+      "docs/**",
       ".firebaserc*",
       ".git/**",
       ".github/**",
