@@ -16,8 +16,10 @@ const required=[
   "index.html","styles.css","landing-ui.css","app.js",
   "src/boot/app-loader.js","src/boot/app-start.js",
   "src/core/app-core1.js","src/core/app-core2.js","src/core/p708-secure-sync-engine.js","src/core/p708-authoritative-repair.js",
+  "src/core/p708-identity-plan.js","src/core/p708-canonical-mapping-repair.js",
   "src/features/app-actions1.js","src/features/app-actions2.js","src/features/app-dashboard.js",
-  "src/features/app-render.js","src/features/app-integrity-fixes.js","src/features/billing-stable-repair.js","src/features/home-enhancements.js",
+  "src/features/app-render.js","src/features/app-integrity-fixes.js","src/features/inactive-mapping-dedup-fix.js",
+  "src/features/canonical-identity-repair.js","src/features/billing-stable-repair.js","src/features/home-enhancements.js",
   "src/features/notification-enhancements.js","src/features/today-calendar.js",
   "src/features/mobile-install-bridge.js","src/features/mobile-install-guide.js","sw.js",
   "manifest.webmanifest","firebase.json","firestore-secure.rules","offline.html",
@@ -35,7 +37,8 @@ for(const file of ["firebase.json","manifest.webmanifest","docs/VALIDATION.json"
 const classicJs=[
   "src/core/app-core1.js","src/core/app-core2.js",
   "src/features/app-actions1.js","src/features/app-actions2.js","src/features/app-dashboard.js",
-  "src/features/app-render.js","src/features/app-integrity-fixes.js","src/features/billing-stable-repair.js","src/features/home-enhancements.js",
+  "src/features/app-render.js","src/features/app-integrity-fixes.js","src/features/inactive-mapping-dedup-fix.js",
+  "src/features/canonical-identity-repair.js","src/features/billing-stable-repair.js","src/features/home-enhancements.js",
   "src/boot/app-start.js","src/features/notification-enhancements.js","src/features/today-calendar.js",
   "src/features/mobile-install-bridge.js","src/features/mobile-install-guide.js","sw.js"
 ];
@@ -43,7 +46,11 @@ for(const file of classicJs){
   if(!exists(file))continue;
   try{new vm.Script(read(file),{filename:file});}catch(error){fail(`JavaScript syntax lỗi ${file}: ${error.message}`);}
 }
-for(const file of ["app.js","src/boot/app-loader.js","src/core/p708-secure-sync-engine.js","src/core/p708-authoritative-repair.js"]){
+const moduleJs=[
+  "app.js","src/boot/app-loader.js","src/core/p708-secure-sync-engine.js","src/core/p708-authoritative-repair.js",
+  "src/core/p708-identity-plan.js","src/core/p708-canonical-mapping-repair.js"
+];
+for(const file of moduleJs){
   if(!exists(file))continue;
   const temp=path.join(os.tmpdir(),`p708-${path.basename(file,".js")}-${process.pid}.mjs`);
   fs.writeFileSync(temp,read(file));
@@ -118,7 +125,7 @@ if(exists("manifest.webmanifest")){
   for(const icon of manifest.icons||[]){const relative=String(icon.src||"").replace(/^\.\//,"");if(relative&&!exists(relative))fail(`Manifest icon không tồn tại: ${relative}`);}
 }
 
-console.log(`Static QA: ${required.length} file bắt buộc, ${classicJs.length+4} frontend JS/module, JSON/HTML/CSS/assets.`);
+console.log(`Static QA: ${required.length} file bắt buộc, ${classicJs.length+moduleJs.length} frontend JS/module, JSON/HTML/CSS/assets.`);
 for(const message of warnings)console.warn(`WARN: ${message}`);
 if(failures.length){for(const message of failures)console.error(`FAIL: ${message}`);process.exit(1);}
 console.log("Static QA PASSED");
