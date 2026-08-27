@@ -1,4 +1,4 @@
-const CACHE_NAME="p708-manager-v5-production-audit-20260827-10";
+const CACHE_NAME="p708-manager-v5-billing-cycle-20260828-1";
 const APP_SHELL=[
   "./",
   "./index.html",
@@ -7,6 +7,7 @@ const APP_SHELL=[
   "./utility-chart.css",
   "./mobile-notification-ui.css",
   "./kpi-polish.css",
+  "./billing-cycle.css",
   "./app.js",
   "./src/boot/app-loader.js",
   "./src/boot/app-start.js",
@@ -16,6 +17,7 @@ const APP_SHELL=[
   "./src/core/p708-authoritative-repair.js",
   "./src/core/p708-identity-plan.js",
   "./src/core/p708-canonical-mapping-repair.js",
+  "./src/core/billing-cycle-period.js",
   "./src/features/app-actions1.js",
   "./src/features/app-actions2.js",
   "./src/features/app-dashboard.js",
@@ -26,6 +28,7 @@ const APP_SHELL=[
   "./src/features/billing-canonical-repair.js",
   "./src/features/billing-stable-repair.js",
   "./src/features/billing-membership-exclusion.js",
+  "./src/features/billing-cycle-history.js",
   "./src/features/home-enhancements.js",
   "./src/features/notification-enhancements.js",
   "./src/features/today-calendar.js",

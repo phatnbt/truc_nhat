@@ -55,6 +55,9 @@ jobs:
       - name: Billing member exclusion regression tests
         run: node .github/billing-member-exclusion.test.mjs
 
+      - name: Billing cycle and swipe history regression tests
+        run: node .github/billing-cycle.test.mjs
+
       - name: Validate optional Cloud Functions dependencies
         run: npm install --prefix functions --ignore-scripts --no-audit --no-fund
 
