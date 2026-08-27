@@ -1,5 +1,17 @@
 (()=>{
+  let authoritativeService=null;
   const nameKey=value=>String(value||"").trim().replace(/\s+/g," ").toLocaleLowerCase("vi-VN");
+
+  const getAuthoritativeService=()=>{
+    if(authoritativeService)return authoritativeService;
+    if(typeof globalThis.createP708AuthoritativeRepair!=="function")throw new Error("Module đồng bộ an toàn chưa sẵn sàng.");
+    authoritativeService=globalThis.createP708AuthoritativeRepair({
+      firebaseConfig:FIREBASE_CONFIG,
+      roomCode:ROOM_CODE,
+      deviceId:DEVICE_ID
+    });
+    return authoritativeService;
+  };
 
   function ensureBillingExclusions(bill){
     if(!bill||typeof bill!=="object")return bill;
@@ -162,30 +174,84 @@
     });
   };
 
-  removeBillingPerson=function(){
+  removeBillingPerson=async function(){
     if(!requireAdmin())return;
-    const bill=currentBill(),person=activeBillPerson(bill);
-    if(!bill||!person)return;
-    if(bill.closed)return toast("Tháng đã chốt sổ");
-    if(!confirm(`Xóa ${person.name} khỏi bảng tháng này?`))return;
+    const localBill=currentBill(),localPerson=activeBillPerson(localBill);
+    if(!localBill||!localPerson)return;
+    if(localBill.closed)return toast("Tháng đã chốt sổ");
+    if(!confirm(`Xóa ${localPerson.name} khỏi bảng tháng này?`))return;
+    if(!navigator.onLine)return toast("Đang ngoại tuyến · kết nối mạng trước khi xóa khỏi tháng",5000);
 
-    const exclusion=markExcluded(bill,person);
-    const key=exclusion.key||nameKey(person.name);
-    const before=bill.people.length;
-    bill.people=bill.people.filter(row=>{
-      if(row.id===person.id)return false;
-      if(exclusion.memberId&&row.memberId===exclusion.memberId)return false;
-      if(!row.memberId&&key&&nameKey(row.name)===key)return false;
+    const month=localBill.month;
+    const target={id:localPerson.id,memberId:localPerson.memberId||null,name:localPerson.name};
+    try{
+      const service=getAuthoritativeService();
+      const snapshot=await service.readServer();
+      state=fromSyncShape(snapshot.payload);
+      confirmedState=clone(state);
+      state.billing.selectedMonth=month;
+      ui.selectedMonth=month;
+
+      const bill=state.billing.months.find(item=>item.month===month);
+      if(!bill)throw new Error("Không tìm thấy bảng điện nước tháng này trên máy chủ.");
+      if(bill.closed)throw new Error("Tháng đã chốt sổ.");
+
+      const exactById=(bill.people||[]).find(person=>person.id===target.id)||null;
+      const exactByMember=target.memberId?(bill.people||[]).find(person=>person.memberId===target.memberId)||null:null;
+      const sameName=(bill.people||[]).filter(person=>nameKey(person.name)===nameKey(target.name));
+      const serverPerson=exactById||exactByMember||(sameName.length===1?sameName[0]:null)||target;
+      const exclusion=markExcluded(bill,serverPerson);
+      const key=exclusion.key||nameKey(target.name);
+      const before=bill.people.length;
+      bill.people=bill.people.filter(row=>{
+        if(row.id===serverPerson.id||row.id===target.id)return false;
+        if(exclusion.memberId&&row.memberId===exclusion.memberId)return false;
+        if(!row.memberId&&key&&nameKey(row.name)===key)return false;
+        return true;
+      });
+      const removed=Math.max(0,before-bill.people.length);
+      bill.updatedAt=nowIso();
+      state.updatedAt=nowIso();
+      ui.activeBillPersonId=bill.people[0]?.id||null;
+
+      const desired=toSyncShape(state);
+      const audit={
+        action:"REMOVE_BILL_PERSON",
+        summary:`Xóa ${target.name} khỏi ${monthLabel(month)} · giữ trạng thái loại khỏi tháng khi cập nhật danh sách${removed>1?` · xóa ${removed} bản trùng`:""}`,
+        targetMemberId:exclusion.memberId||target.memberId||null
+      };
+      await service.commit(desired,{expectedRevision:snapshot.revision,audit});
+      const verified=await service.verify(desired);
+      if(!verified.same)throw new Error("Máy chủ chưa xác nhận việc xóa khỏi tháng. Hệ thống đã dừng để tránh ghi đè dữ liệu khác.");
+
+      if(Array.isArray(verified.accesses))accessAccounts=verified.accesses;
+      state=fromSyncShape(verified.payload);
+      confirmedState=clone(state);
+      state.billing.selectedMonth=month;
+      ui.selectedMonth=month;
+      if(ui.activeBillPersonId&&!currentBill()?.people?.some(person=>person.id===ui.activeBillPersonId))ui.activeBillPersonId=currentBill()?.people?.[0]?.id||null;
+      saveLocal();
+      renderAll();
+      toast("Đã xóa khỏi bảng tháng");
       return true;
-    });
-    const removed=Math.max(1,before-bill.people.length);
-    bill.updatedAt=nowIso();
-    ui.activeBillPersonId=bill.people[0]?.id||null;
-    persist("Đã xóa khỏi bảng tháng",{
-      action:"REMOVE_BILL_PERSON",
-      summary:`Xóa ${person.name} khỏi ${monthLabel(bill.month)} · giữ trạng thái loại khỏi tháng khi cập nhật danh sách${removed>1?` · xóa ${removed} bản trùng`:""}`,
-      targetMemberId:exclusion.memberId||person.memberId||null
-    });
+    }catch(error){
+      console.error("P708 remove billing person",error);
+      toast(error?.message||"Không thể xóa khỏi bảng tháng",7000);
+      try{
+        const latest=await getAuthoritativeService().readServer();
+        if(Array.isArray(latest.accesses))accessAccounts=latest.accesses;
+        state=fromSyncShape(latest.payload);
+        confirmedState=clone(state);
+        state.billing.selectedMonth=month;
+        ui.selectedMonth=month;
+        saveLocal();
+        renderAll();
+      }catch(syncError){
+        console.warn("P708 remove billing recovery",syncError);
+        restoreConfirmedState();
+      }
+      return false;
+    }
   };
 
   addBillingPerson=function(){
