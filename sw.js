@@ -1,4 +1,4 @@
-const CACHE_NAME="p708-manager-v5-production-audit-20260827-9";
+const CACHE_NAME="p708-manager-v5-production-audit-20260827-10";
 const APP_SHELL=[
   "./",
   "./index.html",
