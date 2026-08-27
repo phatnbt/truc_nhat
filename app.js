@@ -1,4 +1,4 @@
-const BOOT_VERSION = "20260827-4";
+const BOOT_VERSION = "20260827-5";
 
 globalThis.P708InstallPrompt = null;
 window.addEventListener("beforeinstallprompt",event=>{
