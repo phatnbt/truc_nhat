@@ -49,6 +49,9 @@ jobs:
       - name: Canonical billing repair regression tests
         run: node .github/billing-canonical-repair.test.mjs
 
+      - name: Billing member exclusion regression tests
+        run: node .github/billing-member-exclusion.test.mjs
+
       - name: Validate optional Cloud Functions dependencies
         run: npm install --prefix functions --ignore-scripts --no-audit --no-fund
 
