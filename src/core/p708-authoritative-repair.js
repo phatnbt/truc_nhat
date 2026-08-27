@@ -152,7 +152,7 @@ export function createP708AuthoritativeRepair({firebaseConfig,roomCode,deviceId}
       });
 
       const nextRevision=currentRevision+1;
-      tx.set(roomRef,{
+      const roomWrite={
         schemaVersion:5,
         roomCode,
         revision:nextRevision,
@@ -160,7 +160,11 @@ export function createP708AuthoritativeRepair({firebaseConfig,roomCode,deviceId}
         lastAdminUid:user.uid,
         lastDeviceId:String(deviceId||"").slice(0,160),
         updatedAt:serverTimestamp()
-      },{merge:true});
+      };
+      // payload is authoritative state. Updating the top-level field replaces the whole
+      // nested map; merge:true used to preserve stale member:* keys and created duplicates.
+      if(roomSnap.exists())tx.update(roomRef,roomWrite);
+      else tx.set(roomRef,roomWrite);
       return {revision:nextRevision,payload:desired};
     });
 
