@@ -31,6 +31,9 @@ jobs:
       - name: Static project validation
         run: node .github/validate.mjs
 
+      - name: Duplicate member and mapping regression tests
+        run: node .github/dedup.test.mjs
+
       - name: Validate optional Cloud Functions dependencies
         run: npm install --prefix functions --ignore-scripts --no-audit --no-fund
 
