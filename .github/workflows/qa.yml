@@ -40,6 +40,9 @@ jobs:
       - name: Authoritative repair verification tests
         run: node .github/authoritative-repair.test.mjs
 
+      - name: Inactive mapping dedup regression tests
+        run: node .github/inactive-mapping-dedup.test.mjs
+
       - name: Validate optional Cloud Functions dependencies
         run: npm install --prefix functions --ignore-scripts --no-audit --no-fund
 
