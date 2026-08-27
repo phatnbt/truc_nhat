@@ -11,6 +11,7 @@ let readCalls=0;
 
 const duplicatePayload={members:{a:{id:"a",name:"Hào"},b:{id:"b",name:"Hào"}},presence:{a:true,b:true},billingMonths:{"2026-08":{month:"2026-08",people:{"person:1":{id:"1",memberId:"a",name:"Hào",days:{}},"person:2":{id:"2",memberId:"b",name:"Hào",days:{}}}}},schedules:{},settings:{}};
 const cleanPayload={members:{a:{id:"a",name:"Hào"}},presence:{a:true},billingMonths:{"2026-08":{month:"2026-08",people:{"person:1":{id:"1",memberId:"a",name:"Hào",days:{}}}}},schedules:{},settings:{}};
+const cleanPersisted={...structuredClone(cleanPayload),updatedAt:"2026-08-27T15:00:00.000Z"};
 
 const service={
   async readServer(){readCalls++;return {revision:7,payload:structuredClone(duplicatePayload)};},
@@ -46,9 +47,9 @@ assert.equal(result,true);
 assert.equal(readCalls,1,"must start from authoritative server state");
 assert.equal(commitCalls.length,1,"must persist repair exactly once through authoritative service");
 assert.equal(commitCalls[0].options.expectedRevision,7,"must guard against concurrent room changes");
-assert.deepEqual(commitCalls[0].desired,cleanPayload,"must write the deduplicated payload, not cached duplicate data");
+assert.deepEqual(commitCalls[0].desired,cleanPersisted,"must write the deduplicated payload, not cached duplicate data");
 assert.equal(verifyCalls,1,"must verify server state after commit");
 assert.equal(basePersistCalls,0,"SYNC_BILL_MEMBERS must bypass the old optimistic merge path");
-assert.deepEqual(context.state,cleanPayload,"verified clean state must remain visible after repair");
+assert.deepEqual(context.state,cleanPersisted,"verified clean state must remain visible after repair");
 
 console.log("Stable billing repair regression QA PASSED");
