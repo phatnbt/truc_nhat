@@ -34,6 +34,9 @@ jobs:
       - name: Duplicate member and mapping regression tests
         run: node .github/dedup.test.mjs
 
+      - name: Stable billing repair regression tests
+        run: node .github/billing-stable-repair.test.mjs
+
       - name: Validate optional Cloud Functions dependencies
         run: npm install --prefix functions --ignore-scripts --no-audit --no-fund
 
