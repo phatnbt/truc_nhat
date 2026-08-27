@@ -1,0 +1,45 @@
+name: P708 Production Billing Repair
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/production-data-repair.mjs"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  repair:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_P708_ROOM_MANAGER }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Check Firebase credentials
+        shell: bash
+        run: |
+          if [ -z "$FIREBASE_SERVICE_ACCOUNT" ]; then
+            echo "Missing Firebase service account secret"
+            exit 1
+          fi
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v3
+        with:
+          credentials_json: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_P708_ROOM_MANAGER }}
+
+      - name: Install Firebase Admin dependency
+        run: npm install --prefix functions --ignore-scripts --no-audit --no-fund
+
+      - name: Repair open billing months in production
+        run: node .github/production-data-repair.mjs
