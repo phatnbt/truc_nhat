@@ -14,6 +14,7 @@ const key=value=>String(value||"")
   .replace(/\s+/g," ")
   .toLocaleLowerCase("vi-VN");
 const trueDays=days=>Object.values(days||{}).filter(value=>value===true).length;
+const canonicalRowKey=person=>`person:${String(person?.id||"").trim()}`;
 
 function mergeRows(entries,canonical){
   const sorted=[...entries].sort((a,b)=>{
@@ -25,6 +26,7 @@ function mergeRows(entries,canonical){
       || String(a.rowKey).localeCompare(String(b.rowKey));
   });
   const target=clone(sorted[0].person)||{};
+  target.id=String(target.id||sorted[0].rowKey||"").replace(/^person:|^member:/,"")||admin.firestore().collection("_ids").doc().id;
   const allDayKeys=new Set();
   for(const {person} of entries)for(const day of Object.keys(person?.days||{}))allDayKeys.add(day);
   target.days={};
@@ -37,7 +39,51 @@ function mergeRows(entries,canonical){
   target.paidAt=paymentSource?.paidAt||entries.find(({person})=>person?.paidAt)?.person?.paidAt||null;
   target.paidBy=paymentSource?.paidBy||entries.find(({person})=>person?.paidBy)?.person?.paidBy||null;
   target.updatedAt=new Date().toISOString();
-  return {rowKey:sorted[0].rowKey,person:target};
+  return {rowKey:canonicalRowKey(target),person:target};
+}
+
+function canonicalizeOpenMonth(bill,members,byName){
+  const original=Object.entries(bill.people||{}).map(([rowKey,person])=>({rowKey,person:clone(person)||{}}));
+  const excludedIds=new Set((bill.excludedMemberIds||[]).map(value=>String(value||"").trim()).filter(Boolean));
+  const excludedKeys=new Set((bill.excludedMemberKeys||[]).map(key).filter(Boolean));
+  const groups=new Map();
+  let excludedRows=0;
+
+  for(const entry of original){
+    const person=entry.person||{},normalized=key(person.name),linked=person.memberId&&members[person.memberId]?{id:person.memberId,name:members[person.memberId]?.name||person.name}:null;
+    const candidates=!linked?(byName.get(normalized)||[]):[];
+    const canonical=linked||(candidates.length===1?candidates[0]:null);
+    const effectiveId=canonical?.id||person.memberId||null;
+    const effectiveName=key(canonical?.name||person.name);
+    if((effectiveId&&excludedIds.has(effectiveId))||(effectiveName&&excludedKeys.has(effectiveName))){excludedRows++;continue;}
+
+    const logical=canonical?`member:${canonical.id}`:`guest:${String(person.id||entry.rowKey)}`;
+    const list=groups.get(logical)||[];
+    list.push({...entry,canonical});
+    groups.set(logical,list);
+  }
+
+  const nextPeople={};
+  let duplicateRows=0,keyRewrites=0,relinkedRows=0;
+  for(const entries of groups.values()){
+    const canonical=entries[0].canonical;
+    let row;
+    if(canonical){
+      row=mergeRows(entries,canonical);
+      duplicateRows+=Math.max(0,entries.length-1);
+      relinkedRows+=entries.filter(({person})=>person?.memberId!==canonical.id||key(person?.name)!==key(canonical.name)).length;
+    }else{
+      const chosen=clone(entries[0].person)||{};
+      chosen.id=String(chosen.id||entries[0].rowKey||"").replace(/^person:|^member:/,"")||admin.firestore().collection("_ids").doc().id;
+      row={rowKey:canonicalRowKey(chosen),person:chosen};
+      duplicateRows+=Math.max(0,entries.length-1);
+    }
+    keyRewrites+=entries.filter(entry=>entry.rowKey!==row.rowKey).length;
+    nextPeople[row.rowKey]=row.person;
+  }
+
+  const changed=excludedRows>0||duplicateRows>0||keyRewrites>0||relinkedRows>0||Object.keys(nextPeople).length!==original.length;
+  return {changed,nextPeople,excludedRows,duplicateRows,keyRewrites,relinkedRows};
 }
 
 const result=await db.runTransaction(async tx=>{
@@ -53,40 +99,23 @@ const result=await db.runTransaction(async tx=>{
     byName.set(normalized,list);
   }
 
-  let removedRows=0,repairedGroups=0;
+  let removedRows=0,repairedGroups=0,keyRewrites=0,relinkedRows=0,excludedRows=0;
   const repairedMonths=[];
   for(const [month,bill] of Object.entries(payload.billingMonths||{})){
     if(!bill||bill.closed===true)continue;
-    const people=bill.people||{};
-    const rowGroups=new Map();
-    for(const [rowKey,person] of Object.entries(people)){
-      const normalized=key(person?.name);if(!normalized)continue;
-      const list=rowGroups.get(normalized)||[];
-      list.push({rowKey,person});
-      rowGroups.set(normalized,list);
-    }
-
-    let monthChanged=false;
-    for(const [normalized,entries] of rowGroups){
-      if(entries.length<2)continue;
-      const candidates=byName.get(normalized)||[];
-      if(candidates.length!==1)continue;
-      const canonical=candidates[0];
-      const merged=mergeRows(entries,canonical);
-      for(const {rowKey} of entries)delete people[rowKey];
-      people[merged.rowKey]=merged.person;
-      removedRows+=entries.length-1;
-      repairedGroups++;
-      monthChanged=true;
-    }
-    if(monthChanged){
-      bill.people=people;
-      bill.updatedAt=new Date().toISOString();
-      repairedMonths.push(month);
-    }
+    const repaired=canonicalizeOpenMonth(bill,members,byName);
+    if(!repaired.changed)continue;
+    bill.people=repaired.nextPeople;
+    bill.updatedAt=new Date().toISOString();
+    removedRows+=repaired.duplicateRows+repaired.excludedRows;
+    repairedGroups+=repaired.duplicateRows>0?1:0;
+    keyRewrites+=repaired.keyRewrites;
+    relinkedRows+=repaired.relinkedRows;
+    excludedRows+=repaired.excludedRows;
+    repairedMonths.push(month);
   }
 
-  if(!removedRows)return {revision:Number(data.revision)||0,removedRows:0,repairedGroups:0,repairedMonths:[]};
+  if(!repairedMonths.length)return {revision:Number(data.revision)||0,removedRows:0,repairedGroups:0,keyRewrites:0,relinkedRows:0,excludedRows:0,repairedMonths:[]};
 
   const nextRevision=(Number(data.revision)||0)+1;
   tx.set(roomRef,{
@@ -95,13 +124,13 @@ const result=await db.runTransaction(async tx=>{
     roomCode:roomId,
     revision:nextRevision,
     payload,
-    lastDeviceId:"production-billing-dedup-migration",
+    lastDeviceId:"production-billing-canonical-migration",
     updatedAt:admin.firestore.FieldValue.serverTimestamp()
   });
-  return {revision:nextRevision,removedRows,repairedGroups,repairedMonths,payload};
+  return {revision:nextRevision,removedRows,repairedGroups,keyRewrites,relinkedRows,excludedRows,repairedMonths,payload};
 });
 
-if(result.removedRows){
+if(result.repairedMonths.length){
   const accessSnap=await db.collection(`rooms/${roomId}/access`).get();
   const batch=db.batch();
   let memberDataWrites=0;
@@ -116,19 +145,19 @@ if(result.removedRows){
       const person=Object.values(bill?.people||{}).find(row=>row?.memberId===access.memberId);
       if(person)billingMonths[month]={days:clone(person.days||{})};
     }
-    if(!Object.keys(billingMonths).length)continue;
     const memberRef=db.doc(`rooms/${roomId}/memberData/${accessDoc.id}`);
-    batch.set(memberRef,{
+    const patch={
       memberId:access.memberId,
       presence:result.payload?.presence?.[access.memberId]!==false,
-      billingMonths,
-      updatedBy:"production-billing-dedup-migration",
+      updatedBy:"production-billing-canonical-migration",
       updatedAt:admin.firestore.FieldValue.serverTimestamp()
-    },{merge:true});
+    };
+    if(Object.keys(billingMonths).length)patch.billingMonths=billingMonths;
+    batch.set(memberRef,patch,{merge:true});
     memberDataWrites++;
   }
   if(memberDataWrites)await batch.commit();
-  console.log(`P708_REPAIR_RESULT revision=${result.revision} repairedGroups=${result.repairedGroups} removedRows=${result.removedRows} months=${result.repairedMonths.join(",")} memberDataWrites=${memberDataWrites}`);
+  console.log(`P708_REPAIR_RESULT revision=${result.revision} repairedGroups=${result.repairedGroups} removedRows=${result.removedRows} excludedRows=${result.excludedRows} keyRewrites=${result.keyRewrites} relinkedRows=${result.relinkedRows} months=${result.repairedMonths.join(",")} memberDataWrites=${memberDataWrites}`);
 }else{
   console.log(`P708_REPAIR_RESULT revision=${result.revision} no_changes_needed=true`);
 }
