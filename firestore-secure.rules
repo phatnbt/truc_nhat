@@ -74,6 +74,32 @@ service cloud.firestore {
           'memberId', 'presence', 'billingMonths', 'updatedBy', 'updatedAt'
         ]);
     }
+    function assignmentMatches(value, taskId, memberId) {
+      return value is map
+        && value.taskId == taskId
+        && value.personId == memberId
+        && value.cut != true;
+    }
+    function assignmentAtMatches(roomId, weekStart, index, taskId, memberId) {
+      let assignments = get(roomPath(roomId)).data.payload.schedules[weekStart].assignments;
+      return assignments is list
+        && assignments.size() > index
+        && assignmentMatches(assignments[index], taskId, memberId);
+    }
+    function taskIsCurrentlyAssigned(roomId, weekStart, scheduleId, taskId, memberId) {
+      let schedules = get(roomPath(roomId)).data.payload.schedules;
+      return weekStart in schedules
+        && schedules[weekStart].id == scheduleId
+        && schedules[weekStart].assignments is list
+        && (
+          assignmentAtMatches(roomId, weekStart, 0, taskId, memberId)
+          || assignmentAtMatches(roomId, weekStart, 1, taskId, memberId)
+          || assignmentAtMatches(roomId, weekStart, 2, taskId, memberId)
+          || assignmentAtMatches(roomId, weekStart, 3, taskId, memberId)
+          || assignmentAtMatches(roomId, weekStart, 4, taskId, memberId)
+          || assignmentAtMatches(roomId, weekStart, 5, taskId, memberId)
+        );
+    }
     function validTaskIdentity(roomId) {
       return request.resource.data.roomCode == roomId
         && request.resource.data.actorUid == request.auth.uid
@@ -88,8 +114,13 @@ service cloud.firestore {
         && request.resource.data.taskName is string
         && request.resource.data.taskName.size() > 0
         && request.resource.data.taskName.size() <= 120
-        && request.resource.data.weekStart in get(roomPath(roomId)).data.payload.schedules
-        && get(roomPath(roomId)).data.payload.schedules[request.resource.data.weekStart].id == request.resource.data.scheduleId;
+        && taskIsCurrentlyAssigned(
+          roomId,
+          request.resource.data.weekStart,
+          request.resource.data.scheduleId,
+          request.resource.data.taskId,
+          request.resource.data.memberId
+        );
     }
     function validAuditCreate(roomId) {
       return hasActiveAccess(roomId)
@@ -143,7 +174,15 @@ service cloud.firestore {
             && request.resource.data.active == true
             && request.resource.data.email == request.auth.token.email);
         allow update: if isAdmin(roomId)
-          && (!isPrimaryUid(roomId, uid) || uid == request.auth.uid);
+          && (
+            !isPrimaryUid(roomId, uid)
+            || (
+              uid == request.auth.uid
+              && request.resource.data.role == 'admin'
+              && request.resource.data.active == true
+              && request.resource.data.email == request.auth.token.email
+            )
+          );
         allow delete: if isAdmin(roomId) && !isPrimaryUid(roomId, uid);
       }
 
@@ -208,6 +247,13 @@ service cloud.firestore {
             && request.resource.data.status == 'submitted'
             && request.resource.data.submittedAt == request.time
             && request.resource.data.updatedAt == request.time
+            && taskIsCurrentlyAssigned(
+              roomId,
+              resource.data.weekStart,
+              resource.data.scheduleId,
+              resource.data.taskId,
+              resource.data.memberId
+            )
             && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
               'status', 'submittedAt', 'updatedAt'
             ]));
