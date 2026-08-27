@@ -4,21 +4,151 @@ service cloud.firestore {
   match /databases/{database}/documents {
     function signedIn() { return request.auth != null; }
     function configPath(roomId) { return /databases/$(database)/documents/rooms/$(roomId)/security/config; }
+    function roomPath(roomId) { return /databases/$(database)/documents/rooms/$(roomId); }
     function accessPath(roomId, uid) { return /databases/$(database)/documents/rooms/$(roomId)/access/$(uid); }
+
     function isPrimaryAdmin(roomId) {
-      return signedIn() && exists(configPath(roomId)) && get(configPath(roomId)).data.adminUid == request.auth.uid;
+      return signedIn()
+        && exists(configPath(roomId))
+        && get(configPath(roomId)).data.adminUid == request.auth.uid;
+    }
+    function isPrimaryUid(roomId, uid) {
+      return exists(configPath(roomId))
+        && get(configPath(roomId)).data.adminUid == uid;
+    }
+    function willBePrimaryAdmin(roomId) {
+      return signedIn()
+        && getAfter(configPath(roomId)).data.adminUid == request.auth.uid;
     }
     function hasActiveAccess(roomId) {
-      return signedIn() && exists(accessPath(roomId, request.auth.uid)) && get(accessPath(roomId, request.auth.uid)).data.active == true;
+      return signedIn()
+        && exists(accessPath(roomId, request.auth.uid))
+        && get(accessPath(roomId, request.auth.uid)).data.active == true;
     }
     function isAdmin(roomId) {
-      return isPrimaryAdmin(roomId) || (hasActiveAccess(roomId) && get(accessPath(roomId, request.auth.uid)).data.role == 'admin');
+      return isPrimaryAdmin(roomId)
+        || (hasActiveAccess(roomId) && get(accessPath(roomId, request.auth.uid)).data.role == 'admin');
     }
-    function ownMemberId(roomId) { return get(accessPath(roomId, request.auth.uid)).data.memberId; }
+    function ownMemberId(roomId) {
+      return get(accessPath(roomId, request.auth.uid)).data.memberId;
+    }
+    function validRoomWrite(roomId) {
+      return request.resource.data.keys().hasAll([
+          'schemaVersion', 'roomCode', 'revision', 'payload',
+          'lastAdminUid', 'lastDeviceId', 'updatedAt'
+        ])
+        && request.resource.data.schemaVersion == 5
+        && request.resource.data.roomCode == roomId
+        && request.resource.data.revision is int
+        && request.resource.data.revision >= 1
+        && request.resource.data.payload is map
+        && request.resource.data.lastAdminUid == request.auth.uid
+        && request.resource.data.lastDeviceId is string
+        && request.resource.data.lastDeviceId.size() <= 160
+        && request.resource.data.updatedAt == request.time;
+    }
+    function validAccessRequest() {
+      return request.resource.data.uid == request.auth.uid
+        && request.resource.data.email == request.auth.token.email
+        && request.resource.data.status == 'pending'
+        && request.resource.data.displayName is string
+        && request.resource.data.displayName.size() > 0
+        && request.resource.data.displayName.size() <= 80
+        && request.resource.data.photoURL is string
+        && request.resource.data.photoURL.size() <= 2048
+        && request.resource.data.requestedAt == request.time
+        && request.resource.data.updatedAt == request.time
+        && request.resource.data.keys().hasOnly([
+          'uid', 'email', 'displayName', 'photoURL', 'status',
+          'requestedAt', 'updatedAt'
+        ]);
+    }
+    function validMemberData(roomId) {
+      return request.resource.data.memberId == ownMemberId(roomId)
+        && request.resource.data.memberId is string
+        && request.resource.data.presence is bool
+        && request.resource.data.billingMonths is map
+        && request.resource.data.updatedBy == request.auth.uid
+        && request.resource.data.updatedAt == request.time
+        && request.resource.data.keys().hasOnly([
+          'memberId', 'presence', 'billingMonths', 'updatedBy', 'updatedAt'
+        ]);
+    }
+    function assignmentMatches(value, taskId, memberId) {
+      return value is map
+        && value.taskId == taskId
+        && value.personId == memberId
+        && value.cut != true;
+    }
+    function assignmentAtMatches(roomId, weekStart, index, taskId, memberId) {
+      let assignments = get(roomPath(roomId)).data.payload.schedules[weekStart].assignments;
+      return assignments is list
+        && assignments.size() > index
+        && assignmentMatches(assignments[index], taskId, memberId);
+    }
+    function taskIsCurrentlyAssigned(roomId, weekStart, scheduleId, taskId, memberId) {
+      let schedules = get(roomPath(roomId)).data.payload.schedules;
+      return weekStart in schedules
+        && schedules[weekStart].id == scheduleId
+        && schedules[weekStart].assignments is list
+        && (
+          assignmentAtMatches(roomId, weekStart, 0, taskId, memberId)
+          || assignmentAtMatches(roomId, weekStart, 1, taskId, memberId)
+          || assignmentAtMatches(roomId, weekStart, 2, taskId, memberId)
+          || assignmentAtMatches(roomId, weekStart, 3, taskId, memberId)
+          || assignmentAtMatches(roomId, weekStart, 4, taskId, memberId)
+          || assignmentAtMatches(roomId, weekStart, 5, taskId, memberId)
+        );
+    }
+    function validTaskIdentity(roomId) {
+      return request.resource.data.roomCode == roomId
+        && request.resource.data.actorUid == request.auth.uid
+        && request.resource.data.memberId == ownMemberId(roomId)
+        && request.resource.data.scheduleId is string
+        && request.resource.data.scheduleId.size() > 0
+        && request.resource.data.scheduleId.size() <= 160
+        && request.resource.data.weekStart is string
+        && request.resource.data.weekStart.matches('^\\d{4}-\\d{2}-\\d{2}$')
+        && request.resource.data.taskId in ['lavabo', 'san', 'quet', 'lau', 'tham', 'rac']
+        && request.resource.data.actorName == get(accessPath(roomId, request.auth.uid)).data.displayName
+        && request.resource.data.taskName is string
+        && request.resource.data.taskName.size() > 0
+        && request.resource.data.taskName.size() <= 120
+        && taskIsCurrentlyAssigned(
+          roomId,
+          request.resource.data.weekStart,
+          request.resource.data.scheduleId,
+          request.resource.data.taskId,
+          request.resource.data.memberId
+        );
+    }
+    function validAuditCreate(roomId) {
+      return hasActiveAccess(roomId)
+        && request.resource.data.roomCode == roomId
+        && request.resource.data.actorUid == request.auth.uid
+        && request.resource.data.actorName == get(accessPath(roomId, request.auth.uid)).data.displayName
+        && request.resource.data.actorEmail == request.auth.token.email
+        && request.resource.data.role == get(accessPath(roomId, request.auth.uid)).data.role
+        && request.resource.data.action is string
+        && request.resource.data.action.size() > 0
+        && request.resource.data.action.size() <= 80
+        && request.resource.data.summary is string
+        && request.resource.data.summary.size() > 0
+        && request.resource.data.summary.size() <= 600
+        && (request.resource.data.targetMemberId == null || request.resource.data.targetMemberId is string)
+        && request.resource.data.deviceId is string
+        && request.resource.data.deviceId.size() <= 160
+        && request.resource.data.createdAt == request.time
+        && request.resource.data.keys().hasOnly([
+          'roomCode', 'actorUid', 'actorName', 'actorEmail', 'role',
+          'action', 'summary', 'targetMemberId', 'deviceId', 'createdAt'
+        ]);
+    }
 
     match /rooms/{roomId} {
       allow read: if hasActiveAccess(roomId) || isPrimaryAdmin(roomId);
-      allow create, update, delete: if isAdmin(roomId);
+      allow create, update: if isAdmin(roomId) && validRoomWrite(roomId);
+      allow delete: if false;
 
       match /security/{configId} {
         allow read: if signedIn();
@@ -26,45 +156,57 @@ service cloud.firestore {
           && configId == 'config'
           && !exists(configPath(roomId))
           && request.resource.data.adminUid == request.auth.uid
-          && request.resource.data.roomCode == roomId;
-        allow update, delete: if isAdmin(roomId);
+          && request.resource.data.roomCode == roomId
+          && request.resource.data.createdAt == request.time
+          && request.resource.data.keys().hasOnly([
+            'roomCode', 'adminUid', 'createdAt'
+          ]);
+        allow update, delete: if false;
       }
 
       match /access/{uid} {
         allow read: if signedIn() && (uid == request.auth.uid || isAdmin(roomId));
-        allow create, update, delete: if isAdmin(roomId);
+        allow create: if (isAdmin(roomId) && !isPrimaryUid(roomId, uid))
+          || (signedIn()
+            && uid == request.auth.uid
+            && willBePrimaryAdmin(roomId)
+            && request.resource.data.role == 'admin'
+            && request.resource.data.active == true
+            && request.resource.data.email == request.auth.token.email);
+        allow update: if isAdmin(roomId)
+          && (
+            !isPrimaryUid(roomId, uid)
+            || (
+              uid == request.auth.uid
+              && request.resource.data.role == 'admin'
+              && request.resource.data.active == true
+              && request.resource.data.email == request.auth.token.email
+            )
+          );
+        allow delete: if isAdmin(roomId) && !isPrimaryUid(roomId, uid);
       }
 
       match /accessRequests/{uid} {
         allow read: if signedIn() && (uid == request.auth.uid || isAdmin(roomId));
         allow create, update: if signedIn()
           && uid == request.auth.uid
-          && request.resource.data.uid == request.auth.uid
-          && request.resource.data.email == request.auth.token.email
-          && request.resource.data.keys().hasOnly([
-            'uid', 'email', 'displayName', 'photoURL', 'status',
-            'requestedAt', 'updatedAt'
-          ]);
+          && validAccessRequest();
         allow delete: if signedIn() && (uid == request.auth.uid || isAdmin(roomId));
       }
 
       match /memberData/{uid} {
-        allow read: if hasActiveAccess(roomId) || isPrimaryAdmin(roomId);
+        allow read: if isAdmin(roomId)
+          || (signedIn() && uid == request.auth.uid && hasActiveAccess(roomId));
         allow create: if isAdmin(roomId)
           || (signedIn()
             && uid == request.auth.uid
             && hasActiveAccess(roomId)
-            && request.resource.data.memberId == ownMemberId(roomId)
-            && request.resource.data.updatedBy == request.auth.uid
-            && request.resource.data.keys().hasOnly([
-              'memberId', 'presence', 'billingMonths', 'updatedBy', 'updatedAt'
-            ]));
+            && validMemberData(roomId));
         allow update: if isAdmin(roomId)
           || (signedIn()
             && uid == request.auth.uid
             && hasActiveAccess(roomId)
-            && request.resource.data.memberId == ownMemberId(roomId)
-            && request.resource.data.updatedBy == request.auth.uid
+            && validMemberData(roomId)
             && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
               'memberId', 'presence', 'billingMonths', 'updatedBy', 'updatedAt'
             ]));
@@ -72,25 +214,47 @@ service cloud.firestore {
       }
 
       match /taskSubmissions/{submissionId} {
-        allow read: if hasActiveAccess(roomId) || isPrimaryAdmin(roomId);
+        // actorUid is immutable after creation, and creation binds it to request.auth.uid.
+        // This lets a member query only their own submissions using where(actorUid == uid).
+        allow read: if isAdmin(roomId)
+          || (signedIn()
+            && hasActiveAccess(roomId)
+            && resource.data.actorUid == request.auth.uid);
         allow create: if signedIn()
           && hasActiveAccess(roomId)
-          && request.resource.data.actorUid == request.auth.uid
-          && request.resource.data.memberId == ownMemberId(roomId)
-          && request.resource.data.roomCode == roomId
+          && validTaskIdentity(roomId)
           && request.resource.data.status == 'submitted'
+          && request.resource.data.submittedAt == request.time
+          && request.resource.data.updatedAt == request.time
           && request.resource.data.keys().hasOnly([
             'roomCode', 'actorUid', 'actorName', 'memberId', 'scheduleId',
             'weekStart', 'taskId', 'taskName', 'status', 'submittedAt', 'updatedAt'
           ]);
-        allow update: if isAdmin(roomId)
+        allow update: if (isAdmin(roomId)
+          && request.resource.data.status in ['approved', 'rejected']
+          && request.resource.data.reviewedBy == request.auth.uid
+          && request.resource.data.reviewedAt == request.time
+          && request.resource.data.updatedAt == request.time
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+            'status', 'reviewNote', 'reviewedBy', 'reviewedAt', 'updatedAt'
+          ]))
           || (signedIn()
             && hasActiveAccess(roomId)
             && resource.data.actorUid == request.auth.uid
             && resource.data.memberId == ownMemberId(roomId)
+            && resource.data.status == 'rejected'
             && request.resource.data.actorUid == resource.data.actorUid
             && request.resource.data.memberId == resource.data.memberId
             && request.resource.data.status == 'submitted'
+            && request.resource.data.submittedAt == request.time
+            && request.resource.data.updatedAt == request.time
+            && taskIsCurrentlyAssigned(
+              roomId,
+              resource.data.weekStart,
+              resource.data.scheduleId,
+              resource.data.taskId,
+              resource.data.memberId
+            )
             && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
               'status', 'submittedAt', 'updatedAt'
             ]));
@@ -99,14 +263,7 @@ service cloud.firestore {
 
       match /auditLogs/{logId} {
         allow read: if isAdmin(roomId);
-        allow create: if signedIn()
-          && hasActiveAccess(roomId)
-          && request.resource.data.actorUid == request.auth.uid
-          && request.resource.data.roomCode == roomId
-          && request.resource.data.keys().hasOnly([
-            'roomCode', 'actorUid', 'actorName', 'actorEmail', 'role',
-            'action', 'summary', 'targetMemberId', 'deviceId', 'createdAt'
-          ]);
+        allow create: if signedIn() && validAuditCreate(roomId);
         allow update: if isAdmin(roomId)
           && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
             'actorEmail', 'actorName', 'summary'
