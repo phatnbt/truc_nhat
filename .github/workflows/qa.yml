@@ -43,6 +43,9 @@ jobs:
       - name: Inactive mapping dedup regression tests
         run: node .github/inactive-mapping-dedup.test.mjs
 
+      - name: Canonical identity regression tests
+        run: node .github/canonical-identity.test.mjs
+
       - name: Validate optional Cloud Functions dependencies
         run: npm install --prefix functions --ignore-scripts --no-audit --no-fund
 
