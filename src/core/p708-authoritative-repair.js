@@ -70,10 +70,6 @@ function activeMappedMemberDocs(payload,memberSnap,accessSnap){
     candidates.push(data);
   }
 
-  // Existing installations may contain legacy duplicate memberData documents for one
-  // member. One-to-one mapping is enforced in the UI now, but reading must still be
-  // deterministic while those old documents are being cleaned up. Prefer the newest
-  // mapped document instead of whichever Firestore happens to return last.
   const newestByMember=new Map();
   for(const data of candidates){
     const previous=newestByMember.get(data.memberId);
@@ -107,13 +103,15 @@ export function createP708AuthoritativeRepair({firebaseConfig,roomCode,deviceId}
       getDocsFromServer(memberDataCollection),
       getDocsFromServer(accessCollection)
     ]);
-    if(!roomSnap.exists())return {revision:0,payload:{},roomPayload:{}};
+    const accesses=accessSnap.docs.map(item=>({uid:item.id,...item.data()}));
+    if(!roomSnap.exists())return {revision:0,payload:{},roomPayload:{},accesses};
     const data=roomSnap.data()||{},roomPayload=clone(data.payload)||{};
     const memberDocs=activeMappedMemberDocs(roomPayload,memberSnap,accessSnap);
     return {
       revision:Number(data.revision)||0,
       roomPayload,
-      payload:overlayMemberData(roomPayload,memberDocs)
+      payload:overlayMemberData(roomPayload,memberDocs),
+      accesses
     };
   }
 
@@ -191,10 +189,6 @@ export function createP708AuthoritativeRepair({firebaseConfig,roomCode,deviceId}
 
   async function verify(expectedPayload){
     const server=await readServer();
-    // Verify the room payload itself. memberData can legitimately change immediately
-    // after the transaction when a member toggles attendance, and object key ordering
-    // is not preserved by Firestore maps. Both cases must not be treated as a failed
-    // repair when the deduplicated room payload was actually committed correctly.
     const same=stableStringify(server.roomPayload)===stableStringify(expectedPayload||{});
     return {...server,same};
   }

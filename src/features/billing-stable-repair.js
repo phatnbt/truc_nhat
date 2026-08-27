@@ -33,6 +33,7 @@
       const verified=await service.verify(desired);
       if(!verified.same)throw new Error("Máy chủ chưa giữ bản dữ liệu đã sửa. Hệ thống đã dừng để tránh hiển thị sai.");
 
+      if(Array.isArray(verified.accesses))accessAccounts=verified.accesses;
       state=fromSyncShape(verified.payload);
       confirmedState=clone(state);
       saveLocal();
@@ -45,6 +46,7 @@
       toast(error?.message||"Không thể sửa dữ liệu trùng trên máy chủ",7000);
       try{
         const latest=await getRepairService().readServer();
+        if(Array.isArray(latest.accesses))accessAccounts=latest.accesses;
         state=fromSyncShape(latest.payload);
         confirmedState=clone(state);
         saveLocal();
@@ -67,10 +69,11 @@
     }
 
     try{
-      // Start from the authoritative server payload plus the latest memberData overlay.
-      // This prevents a cached/stale room snapshot from being repaired for 1–3 seconds
-      // and then overwriting the UI again when Firestore finishes synchronizing.
+      // Use one authoritative server snapshot for BOTH room data and account mappings.
+      // Realtime UI state can lag behind Firestore by a few seconds; stale access data
+      // previously made revoked/inactive mappings look active and blocked safe dedup.
       const snapshot=await getRepairService().readServer();
+      if(Array.isArray(snapshot.accesses))accessAccounts=snapshot.accesses;
       state=fromSyncShape(snapshot.payload);
       confirmedState=clone(state);
       saveLocal();
