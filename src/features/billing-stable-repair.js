@@ -1,6 +1,8 @@
 (()=>{
   let repairService=null;
+  let mappingRepairService=null;
   let expectedRevision=null;
+  let beforeRepairPayload=null;
 
   const getRepairService=()=>{
     if(repairService)return repairService;
@@ -11,6 +13,16 @@
       deviceId:DEVICE_ID
     });
     return repairService;
+  };
+
+  const getMappingRepairService=()=>{
+    if(mappingRepairService)return mappingRepairService;
+    if(typeof globalThis.createP708CanonicalMappingRepair!=="function")throw new Error("Module sửa mapping chưa sẵn sàng.");
+    mappingRepairService=globalThis.createP708CanonicalMappingRepair({
+      firebaseConfig:FIREBASE_CONFIG,
+      roomCode:ROOM_CODE
+    });
+    return mappingRepairService;
   };
 
   const basePersist=persist;
@@ -30,6 +42,16 @@
     try{
       const service=getRepairService();
       await service.commit(desired,{expectedRevision,audit});
+
+      // The room payload can only keep one canonical member ID. Any access document
+      // still pointing at an old duplicate ID must be migrated too, otherwise the next
+      // login/sync can revive stale identity data or leave the user unable to edit.
+      const mappingResult=await getMappingRepairService().repair({
+        beforePayload:beforeRepairPayload||{},
+        desiredPayload:desired
+      });
+      if(Array.isArray(mappingResult?.accesses))accessAccounts=mappingResult.accesses;
+
       const verified=await service.verify(desired);
       if(!verified.same)throw new Error("Máy chủ chưa giữ bản dữ liệu đã sửa. Hệ thống đã dừng để tránh hiển thị sai.");
 
@@ -38,7 +60,7 @@
       confirmedState=clone(state);
       saveLocal();
       renderAll();
-      if(message)toast(message,5000);
+      if(message)toast(mappingResult?.remapped?`${message} · đã sửa ${mappingResult.remapped} mapping tài khoản`:message,5000);
       return true;
     }catch(error){
       console.error("P708 authoritative billing repair",error);
@@ -57,6 +79,7 @@
       return false;
     }finally{
       expectedRevision=null;
+      beforeRepairPayload=null;
     }
   };
 
@@ -69,11 +92,9 @@
     }
 
     try{
-      // Use one authoritative server snapshot for BOTH room data and account mappings.
-      // Realtime UI state can lag behind Firestore by a few seconds; stale access data
-      // previously made revoked/inactive mappings look active and blocked safe dedup.
       const snapshot=await getRepairService().readServer();
       if(Array.isArray(snapshot.accesses))accessAccounts=snapshot.accesses;
+      beforeRepairPayload=clone(snapshot.roomPayload||snapshot.payload||{});
       state=fromSyncShape(snapshot.payload);
       confirmedState=clone(state);
       saveLocal();
@@ -82,10 +103,12 @@
       return await baseSyncBillingMembers();
     }catch(error){
       expectedRevision=null;
+      beforeRepairPayload=null;
       console.error("P708 prepare billing repair",error);
       toast(error?.message||"Không thể tải dữ liệu mới nhất để sửa trùng",7000);
     }finally{
       expectedRevision=null;
+      beforeRepairPayload=null;
     }
   };
 })();
