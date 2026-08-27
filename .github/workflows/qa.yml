@@ -40,6 +40,9 @@ jobs:
       - name: Authoritative repair verification tests
         run: node .github/authoritative-repair.test.mjs
 
+      - name: Authoritative payload replacement regression tests
+        run: node .github/authoritative-payload-replacement.test.mjs
+
       - name: Inactive mapping dedup regression tests
         run: node .github/inactive-mapping-dedup.test.mjs
 
