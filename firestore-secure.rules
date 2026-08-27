@@ -214,11 +214,12 @@ service cloud.firestore {
       }
 
       match /taskSubmissions/{submissionId} {
+        // actorUid is immutable after creation, and creation binds it to request.auth.uid.
+        // This lets a member query only their own submissions using where(actorUid == uid).
         allow read: if isAdmin(roomId)
           || (signedIn()
             && hasActiveAccess(roomId)
-            && resource.data.actorUid == request.auth.uid
-            && resource.data.memberId == ownMemberId(roomId));
+            && resource.data.actorUid == request.auth.uid);
         allow create: if signedIn()
           && hasActiveAccess(roomId)
           && validTaskIdentity(roomId)
