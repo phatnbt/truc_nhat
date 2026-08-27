@@ -1,4 +1,4 @@
-const CACHE_NAME="p708-manager-v5-production-audit-20260827-7";
+const CACHE_NAME="p708-manager-v5-production-audit-20260827-8";
 const APP_SHELL=[
   "./",
   "./index.html",
@@ -14,12 +14,15 @@ const APP_SHELL=[
   "./src/core/app-core2.js",
   "./src/core/p708-secure-sync-engine.js",
   "./src/core/p708-authoritative-repair.js",
+  "./src/core/p708-identity-plan.js",
+  "./src/core/p708-canonical-mapping-repair.js",
   "./src/features/app-actions1.js",
   "./src/features/app-actions2.js",
   "./src/features/app-dashboard.js",
   "./src/features/app-render.js",
   "./src/features/app-integrity-fixes.js",
   "./src/features/inactive-mapping-dedup-fix.js",
+  "./src/features/canonical-identity-repair.js",
   "./src/features/billing-stable-repair.js",
   "./src/features/home-enhancements.js",
   "./src/features/notification-enhancements.js",
