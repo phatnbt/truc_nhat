@@ -6,6 +6,22 @@ import {
 } from "https://www.gstatic.com/firebasejs/12.16.0/firebase-firestore.js";
 
 const clone=value=>value==null?value:JSON.parse(JSON.stringify(value));
+const isObject=value=>value!==null&&typeof value==="object"&&!Array.isArray(value);
+
+function stableValue(value){
+  if(Array.isArray(value))return value.map(stableValue);
+  if(!isObject(value))return value;
+  return Object.fromEntries(Object.keys(value).sort().map(key=>[key,stableValue(value[key])]));
+}
+function stableStringify(value){return JSON.stringify(stableValue(value));}
+function timestampMillis(value){
+  if(value&&typeof value.toMillis==="function")return value.toMillis();
+  const seconds=Number(value?.seconds??value?._seconds);
+  const nanos=Number(value?.nanoseconds??value?._nanoseconds)||0;
+  if(Number.isFinite(seconds))return seconds*1000+nanos/1e6;
+  const parsed=Date.parse(value||"");
+  return Number.isFinite(parsed)?parsed:0;
+}
 
 function memberPersonEntry(shape,memberId,month){
   const people=shape?.billingMonths?.[month]?.people||{};
@@ -43,6 +59,33 @@ function overlayMemberData(shape,memberDocs){
   return output;
 }
 
+function activeMappedMemberDocs(payload,memberSnap,accessSnap){
+  const accessByUid=new Map(accessSnap.docs.map(item=>[item.id,{uid:item.id,...item.data()}]));
+  const candidates=[];
+  for(const item of memberSnap.docs){
+    const data={uid:item.id,...item.data()},access=accessByUid.get(item.id);
+    if(!access||access.active===false||!access.memberId)continue;
+    if(access.memberId!==data.memberId)continue;
+    if(!payload?.members?.[data.memberId])continue;
+    candidates.push(data);
+  }
+
+  // Existing installations may contain legacy duplicate memberData documents for one
+  // member. One-to-one mapping is enforced in the UI now, but reading must still be
+  // deterministic while those old documents are being cleaned up. Prefer the newest
+  // mapped document instead of whichever Firestore happens to return last.
+  const newestByMember=new Map();
+  for(const data of candidates){
+    const previous=newestByMember.get(data.memberId);
+    if(!previous){newestByMember.set(data.memberId,data);continue;}
+    const currentStamp=timestampMillis(data.updatedAt),previousStamp=timestampMillis(previous.updatedAt);
+    if(currentStamp>previousStamp||(currentStamp===previousStamp&&String(data.uid).localeCompare(String(previous.uid))<0)){
+      newestByMember.set(data.memberId,data);
+    }
+  }
+  return [...newestByMember.values()];
+}
+
 function auditId(uid){
   const random=globalThis.crypto?.randomUUID?.()||Math.random().toString(36).slice(2);
   return `${Date.now()}-${uid}-${random}`;
@@ -59,16 +102,18 @@ export function createP708AuthoritativeRepair({firebaseConfig,roomCode,deviceId}
   const auditCollection=collection(db,"rooms",roomCode,"auditLogs");
 
   async function readServer(){
-    const [roomSnap,memberSnap]=await Promise.all([
+    const [roomSnap,memberSnap,accessSnap]=await Promise.all([
       getDocFromServer(roomRef),
-      getDocsFromServer(memberDataCollection)
+      getDocsFromServer(memberDataCollection),
+      getDocsFromServer(accessCollection)
     ]);
-    if(!roomSnap.exists())return {revision:0,payload:{}};
-    const data=roomSnap.data()||{};
-    const memberDocs=memberSnap.docs.map(item=>({uid:item.id,...item.data()}));
+    if(!roomSnap.exists())return {revision:0,payload:{},roomPayload:{}};
+    const data=roomSnap.data()||{},roomPayload=clone(data.payload)||{};
+    const memberDocs=activeMappedMemberDocs(roomPayload,memberSnap,accessSnap);
     return {
       revision:Number(data.revision)||0,
-      payload:overlayMemberData(clone(data.payload)||{},memberDocs)
+      roomPayload,
+      payload:overlayMemberData(roomPayload,memberDocs)
     };
   }
 
@@ -146,7 +191,11 @@ export function createP708AuthoritativeRepair({firebaseConfig,roomCode,deviceId}
 
   async function verify(expectedPayload){
     const server=await readServer();
-    const same=JSON.stringify(server.payload)===JSON.stringify(expectedPayload||{});
+    // Verify the room payload itself. memberData can legitimately change immediately
+    // after the transaction when a member toggles attendance, and object key ordering
+    // is not preserved by Firestore maps. Both cases must not be treated as a failed
+    // repair when the deduplicated room payload was actually committed correctly.
+    const same=stableStringify(server.roomPayload)===stableStringify(expectedPayload||{});
     return {...server,same};
   }
 
