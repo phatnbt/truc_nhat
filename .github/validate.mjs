@@ -13,31 +13,37 @@ const exists=relative=>fs.existsSync(path.join(root,relative));
 const read=relative=>fs.readFileSync(path.join(root,relative),"utf8");
 
 const required=[
-  "index.html","styles.css","landing-ui.css","app.js","app-loader.js","app-core1.js","app-core2.js",
-  "app-actions1.js","app-actions2.js","app-dashboard.js","app-render.js","app-integrity-fixes.js",
-  "home-enhancements.js","app-start.js","notification-enhancements.js","today-calendar.js",
-  "mobile-install-bridge.js","mobile-install-guide.js","p708-secure-sync-engine.js","sw.js",
+  "index.html","styles.css","landing-ui.css","app.js",
+  "src/boot/app-loader.js","src/boot/app-start.js",
+  "src/core/app-core1.js","src/core/app-core2.js","src/core/p708-secure-sync-engine.js",
+  "src/features/app-actions1.js","src/features/app-actions2.js","src/features/app-dashboard.js",
+  "src/features/app-render.js","src/features/app-integrity-fixes.js","src/features/home-enhancements.js",
+  "src/features/notification-enhancements.js","src/features/today-calendar.js",
+  "src/features/mobile-install-bridge.js","src/features/mobile-install-guide.js","sw.js",
   "manifest.webmanifest","firebase.json","firestore-secure.rules","offline.html",
   "icons/icon-32.png","icons/icon-192.png","icons/icon-512.png","icons/icon-maskable-512.png",
+  "docs/VALIDATION.json","docs/README_FREE_EDITION.md","docs/README_P708_SECURE.md",
   "functions/index.js","functions/package.json"
 ];
 for(const file of required)if(!exists(file))fail(`Thiếu file bắt buộc: ${file}`);
 
-for(const file of ["firebase.json","manifest.webmanifest","VALIDATION.json","functions/package.json"]){
+for(const file of ["firebase.json","manifest.webmanifest","docs/VALIDATION.json","functions/package.json"]){
   if(!exists(file))continue;
   try{JSON.parse(read(file));}catch(error){fail(`JSON lỗi ${file}: ${error.message}`);}
 }
 
 const classicJs=[
-  "app-core1.js","app-core2.js","app-actions1.js","app-actions2.js","app-dashboard.js","app-render.js",
-  "app-integrity-fixes.js","home-enhancements.js","app-start.js","notification-enhancements.js",
-  "today-calendar.js","mobile-install-bridge.js","mobile-install-guide.js","sw.js"
+  "src/core/app-core1.js","src/core/app-core2.js",
+  "src/features/app-actions1.js","src/features/app-actions2.js","src/features/app-dashboard.js",
+  "src/features/app-render.js","src/features/app-integrity-fixes.js","src/features/home-enhancements.js",
+  "src/boot/app-start.js","src/features/notification-enhancements.js","src/features/today-calendar.js",
+  "src/features/mobile-install-bridge.js","src/features/mobile-install-guide.js","sw.js"
 ];
 for(const file of classicJs){
   if(!exists(file))continue;
   try{new vm.Script(read(file),{filename:file});}catch(error){fail(`JavaScript syntax lỗi ${file}: ${error.message}`);}
 }
-for(const file of ["app.js","app-loader.js","p708-secure-sync-engine.js"]){
+for(const file of ["app.js","src/boot/app-loader.js","src/core/p708-secure-sync-engine.js"]){
   if(!exists(file))continue;
   const temp=path.join(os.tmpdir(),`p708-${path.basename(file,".js")}-${process.pid}.mjs`);
   fs.writeFileSync(temp,read(file));
@@ -66,9 +72,12 @@ if(exists("index.html")){
   }
 }
 
-if(exists("app-loader.js")){
-  for(const match of read("app-loader.js").matchAll(/["'`](\.\/[^"'`?]+\.js)(?:\?[^"'`]*)?["'`]/g)){
-    const relative=match[1].replace(/^\.\//,"");if(!exists(relative))fail(`app-loader.js tham chiếu file không tồn tại: ${relative}`);
+const loaderPath="src/boot/app-loader.js";
+if(exists(loaderPath)){
+  const loaderDir=path.dirname(loaderPath);
+  for(const match of read(loaderPath).matchAll(/["'`](\.\.?\/[^"'`?]+\.js)(?:\?[^"'`]*)?["'`]/g)){
+    const relative=path.normalize(path.join(loaderDir,match[1]));
+    if(!exists(relative))fail(`${loaderPath} tham chiếu file không tồn tại: ${relative}`);
   }
 }
 
@@ -87,10 +96,19 @@ for(const file of ["styles.css","landing-ui.css","utility-chart.css","mobile-not
   if(opens!==closes)fail(`CSS ngoặc không cân bằng ${file}: ${opens} { / ${closes} }`);
 }
 
+const forbiddenRootSources=[
+  "app-loader.js","app-core1.js","app-core2.js","app-actions1.js","app-actions2.js","app-dashboard.js",
+  "app-render.js","home-enhancements.js","app-start.js","notification-enhancements.js",
+  "today-calendar.js","mobile-install-bridge.js","mobile-install-guide.js","p708-secure-sync-engine.js",
+  "README_FREE_EDITION.md","README_P708_SECURE.md","VALIDATION.json"
+];
+for(const file of forbiddenRootSources)if(exists(file))fail(`File đã được tổ chức vào thư mục nhưng vẫn còn ở root: ${file}`);
+
 if(exists("firebase.json")){
   const config=JSON.parse(read("firebase.json")),ignore=config.hosting?.ignore||[];
   if(!ignore.includes("functions/**"))fail("firebase.json phải ignore functions/** ở bản Free");
   if(!ignore.includes(".github/**"))fail("firebase.json phải ignore .github/**");
+  if(!ignore.includes("docs/**"))fail("firebase.json phải ignore docs/**");
   if(config.firestore?.rules!=="firestore-secure.rules")fail("firebase.json chưa trỏ đúng firestore-secure.rules");
 }
 
