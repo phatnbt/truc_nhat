@@ -1,0 +1,77 @@
+name: Firebase Production Deploy
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "**/*.html"
+      - "**/*.css"
+      - "**/*.js"
+      - "**/*.webmanifest"
+      - "icons/**"
+      - "firebase.json"
+      - "firestore-secure.rules"
+      - ".github/workflows/firebase-deploy.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: p708-firebase-production
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_P708_ROOM_MANAGER }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Check Firebase credentials
+        id: credentials
+        shell: bash
+        run: |
+          if [ -n "$FIREBASE_SERVICE_ACCOUNT" ]; then
+            echo "available=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "available=false" >> "$GITHUB_OUTPUT"
+            echo "Firebase deploy skipped: repository secret FIREBASE_SERVICE_ACCOUNT_P708_ROOM_MANAGER is not configured."
+          fi
+
+      - name: Setup Node.js
+        if: steps.credentials.outputs.available == 'true'
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Authenticate to Google Cloud
+        if: steps.credentials.outputs.available == 'true'
+        uses: google-github-actions/auth@v3
+        with:
+          credentials_json: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_P708_ROOM_MANAGER }}
+
+      - name: Install Firebase CLI
+        if: steps.credentials.outputs.available == 'true'
+        run: npm install --global firebase-tools
+
+      - name: Validate before deploy
+        if: steps.credentials.outputs.available == 'true'
+        run: node .github/validate.mjs
+
+      - name: Deploy Hosting and Firestore Rules
+        if: steps.credentials.outputs.available == 'true'
+        run: firebase deploy --only hosting,firestore:rules --project p708-room-manager --non-interactive
+
+      - name: Deployment summary
+        if: always()
+        shell: bash
+        run: |
+          if [ "${{ steps.credentials.outputs.available }}" = "true" ]; then
+            echo "Firebase production deploy was attempted for project p708-room-manager." >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "Firebase production deploy was not attempted because FIREBASE_SERVICE_ACCOUNT_P708_ROOM_MANAGER is missing." >> "$GITHUB_STEP_SUMMARY"
+          fi
