@@ -54,7 +54,7 @@ vm.createContext(context);
 vm.runInContext(source,context,{filename:"billing-membership-exclusion.js"});
 
 context.removeBillingPerson();
-assert.deepEqual(bill.excludedMemberIds,["m-phat"],"deleted linked member must be tombstoned for this month");
+assert.equal(JSON.stringify(bill.excludedMemberIds),JSON.stringify(["m-phat"]),"deleted linked member must be tombstoned for this month");
 assert.equal(bill.people.some(person=>person.memberId==="m-phat"),false,"deleted member must leave the month immediately");
 
 bill.people.push(
@@ -72,9 +72,9 @@ assert.equal(afterFirstSync.find(person=>person.memberId==="m-hung").days["4"],t
 assert.equal(afterFirstSync.find(person=>person.memberId==="m-hao").days["3"],true);
 assert.equal(afterFirstSync.find(person=>person.memberId==="m-hao").days["5"],true,"legacy dedup must preserve marked stay days");
 
-const stableIds=afterFirstSync.map(person=>person.id).sort();
+const stableIds=[...afterFirstSync].map(person=>person.id).sort();
 context.syncBillingMembers();
-assert.deepEqual(bill.people.map(person=>person.id).sort(),stableIds,"repeated sync must be idempotent and must not grow the list");
+assert.equal(JSON.stringify([...bill.people].map(person=>person.id).sort()),JSON.stringify(stableIds),"repeated sync must be idempotent and must not grow the list");
 assert.equal(bill.people.some(person=>person.memberId==="m-phat"),false,"second sync must still respect the tombstone");
 
 input.value="Phát";
@@ -84,7 +84,7 @@ assert.equal(bill.people.filter(person=>person.memberId==="m-phat").length,1,"ma
 
 context.syncBillingMembers();
 assert.equal(bill.people.length,3,"after explicit restore the month must contain exactly the three current members");
-assert.equal(new Set(bill.people.map(person=>person.memberId)).size,3,"restored month must not contain duplicate member mappings");
+assert.equal(new Set([...bill.people].map(person=>person.memberId)).size,3,"restored month must not contain duplicate member mappings");
 assert.ok(persistCalls.some(call=>call.audit?.action==="REMOVE_BILL_PERSON"));
 assert.ok(persistCalls.some(call=>call.audit?.action==="SYNC_BILL_MEMBERS"));
 assert.ok(persistCalls.some(call=>call.audit?.action==="ADD_BILL_PERSON"));
