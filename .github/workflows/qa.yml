@@ -1,0 +1,47 @@
+name: P708 Production QA
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main, "fix/**"]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: p708-qa-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  static-and-rules:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: functions/package.json
+
+      - name: Static project validation
+        run: node .github/validate.mjs
+
+      - name: Validate optional Cloud Functions dependencies
+        run: npm install --prefix functions --ignore-scripts --no-audit --no-fund
+
+      - name: Setup Java for Firestore emulator
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - name: Install Firestore rules test tooling
+        run: npm install --no-save --package-lock=false --ignore-scripts --no-audit --no-fund firebase firebase-tools @firebase/rules-unit-testing
+
+      - name: Firestore security integration tests
+        run: npx firebase-tools emulators:exec --only firestore --project demo-p708-production-audit "node .github/rules.test.mjs"
