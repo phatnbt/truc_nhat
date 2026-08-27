@@ -1,4 +1,4 @@
-const CACHE_NAME="p708-manager-v5-production-audit-20260827-8";
+const CACHE_NAME="p708-manager-v5-production-audit-20260827-9";
 const APP_SHELL=[
   "./",
   "./index.html",
@@ -25,6 +25,7 @@ const APP_SHELL=[
   "./src/features/canonical-identity-repair.js",
   "./src/features/billing-canonical-repair.js",
   "./src/features/billing-stable-repair.js",
+  "./src/features/billing-membership-exclusion.js",
   "./src/features/home-enhancements.js",
   "./src/features/notification-enhancements.js",
   "./src/features/today-calendar.js",
