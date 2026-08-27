@@ -1,4 +1,4 @@
-const CACHE_NAME="p708-manager-v5-free-landing-20260827-1";
+const CACHE_NAME="p708-manager-v5-production-audit-20260827-2";
 const APP_SHELL=[
   "./",
   "./index.html",
@@ -6,6 +6,7 @@ const APP_SHELL=[
   "./landing-ui.css",
   "./utility-chart.css",
   "./mobile-notification-ui.css",
+  "./kpi-polish.css",
   "./app.js",
   "./app-loader.js",
   "./app-core1.js",
@@ -42,13 +43,32 @@ self.addEventListener("activate",event=>event.waitUntil((async()=>{
   await self.clients.claim();
 })()));
 
-self.addEventListener("message",event=>{if(event.data?.type==="SKIP_WAITING")self.skipWaiting();});
-self.addEventListener("notificationclick",event=>{event.notification.close();event.waitUntil((async()=>{const clientsList=await clients.matchAll({type:"window",includeUncontrolled:true});if(clientsList[0]){await clientsList[0].focus();return;}await clients.openWindow("./");})());});
+self.addEventListener("message",event=>{
+  if(event.data?.type==="SKIP_WAITING")self.skipWaiting();
+});
+
+self.addEventListener("notificationclick",event=>{
+  event.notification.close();
+  event.waitUntil((async()=>{
+    const clientsList=await clients.matchAll({type:"window",includeUncontrolled:true});
+    const target=event.notification?.data?.url||"./";
+    const existing=clientsList.find(client=>client.url.startsWith(self.location.origin));
+    if(existing){await existing.focus();if("navigate" in existing)await existing.navigate(target).catch(()=>{});return;}
+    await clients.openWindow(target);
+  })());
+});
 
 async function networkFirst(request,fallback){
   try{
     const response=await fetch(request,{cache:"no-store"});
-    if(response?.ok){const cache=await caches.open(CACHE_NAME);await cache.put(request,response.clone());}
+    if(response?.ok){
+      const cache=await caches.open(CACHE_NAME);
+      await cache.put(request,response.clone());
+      return response;
+    }
+    const cached=await caches.match(request);
+    if(cached)return cached;
+    if(fallback){const backup=await caches.match(fallback);if(backup)return backup;}
     return response;
   }catch{
     return (await caches.match(request))||(fallback?await caches.match(fallback):null)||Response.error();
@@ -64,10 +84,7 @@ self.addEventListener("fetch",event=>{
   }
   if(url.origin!==self.location.origin)return;
   const runtimeAsset=/\.(?:js|css|html|webmanifest)$/i.test(url.pathname);
-  if(runtimeAsset){
-    event.respondWith(networkFirst(event.request));
-    return;
-  }
+  if(runtimeAsset){event.respondWith(networkFirst(event.request));return;}
   event.respondWith((async()=>{
     const cached=await caches.match(event.request);
     if(cached)return cached;
