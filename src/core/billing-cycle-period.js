@@ -1,4 +1,6 @@
 export const BILLING_CYCLE_CUTOVER_MONTH = "2026-09";
+export const BILLING_CYCLE_START_DAY = 30;
+export const BILLING_CYCLE_END_DAY = 29;
 
 const validMonth = value => /^\d{4}-(0[1-9]|1[0-2])$/.test(String(value || ""));
 const pad = value => String(value).padStart(2, "0");
@@ -10,21 +12,38 @@ export function shiftMonth(month, offset = 0) {
   return `${date.getUTCFullYear()}-${pad(date.getUTCMonth() + 1)}`;
 }
 
+export function daysInMonthKey(month) {
+  if (!validMonth(month)) return 0;
+  const [year, monthNumber] = month.split("-").map(Number);
+  return new Date(Date.UTC(year, monthNumber, 0)).getUTCDate();
+}
+
 export function isCycleMonth(month) {
   return validMonth(month) && month >= BILLING_CYCLE_CUTOVER_MONTH;
 }
 
 export function cycleBounds(month) {
   if (!validMonth(month)) return null;
+
   const previous = shiftMonth(month, -1);
-  const [startYear, startMonth] = previous.split("-").map(Number);
-  const [endYear, endMonth] = month.split("-").map(Number);
-  return {
-    month,
-    start: `${startYear}-${pad(startMonth)}-28`,
-    end: `${endYear}-${pad(endMonth)}-27`,
-    endExclusive: `${endYear}-${pad(endMonth)}-28`
-  };
+  const previousLastDay = daysInMonthKey(previous);
+  const currentLastDay = daysInMonthKey(month);
+  const next = shiftMonth(month, 1);
+
+  // Quy ước chuẩn: ngày 29 chốt sổ, ngày 30 bắt đầu kỳ mới.
+  // Riêng tháng 2 không có ngày 30 (và có thể không có ngày 29), nên kỳ kế
+  // tiếp bắt đầu ngày 01 của tháng sau. Cách này bảo đảm không trùng/thiếu ngày.
+  const start = previousLastDay >= BILLING_CYCLE_START_DAY
+    ? `${previous}-${pad(BILLING_CYCLE_START_DAY)}`
+    : `${month}-01`;
+
+  const endDay = Math.min(BILLING_CYCLE_END_DAY, currentLastDay);
+  const end = `${month}-${pad(endDay)}`;
+  const endExclusive = endDay < currentLastDay
+    ? `${month}-${pad(endDay + 1)}`
+    : `${next}-01`;
+
+  return { month, start, end, endExclusive };
 }
 
 export function parseDateKey(value) {
@@ -68,7 +87,7 @@ export function currentPeriodMonth(input = new Date()) {
   if (Number.isNaN(date.getTime())) return "";
   const year = date.getFullYear(), month = date.getMonth() + 1, day = date.getDate();
   const base = `${year}-${pad(month)}`;
-  return day >= 28 ? shiftMonth(base, 1) : base;
+  return day >= BILLING_CYCLE_START_DAY ? shiftMonth(base, 1) : base;
 }
 
 export function formatPeriodRange(month, locale = "vi-VN") {
