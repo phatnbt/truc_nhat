@@ -1,4 +1,4 @@
-const CACHE_NAME="p708-manager-v5-billing-cycle-20260828-1";
+const CACHE_NAME="p708-manager-v5-billing-cycle-20260829-1";
 const APP_SHELL=[
   "./",
   "./index.html",
