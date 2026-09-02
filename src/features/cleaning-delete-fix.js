@@ -39,7 +39,6 @@
   }
 
   // Khi người dùng CHỦ ĐỘNG tạo lại đúng tuần đã xóa thì mới gỡ tombstone.
-  // Không có thao tác tạo mới => tombstone tiếp tục thắng mọi snapshot cũ.
   createSchedule=async function(){
     const week=$("#cleanWeek")?.value||"";
     if(!week)return baseCreateSchedule();
@@ -48,7 +47,12 @@
     const tombstone=state?._sync?.deletedSchedules?.[week];
     if(tombstone&&typeof globalThis.restoreScheduleWeek==="function"){
       try{
-        await globalThis.restoreScheduleWeek({firebaseConfig:FIREBASE_CONFIG,roomCode:ROOM_CODE,weekStart:week});
+        await globalThis.restoreScheduleWeek({
+          firebaseConfig:FIREBASE_CONFIG,
+          roomCode:ROOM_CODE,
+          deviceId:DEVICE_ID,
+          weekStart:week
+        });
         state._sync=state._sync||{};
         state._sync.deletedSchedules=state._sync.deletedSchedules||{};
         delete state._sync.deletedSchedules[week];
