@@ -1,5 +1,28 @@
 (()=>{
   let deletingWeek=false;
+  const baseToSyncShape=toSyncShape;
+  const baseFromSyncShape=fromSyncShape;
+  const baseCreateSchedule=createSchedule;
+
+  // Giữ tombstone trong shape đồng bộ và loại mọi lịch đã bị xóa trước khi đưa
+  // dữ liệu server vào state. Đây là chốt chặn chống snapshot/device cũ resurrect.
+  toSyncShape=function(source=state){
+    const shape=baseToSyncShape(source);
+    shape._sync=clone(source?._sync||{});
+    shape._sync.deletedSchedules=clone(shape._sync.deletedSchedules||{});
+    return shape;
+  };
+
+  fromSyncShape=function(shape){
+    const clean=clone(shape)||{};
+    const deleted=clean?._sync?.deletedSchedules||{};
+    clean.schedules=clean.schedules&&typeof clean.schedules==="object"?clean.schedules:{};
+    for(const weekStart of Object.keys(deleted))delete clean.schedules[weekStart];
+    const next=baseFromSyncShape(clean);
+    next._sync=clone(clean._sync||{});
+    next._sync.deletedSchedules=clone(deleted);
+    return next;
+  };
 
   async function syncFromServer(){
     if(!realtimeEngine?.forceSync)return true;
@@ -14,6 +37,28 @@
     }
     return currentSchedule();
   }
+
+  // Khi người dùng CHỦ ĐỘNG tạo lại đúng tuần đã xóa thì mới gỡ tombstone.
+  // Không có thao tác tạo mới => tombstone tiếp tục thắng mọi snapshot cũ.
+  createSchedule=async function(){
+    const week=$("#cleanWeek")?.value||"";
+    if(!week)return baseCreateSchedule();
+    const people=state.members.filter(m=>state.presence[m.id]!==false);
+    if(!people.length)return baseCreateSchedule();
+    const tombstone=state?._sync?.deletedSchedules?.[week];
+    if(tombstone&&typeof globalThis.restoreScheduleWeek==="function"){
+      try{
+        await globalThis.restoreScheduleWeek({firebaseConfig:FIREBASE_CONFIG,roomCode:ROOM_CODE,weekStart:week});
+        state._sync=state._sync||{};
+        state._sync.deletedSchedules=state._sync.deletedSchedules||{};
+        delete state._sync.deletedSchedules[week];
+      }catch(error){
+        console.error("P708 restore deleted schedule week",error);
+        return toast(error?.message||"Không thể tạo lại tuần đã xóa",6000);
+      }
+    }
+    return baseCreateSchedule();
+  };
 
   deleteSchedule=async function(){
     if(!requireAdmin()||deletingWeek)return;
@@ -49,7 +94,10 @@
         console.warn("P708 cleanup week submissions",error);
       });
 
-      // Cập nhật local ngay để UI không giữ card cũ trong lúc listener Firestore phản hồi.
+      const tombstone={deletedAt:nowIso(),deletedBy:authSession.user?.uid||"",scheduleId};
+      state._sync=state._sync||{};
+      state._sync.deletedSchedules=state._sync.deletedSchedules||{};
+      state._sync.deletedSchedules[weekStart]=tombstone;
       state.schedules=state.schedules.filter(item=>item.weekStart!==weekStart&&item.id!==scheduleId);
       ui.selectedScheduleId=null;
       saveLocal();renderCleaning();
@@ -57,7 +105,7 @@
       await syncFromServer();
       const stillThere=state.schedules.some(item=>item.weekStart===weekStart);
       if(stillThere){
-        toast("Máy chủ vẫn còn lịch tuần này sau khi xóa trực tiếp. Hãy gửi ảnh màn hình này để kiểm tra quyền Firestore.",6500);
+        toast("Lịch tuần vẫn xuất hiện sau tombstone. Hệ thống đã chặn ghi tiếp để tránh sai dữ liệu.",6500);
         return;
       }
 
@@ -65,7 +113,7 @@
       ui.selectedScheduleId=next?.id||null;
       if($("#cleanWeek"))$("#cleanWeek").value=next?.weekStart||dateValue(nextMonday());
       saveLocal();renderCleaning();
-      toast(result?.removed===false?"Tuần này đã được xóa trước đó":"Đã xóa tuần khỏi máy chủ");
+      toast(result?.reason==="already_deleted"?"Tuần này đã được xóa trước đó":"Đã xóa tuần khỏi máy chủ");
     }catch(error){
       console.error("P708 delete schedule",error);
       toast(error?.message||"Không thể xóa tuần",6000);
