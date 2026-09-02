@@ -31,10 +31,8 @@ export async function deleteScheduleAuthoritatively({firebaseConfig,roomCode,dev
       scheduleId:current?.id||scheduleId||null
     };
 
-    // QUAN TRỌNG: không dùng set(...,{merge:true}) để "xóa" key con trong map.
-    // Omit key khi merge không phải delete. deleteField() mới xóa nested field thật.
-    // Tombstone được lưu cả trong payload lẫn metadata phòng để mọi listener/client
-    // mới đều biết lịch này đã bị xóa và không được resurrect từ snapshot cũ.
+    // Omit một key trong object rồi merge lại KHÔNG phải phép delete của Firestore.
+    // deleteField() trên exact nested path mới xóa lịch thật sự trên server.
     tx.update(
       roomRef,
       new FieldPath("payload","schedules",weekStart), deleteField(),
@@ -49,7 +47,7 @@ export async function deleteScheduleAuthoritatively({firebaseConfig,roomCode,dev
   });
 }
 
-export async function restoreScheduleWeek({firebaseConfig,roomCode,weekStart}){
+export async function restoreScheduleWeek({firebaseConfig,roomCode,deviceId,weekStart}){
   if(!weekStart)return;
   const app=appFor(firebaseConfig),auth=getAuth(app),db=getFirestore(app),user=auth.currentUser;
   if(!user)throw new Error("Bạn cần đăng nhập trước.");
@@ -60,7 +58,11 @@ export async function restoreScheduleWeek({firebaseConfig,roomCode,weekStart}){
     tx.update(
       roomRef,
       new FieldPath("payload","_sync","deletedSchedules",weekStart),deleteField(),
-      new FieldPath("deletedSchedules",weekStart),deleteField()
+      new FieldPath("deletedSchedules",weekStart),deleteField(),
+      "revision",increment(1),
+      "lastAdminUid",user.uid,
+      "lastDeviceId",String(deviceId||"").slice(0,160),
+      "updatedAt",serverTimestamp()
     );
   });
 }
