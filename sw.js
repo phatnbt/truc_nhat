@@ -1,4 +1,4 @@
-const CACHE_NAME="p708-manager-v5-cleaning-delete-20260902-2";
+const CACHE_NAME="p708-manager-v5-cleaning-delete-20260902-3";
 const APP_SHELL=[
   "./",
   "./index.html",
