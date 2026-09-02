@@ -1,8 +1,9 @@
-import { getApps, getApp, initializeApp } from "https://www.gstatic.com/firebasejs/12.16.0/firebase-app.js";
+import { getApps, initializeApp } from "https://www.gstatic.com/firebasejs/12.16.0/firebase-app.js";
 import { getAuth } from "https://www.gstatic.com/firebasejs/12.16.0/firebase-auth.js";
-import { getFirestore, doc, runTransaction, serverTimestamp, increment } from "https://www.gstatic.com/firebasejs/12.16.0/firebase-firestore.js";
-
-const clone=value=>value==null?value:JSON.parse(JSON.stringify(value));
+import {
+  getFirestore, doc, runTransaction, serverTimestamp, increment,
+  deleteField, FieldPath
+} from "https://www.gstatic.com/firebasejs/12.16.0/firebase-firestore.js";
 
 function appFor(firebaseConfig){
   const existing=getApps().find(app=>app.name==="p708-secure-manager-v5");
@@ -15,26 +16,42 @@ export async function deleteScheduleAuthoritatively({firebaseConfig,roomCode,dev
   if(!user)throw new Error("Bạn cần đăng nhập trước.");
   const roomRef=doc(db,"rooms",roomCode);
 
-  const result=await runTransaction(db,async tx=>{
+  return runTransaction(db,async tx=>{
     const snap=await tx.get(roomRef);
     if(!snap.exists())throw new Error("Không tìm thấy dữ liệu phòng.");
-    const room=snap.data()||{},payload=clone(room.payload)||{};
-    payload.schedules=payload.schedules&&typeof payload.schedules==="object"?payload.schedules:{};
-    const current=payload.schedules[weekStart]||null;
-    if(!current)return {removed:false,reason:"missing"};
-    if(scheduleId&&current.id&&current.id!==scheduleId)return {removed:false,reason:"changed",serverScheduleId:current.id};
+    const room=snap.data()||{};
+    const current=room?.payload?.schedules?.[weekStart]||null;
+    if(current&&scheduleId&&current.id&&current.id!==scheduleId){
+      return {removed:false,reason:"changed",serverScheduleId:current.id};
+    }
 
-    delete payload.schedules[weekStart];
-    tx.set(roomRef,{
-      schemaVersion:5,
-      roomCode,
-      revision:increment(1),
-      payload,
-      lastAdminUid:user.uid,
-      lastDeviceId:String(deviceId||"").slice(0,160),
-      updatedAt:serverTimestamp()
-    },{merge:true});
-    return {removed:true};
+    // Không dùng set(...,{merge:true}) để xóa key con trong map: Firestore sẽ giữ
+    // key bị thiếu. deleteField + FieldPath mới là phép xóa nested field thực sự.
+    tx.update(
+      roomRef,
+      new FieldPath("payload","schedules",weekStart), deleteField(),
+      new FieldPath("deletedSchedules",weekStart), {
+        deletedAt:new Date().toISOString(),
+        deletedBy:user.uid,
+        scheduleId:current?.id||scheduleId||null
+      },
+      "revision", increment(1),
+      "lastAdminUid", user.uid,
+      "lastDeviceId", String(deviceId||"").slice(0,160),
+      "updatedAt", serverTimestamp()
+    );
+    return {removed:!!current,reason:current?"deleted":"already_deleted"};
   });
-  return result;
+}
+
+export async function restoreScheduleWeek({firebaseConfig,roomCode,weekStart}){
+  if(!weekStart)return;
+  const app=appFor(firebaseConfig),auth=getAuth(app),db=getFirestore(app),user=auth.currentUser;
+  if(!user)throw new Error("Bạn cần đăng nhập trước.");
+  const roomRef=doc(db,"rooms",roomCode);
+  await runTransaction(db,async tx=>{
+    const snap=await tx.get(roomRef);
+    if(!snap.exists())throw new Error("Không tìm thấy dữ liệu phòng.");
+    tx.update(roomRef,new FieldPath("deletedSchedules",weekStart),deleteField());
+  });
 }
