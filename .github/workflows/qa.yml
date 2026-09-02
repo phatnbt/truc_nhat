@@ -58,6 +58,9 @@ jobs:
       - name: Billing cycle and swipe history regression tests
         run: node .github/billing-cycle.test.mjs
 
+      - name: Cleaning week deletion resurrection regression tests
+        run: node .github/cleaning-delete-tombstone.test.mjs
+
       - name: Validate optional Cloud Functions dependencies
         run: npm install --prefix functions --ignore-scripts --no-audit --no-fund
 
