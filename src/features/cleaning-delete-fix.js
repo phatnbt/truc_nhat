@@ -15,15 +15,6 @@
     return currentSchedule();
   }
 
-  async function removeScheduleOnce(weekStart,scheduleId){
-    state.schedules=state.schedules.filter(schedule=>schedule.weekStart!==weekStart&&schedule.id!==scheduleId);
-    ui.selectedScheduleId=null;
-    return persist("",{
-      action:"DELETE_SCHEDULE",
-      summary:`Xóa lịch tuần ${weekStart}`
-    });
-  }
-
   deleteSchedule=async function(){
     if(!requireAdmin()||deletingWeek)return;
     if(!navigator.onLine)return toast("Đang ngoại tuyến · không thể xóa tuần",5000);
@@ -33,8 +24,6 @@
     if(button){button.disabled=true;button.textContent="Đang kiểm tra…";}
 
     try{
-      // Luôn đọc snapshot mới nhất trước khi xác định tuần cần xóa. Điều này tránh
-      // xóa trên state cũ rồi listener realtime đưa lịch cũ trở lại.
       const synced=await syncFromServer();
       if(!synced)return toast("Không lấy được dữ liệu mới nhất từ máy chủ",5000);
 
@@ -44,32 +33,31 @@
       if(!confirm(`Xóa lịch ${weekRange(weekStart)}?\n\nCác báo hoàn thành của tuần này cũng sẽ được dọn.`))return;
 
       if(button)button.textContent="Đang xóa…";
-      let saved=await removeScheduleOnce(weekStart,scheduleId);
-      if(!saved)return;
+      if(typeof globalThis.deleteScheduleAuthoritatively!=="function")throw new Error("Chức năng xóa máy chủ chưa sẵn sàng. Hãy tải lại ứng dụng.");
 
-      // Dọn báo công việc sau khi lịch chính đã được xóa. Lỗi dọn báo không được
-      // phép làm sống lại lịch đã xóa.
+      const result=await globalThis.deleteScheduleAuthoritatively({
+        firebaseConfig:FIREBASE_CONFIG,
+        roomCode:ROOM_CODE,
+        deviceId:DEVICE_ID,
+        weekStart,
+        scheduleId
+      });
+
+      if(result?.reason==="changed")throw new Error("Lịch tuần này đã thay đổi trên thiết bị khác. Hãy tải lại rồi thử xóa lại.");
+
       await realtimeEngine?.deleteTaskSubmissionsForWeek(weekStart).catch(error=>{
         console.warn("P708 cleanup week submissions",error);
       });
 
+      // Cập nhật local ngay để UI không giữ card cũ trong lúc listener Firestore phản hồi.
+      state.schedules=state.schedules.filter(item=>item.weekStart!==weekStart&&item.id!==scheduleId);
+      ui.selectedScheduleId=null;
+      saveLocal();renderCleaning();
+
       await syncFromServer();
-      let returned=state.schedules.some(item=>item.weekStart===weekStart||item.id===scheduleId);
-
-      // Nếu một snapshot cũ/race condition vừa ghi lịch trở lại, thực hiện lại
-      // trên chính snapshot server vừa đọc. Không dựa vào state trước thao tác.
-      if(returned){
-        const latest=state.schedules.find(item=>item.weekStart===weekStart||item.id===scheduleId);
-        saved=await removeScheduleOnce(weekStart,latest?.id||scheduleId);
-        if(saved){
-          await realtimeEngine?.deleteTaskSubmissionsForWeek(weekStart).catch(()=>{});
-          await syncFromServer();
-        }
-        returned=state.schedules.some(item=>item.weekStart===weekStart||item.id===scheduleId);
-      }
-
-      if(returned){
-        toast("Máy chủ vẫn còn lịch tuần này. Hệ thống đã dừng để tránh hiển thị sai.",6000);
+      const stillThere=state.schedules.some(item=>item.weekStart===weekStart);
+      if(stillThere){
+        toast("Máy chủ vẫn còn lịch tuần này sau khi xóa trực tiếp. Hãy gửi ảnh màn hình này để kiểm tra quyền Firestore.",6500);
         return;
       }
 
@@ -77,7 +65,7 @@
       ui.selectedScheduleId=next?.id||null;
       if($("#cleanWeek"))$("#cleanWeek").value=next?.weekStart||dateValue(nextMonday());
       saveLocal();renderCleaning();
-      toast("Đã xóa tuần và đồng bộ máy chủ");
+      toast(result?.removed===false?"Tuần này đã được xóa trước đó":"Đã xóa tuần khỏi máy chủ");
     }catch(error){
       console.error("P708 delete schedule",error);
       toast(error?.message||"Không thể xóa tuần",6000);
