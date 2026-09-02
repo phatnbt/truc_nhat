@@ -1,4 +1,4 @@
-const CACHE_NAME="p708-manager-v5-billing-cycle-20260829-1";
+const CACHE_NAME="p708-manager-v5-cleaning-delete-20260902-1";
 const APP_SHELL=[
   "./",
   "./index.html",
@@ -20,6 +20,7 @@ const APP_SHELL=[
   "./src/core/billing-cycle-period.js",
   "./src/features/app-actions1.js",
   "./src/features/app-actions2.js",
+  "./src/features/cleaning-delete-fix.js",
   "./src/features/app-dashboard.js",
   "./src/features/app-render.js",
   "./src/features/app-integrity-fixes.js",
