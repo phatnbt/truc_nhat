@@ -31,11 +31,13 @@ jobs:
         run: pipx install graphifyy
 
       - name: Build project knowledge graph
-        run: graphify .
+        run: |
+          mkdir -p graphify-out
+          graphify . --code-only 2>&1 | tee graphify-out/build.log
 
       - name: Query cleaning deletion dependency path
         run: |
-          graphify query "deleteSchedule cleaning schedule Firestore realtime persist tombstone" > graphify-out/cleaning-delete-query.txt || true
+          graphify query "deleteSchedule cleaning schedule Firestore realtime persist tombstone" 2>&1 | tee graphify-out/cleaning-delete-query.txt || true
 
       - name: Upload Graphify report
         uses: actions/upload-artifact@v4
