@@ -1,0 +1,45 @@
+name: Graphify Architecture Audit
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - "src/**"
+      - "app.js"
+      - "sw.js"
+      - "firestore-secure.rules"
+      - ".github/workflows/graphify-audit.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  graphify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install Graphify
+        run: pipx install graphifyy
+
+      - name: Build project knowledge graph
+        run: graphify .
+
+      - name: Query cleaning deletion dependency path
+        run: |
+          graphify query "deleteSchedule cleaning schedule Firestore realtime persist tombstone" > graphify-out/cleaning-delete-query.txt || true
+
+      - name: Upload Graphify report
+        uses: actions/upload-artifact@v4
+        with:
+          name: graphify-truc-nhat
+          path: graphify-out/
+          if-no-files-found: error
