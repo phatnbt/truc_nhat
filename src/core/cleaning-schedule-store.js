@@ -25,16 +25,21 @@ export async function deleteScheduleAuthoritatively({firebaseConfig,roomCode,dev
       return {removed:false,reason:"changed",serverScheduleId:current.id};
     }
 
-    // Không dùng set(...,{merge:true}) để xóa key con trong map: Firestore sẽ giữ
-    // key bị thiếu. deleteField + FieldPath mới là phép xóa nested field thực sự.
+    const tombstone={
+      deletedAt:new Date().toISOString(),
+      deletedBy:user.uid,
+      scheduleId:current?.id||scheduleId||null
+    };
+
+    // QUAN TRỌNG: không dùng set(...,{merge:true}) để "xóa" key con trong map.
+    // Omit key khi merge không phải delete. deleteField() mới xóa nested field thật.
+    // Tombstone được lưu cả trong payload lẫn metadata phòng để mọi listener/client
+    // mới đều biết lịch này đã bị xóa và không được resurrect từ snapshot cũ.
     tx.update(
       roomRef,
       new FieldPath("payload","schedules",weekStart), deleteField(),
-      new FieldPath("deletedSchedules",weekStart), {
-        deletedAt:new Date().toISOString(),
-        deletedBy:user.uid,
-        scheduleId:current?.id||scheduleId||null
-      },
+      new FieldPath("payload","_sync","deletedSchedules",weekStart), tombstone,
+      new FieldPath("deletedSchedules",weekStart), tombstone,
       "revision", increment(1),
       "lastAdminUid", user.uid,
       "lastDeviceId", String(deviceId||"").slice(0,160),
@@ -52,6 +57,10 @@ export async function restoreScheduleWeek({firebaseConfig,roomCode,weekStart}){
   await runTransaction(db,async tx=>{
     const snap=await tx.get(roomRef);
     if(!snap.exists())throw new Error("Không tìm thấy dữ liệu phòng.");
-    tx.update(roomRef,new FieldPath("deletedSchedules",weekStart),deleteField());
+    tx.update(
+      roomRef,
+      new FieldPath("payload","_sync","deletedSchedules",weekStart),deleteField(),
+      new FieldPath("deletedSchedules",weekStart),deleteField()
+    );
   });
 }
