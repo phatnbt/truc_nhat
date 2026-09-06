@@ -21,11 +21,18 @@ assert.match(widget,/pet-hop/);
 assert.match(widget,/pet-wiggle/);
 assert.match(widget,/pet-twirl/);
 assert.match(widget,/pet-nuzzle/);
+assert.match(widget,/function ownMemberId\(\)/);
+assert.match(widget,/if\(!mine\|\|memberId!==mine\)return false/);
+assert.match(widget,/canCallMember:memberId=>!!ownMemberId\(\)&&memberId===ownMemberId\(\)/);
+assert.doesNotMatch(widget,/mine\|\|state\.members\[0\]/);
 
 assert.match(garden,/homePetGarden/);
 assert.match(garden,/Pet của thành viên/);
 assert.match(garden,/data-garden-member/);
+assert.match(garden,/data-garden-locked/);
+assert.match(garden,/Pet riêng/);
 assert.match(garden,/P708PetWidget\?\.selectMember/);
+assert.match(garden,/const tag=isMine\?"button":"div"/);
 assert.doesNotMatch(garden,/pet-garden-summary/);
 assert.doesNotMatch(garden,/openMyPetButton/);
 
@@ -40,10 +47,10 @@ assert.match(css,/@keyframes pet-blink/);
 assert.match(css,/width:52px;height:52px/);
 assert.doesNotMatch(css,/\.pet-float-card\{/);
 
-assert.match(loader,/home-pet-garden\.js\?v=20260907-3/);
-assert.match(loader,/cleaning-pet-streak\.js\?v=20260907-3/);
-assert.match(sw,/p708-manager-v5-pet-compact-20260907-3/);
+assert.match(loader,/home-pet-garden\.js\?v=20260907-4/);
+assert.match(loader,/cleaning-pet-streak\.js\?v=20260907-4/);
+assert.match(sw,/p708-manager-v5-pet-owner-20260907-4/);
 assert.match(sw,/home-pet-garden\.js/);
 assert.match(sw,/cleaning-pet\.css/);
 
-console.log("Compact floating pet and member pet UI regression tests passed.");
+console.log("Pet ownership isolation and compact pet UI regression tests passed.");
