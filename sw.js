@@ -1,4 +1,4 @@
-const CACHE_NAME="p708-manager-v5-pet-compact-20260907-3";
+const CACHE_NAME="p708-manager-v5-pet-owner-20260907-4";
 const APP_SHELL=[
   "./",
   "./index.html",
