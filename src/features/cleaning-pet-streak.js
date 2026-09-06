@@ -2,8 +2,7 @@
   const S=globalThis.P708CleaningStreak;
   if(!S||typeof renderCleaning!=="function")return;
 
-  const POSITION_KEY_PREFIX="p708_floating_pet_position_v3";
-  let selectedMemberId=null;
+  const POSITION_KEY_PREFIX="p708_floating_pet_position_v4";
   let suppressClickUntil=0;
   let reactionIndex=0;
   let bubbleTimer=0;
@@ -12,7 +11,7 @@
     if(document.querySelector('link[data-cleaning-pet="1"]'))return;
     const link=document.createElement("link");
     link.rel="stylesheet";
-    link.href="./cleaning-pet.css?v=20260907-3";
+    link.href="./cleaning-pet.css?v=20260907-4";
     link.dataset.cleaningPet="1";
     document.head.appendChild(link);
   }
@@ -26,10 +25,14 @@
     return S.memberStreak({schedules:state.schedules,member,now:Date.now()});
   }
 
+  function ownMemberId(){
+    return typeof myMemberId==="function"?myMemberId():null;
+  }
+
   function currentMember(){
-    const mine=typeof myMemberId==="function"?myMemberId():null;
-    if(!selectedMemberId||!state.members.some(m=>m.id===selectedMemberId))selectedMemberId=mine||state.members[0]?.id||null;
-    return state.members.find(m=>m.id===selectedMemberId)||null;
+    const mine=ownMemberId();
+    if(!mine)return null;
+    return state.members.find(m=>m.id===mine)||null;
   }
 
   function petFace(stage,memberName,size="float"){
@@ -48,16 +51,16 @@
     host=document.createElement("aside");
     host.id="floatingPetHost";
     host.className="floating-pet-host dock-right";
-    host.setAttribute("aria-label","Mini pet streak trực nhật");
+    host.setAttribute("aria-label","Mini pet streak trực nhật của tôi");
     host.innerHTML=`
-      <button class="pet-float-orb" id="petFloatOrb" type="button" aria-label="Mini pet">
+      <button class="pet-float-orb" id="petFloatOrb" type="button" aria-label="Mini pet của tôi">
         <span class="pet-float-visual" id="petFloatVisual"></span>
         <span class="pet-float-fire" id="petFloatFire">🔥0</span>
         <span class="pet-hearts" id="petFloatHearts" aria-hidden="true"></span>
         <span class="pet-sparkles" aria-hidden="true"><i></i><i></i><i></i></span>
       </button>
       <div class="pet-mini-bubble" id="petMiniBubble" aria-live="polite">
-        <b id="petMiniOwner">Pet P708</b><span id="petMiniStatus">🔥 0 streak</span>
+        <b id="petMiniOwner">Pet của tôi</b><span id="petMiniStatus">🔥 0 streak</span>
       </div>`;
     document.body.appendChild(host);
     bindWidgetEvents(host);
@@ -214,10 +217,12 @@
   }
 
   function selectMember(memberId,{react=true}={}){
-    if(!state.members.some(m=>m.id===memberId))return;
-    selectedMemberId=memberId;
+    const mine=ownMemberId();
+    if(!mine||memberId!==mine)return false;
+    if(!state.members.some(m=>m.id===mine))return false;
     refreshWidget();
     if(react)setTimeout(animatePet,0);
+    return true;
   }
 
   const baseRenderCleaning=renderCleaning;
@@ -231,9 +236,10 @@
   globalThis.P708PetWidget={
     refresh:refreshWidget,
     selectMember,
-    open:()=>{showBubble();animatePet();},
+    canCallMember:memberId=>!!ownMemberId()&&memberId===ownMemberId(),
+    open:()=>{if(currentMember()){showBubble();animatePet();}},
     close:()=>document.querySelector("#petMiniBubble")?.classList.remove("show"),
-    touch:animatePet,
+    touch:()=>{if(currentMember())animatePet();},
     renderFace:petFace
   };
   ensureStyles();
