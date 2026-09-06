@@ -67,6 +67,9 @@ jobs:
       - name: Cleaning mini pet streak regression tests
         run: node .github/cleaning-streak.test.mjs
 
+      - name: Floating pet and home garden UI regression tests
+        run: node .github/pet-widget-ui.test.mjs
+
       - name: Validate optional Cloud Functions dependencies
         run: npm install --prefix functions --ignore-scripts --no-audit --no-fund
 
