@@ -30,7 +30,8 @@ assert.match(garden,/homePetGarden/);
 assert.match(garden,/Pet của thành viên/);
 assert.match(garden,/data-garden-member/);
 assert.match(garden,/data-garden-locked/);
-assert.match(garden,/Pet riêng/);
+assert.doesNotMatch(garden,/garden-pet-lock/);
+assert.doesNotMatch(garden,/🔒 Pet riêng/);
 assert.match(garden,/P708PetWidget\?\.selectMember/);
 assert.match(garden,/const tag=isMine\?"button":"div"/);
 assert.doesNotMatch(garden,/pet-garden-summary/);
@@ -47,9 +48,9 @@ assert.match(css,/@keyframes pet-blink/);
 assert.match(css,/width:52px;height:52px/);
 assert.doesNotMatch(css,/\.pet-float-card\{/);
 
-assert.match(loader,/home-pet-garden\.js\?v=20260907-4/);
-assert.match(loader,/cleaning-pet-streak\.js\?v=20260907-4/);
-assert.match(sw,/p708-manager-v5-pet-owner-20260907-4/);
+assert.match(loader,/home-pet-garden\.js\?v=20260907-5/);
+assert.match(loader,/cleaning-pet-streak\.js\?v=20260907-5/);
+assert.match(sw,/p708-manager-v5-pet-owner-20260907-5/);
 assert.match(sw,/home-pet-garden\.js/);
 assert.match(sw,/cleaning-pet\.css/);
 
