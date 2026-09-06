@@ -64,6 +64,9 @@ jobs:
       - name: Cleaning long-absence fairness regression tests
         run: node .github/cleaning-fairness.test.mjs
 
+      - name: Cleaning mini pet streak regression tests
+        run: node .github/cleaning-streak.test.mjs
+
       - name: Validate optional Cloud Functions dependencies
         run: npm install --prefix functions --ignore-scripts --no-audit --no-fund
 
