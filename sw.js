@@ -1,4 +1,4 @@
-const CACHE_NAME="p708-manager-v5-cleaning-fairness-20260906-1";
+const CACHE_NAME="p708-manager-v5-pet-streak-20260907-1";
 const APP_SHELL=[
   "./",
   "./index.html",
@@ -8,6 +8,7 @@ const APP_SHELL=[
   "./mobile-notification-ui.css",
   "./kpi-polish.css",
   "./billing-cycle.css",
+  "./cleaning-pet.css",
   "./app.js",
   "./src/boot/app-loader.js",
   "./src/boot/app-start.js",
@@ -19,6 +20,7 @@ const APP_SHELL=[
   "./src/core/p708-canonical-mapping-repair.js",
   "./src/core/billing-cycle-period.js",
   "./src/core/cleaning-fairness.js",
+  "./src/core/cleaning-streak.js",
   "./src/core/cleaning-schedule-store.js",
   "./src/features/app-actions1.js",
   "./src/features/cleaning-fairness-upgrade.js",
@@ -26,6 +28,7 @@ const APP_SHELL=[
   "./src/features/cleaning-delete-fix.js",
   "./src/features/app-dashboard.js",
   "./src/features/app-render.js",
+  "./src/features/cleaning-pet-streak.js",
   "./src/features/app-integrity-fixes.js",
   "./src/features/inactive-mapping-dedup-fix.js",
   "./src/features/canonical-identity-repair.js",
