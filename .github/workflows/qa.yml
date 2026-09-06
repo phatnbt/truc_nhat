@@ -61,6 +61,9 @@ jobs:
       - name: Cleaning week deletion resurrection regression tests
         run: node .github/cleaning-delete-tombstone.test.mjs
 
+      - name: Cleaning long-absence fairness regression tests
+        run: node .github/cleaning-fairness.test.mjs
+
       - name: Validate optional Cloud Functions dependencies
         run: npm install --prefix functions --ignore-scripts --no-audit --no-fund
 
