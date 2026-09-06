@@ -2,33 +2,34 @@
   const S=globalThis.P708CleaningStreak;
   if(!S||typeof renderCleaning!=="function")return;
 
+  const POSITION_KEY_PREFIX="p708_floating_pet_position_v2";
   let selectedMemberId=null;
-  const baseRenderCleaning=renderCleaning;
+  let suppressClickUntil=0;
 
   function ensureStyles(){
     if(document.querySelector('link[data-cleaning-pet="1"]'))return;
     const link=document.createElement("link");
     link.rel="stylesheet";
-    link.href="./cleaning-pet.css?v=20260907-1";
+    link.href="./cleaning-pet.css?v=20260907-2";
     link.dataset.cleaningPet="1";
     document.head.appendChild(link);
+  }
+
+  function storageKey(){
+    const uid=authSession?.user?.uid||"local";
+    return `${POSITION_KEY_PREFIX}:${uid}`;
   }
 
   function statsFor(member){
     return S.memberStreak({schedules:state.schedules,member,now:Date.now()});
   }
 
-  function ensurePanel(){
-    const host=$("#cleanMemberList")?.parentElement;
-    if(!host)return null;
-    let panel=$("#cleaningPetPanel");
-    if(panel)return panel;
-    panel=document.createElement("section");
-    panel.id="cleaningPetPanel";
-    panel.className="pet-streak-panel";
-    panel.setAttribute("aria-label","Mini pet streak trực nhật");
-    host.appendChild(panel);
-    return panel;
+  function currentMember(){
+    const mine=typeof myMemberId==="function"?myMemberId():null;
+    if(!selectedMemberId||!state.members.some(m=>m.id===selectedMemberId)){
+      selectedMemberId=mine||state.members[0]?.id||null;
+    }
+    return state.members.find(m=>m.id===selectedMemberId)||null;
   }
 
   function petFace(stage,memberName,large=false){
@@ -41,74 +42,197 @@
     </div>`;
   }
 
-  function selectedMember(){
-    const mine=myMemberId?.();
-    if(!selectedMemberId||!state.members.some(m=>m.id===selectedMemberId))selectedMemberId=mine||state.members[0]?.id||null;
-    return state.members.find(m=>m.id===selectedMemberId)||null;
+  function ensureWidget(){
+    let host=document.querySelector("#floatingPetHost");
+    if(host)return host;
+    host=document.createElement("aside");
+    host.id="floatingPetHost";
+    host.className="floating-pet-host dock-right";
+    host.setAttribute("aria-label","Mini pet streak trực nhật");
+    host.innerHTML=`
+      <div class="pet-float-orb" id="petFloatOrb" role="button" tabindex="0" aria-label="Mở Mini Pet">
+        <div id="petFloatVisual"></div>
+        <span class="pet-float-fire" id="petFloatFire">🔥 0</span>
+        <span class="pet-drag-hint" aria-hidden="true">⋮⋮</span>
+        <div class="pet-hearts" id="petFloatHearts" aria-hidden="true"></div>
+      </div>
+      <section class="pet-float-card" id="petFloatCard" aria-hidden="true">
+        <div class="pet-float-card-head">
+          <div><span>STREAK PET</span><b id="petFloatOwner">Pet P708</b></div>
+          <button class="pet-icon-button" id="petFloatClose" type="button" aria-label="Đóng">×</button>
+        </div>
+        <div class="pet-float-card-body">
+          <div class="pet-popup-scene" id="petPopupScene"></div>
+          <div class="pet-popup-copy">
+            <h4 id="petFloatStage">Trứng</h4>
+            <p id="petFloatStatus">Chưa có dữ liệu</p>
+            <div class="pet-progress"><span id="petFloatProgress"></span></div>
+            <small id="petFloatNext">Còn 1 tuần để tiến hóa</small>
+          </div>
+        </div>
+        <div class="pet-popup-stats">
+          <span><b id="petFloatCurrent">0</b> streak</span>
+          <span><b id="petFloatBest">0</b> cao nhất</span>
+          <span><b id="petFloatGood">0</b> tuần tốt</span>
+        </div>
+        <div class="pet-popup-actions">
+          <button class="btn small soft" id="petFloatTouch" type="button">💗 Vuốt bé</button>
+          <button class="btn small primary" id="petFloatGarden" type="button">🌿 Vườn pet</button>
+        </div>
+      </section>`;
+    document.body.appendChild(host);
+    bindWidgetEvents(host);
+    restorePosition(host);
+    return host;
   }
 
-  function renderPanel(){
-    ensureStyles();
-    const panel=ensurePanel();
-    if(!panel)return;
-    const members=state.members||[];
-    if(!members.length){
-      panel.innerHTML='<div class="pet-empty">🥚 Thêm thành viên để bắt đầu nuôi pet streak.</div>';
-      return;
+  function viewportBounds(host,x,y){
+    const rect=host.getBoundingClientRect();
+    const width=rect.width||76,height=76,margin=10;
+    const reservedBottom=Math.max(88,Number.parseInt(getComputedStyle(document.documentElement).getPropertyValue("--pet-safe-bottom"))||88);
+    const maxX=Math.max(margin,window.innerWidth-width-margin);
+    const maxY=Math.max(margin,window.innerHeight-height-reservedBottom-margin);
+    return {
+      x:Math.max(margin,Math.min(maxX,x)),
+      y:Math.max(margin,Math.min(maxY,y)),
+      maxX,maxY
+    };
+  }
+
+  function applyPosition(host,x,y,{save=false,snap=false}={}){
+    const bounded=viewportBounds(host,x,y);
+    let nextX=bounded.x;
+    if(snap)nextX=bounded.x<window.innerWidth/2?10:bounded.maxX;
+    host.style.left=`${nextX}px`;
+    host.style.top=`${bounded.y}px`;
+    host.style.right="auto";
+    host.style.bottom="auto";
+    const rightSide=nextX>=window.innerWidth/2;
+    host.classList.toggle("dock-right",rightSide);
+    host.classList.toggle("dock-left",!rightSide);
+    host.classList.toggle("dock-top",bounded.y<300);
+    if(save){
+      try{localStorage.setItem(storageKey(),JSON.stringify({x:nextX,y:bounded.y}));}catch{}
     }
+  }
 
-    const member=selectedMember();
-    const stats=statsFor(member);
-    const stage=S.petStage(stats.current);
-    const progress=S.petProgress(stats.current);
-    const nextText=stage.next==null?"Đã đạt cấp cao nhất":`Còn ${Math.max(0,stage.next-stats.current)} tuần để pet tiến hóa`;
-    const garden=members.map(m=>{
-      const st=statsFor(m),sg=S.petStage(st.current),mine=m.id===myMemberId?.();
-      return `<button class="pet-member ${m.id===member.id?"active":""}" data-pet-member="${m.id}" type="button" aria-pressed="${m.id===member.id}">
-        <span class="pet-member-avatar">${sg.emoji}</span>
-        <span><b>${esc(m.name)}${mine?" · Bạn":""}</b><small>🔥 ${st.current} tuần · ${esc(sg.name)}</small></span>
-      </button>`;
-    }).join("");
+  function restorePosition(host){
+    let saved=null;
+    try{saved=JSON.parse(localStorage.getItem(storageKey())||"null");}catch{}
+    requestAnimationFrame(()=>{
+      if(saved&&Number.isFinite(saved.x)&&Number.isFinite(saved.y)){
+        applyPosition(host,saved.x,saved.y);
+      }else{
+        const rect=host.getBoundingClientRect();
+        applyPosition(host,window.innerWidth-(rect.width||76)-16,window.innerHeight-190);
+      }
+    });
+  }
 
-    panel.innerHTML=`
-      <div class="pet-panel-head"><div><p class="pet-eyebrow">STREAK PET</p><h3>Nuôi bé bằng tuần trực tốt</h3></div><span class="pet-fire">🔥 ${stats.current}</span></div>
-      <div class="pet-hero-card">
-        <div class="pet-scene">${petFace(stage,member.name,true)}<div class="pet-hearts" id="petHearts" aria-hidden="true"></div></div>
-        <div class="pet-copy">
-          <span class="pet-owner">Pet của ${esc(member.name)}</span>
-          <h4>${esc(stage.name)}</h4>
-          <p>${esc(S.streakStatusLabel(stats.status))}</p>
-          <div class="pet-progress"><span style="width:${progress}%"></span></div>
-          <small>${esc(nextText)}</small>
-          <div class="pet-stats"><span><b>${stats.current}</b> streak</span><span><b>${stats.best}</b> cao nhất</span><span><b>${stats.completedWeeks}</b> tuần tốt</span></div>
-          <button class="btn small soft pet-touch-button" id="petTouchButton" type="button">💗 Vuốt bé</button>
-        </div>
-      </div>
-      <div class="pet-rule-note"><b>Luật streak:</b> hoàn thành toàn bộ việc được giao trong tuần = +1. Tuần vắng hoặc không được giao việc sẽ đóng băng, không làm mất streak. Tuần đã kết thúc mà còn việc chưa xong mới làm streak về 0.</div>
-      <div class="pet-garden-title"><b>Vườn pet P708</b><small>Chạm một thành viên để xem pet</small></div>
-      <div class="pet-garden">${garden}</div>`;
-
-    panel.querySelectorAll('[data-pet-member]').forEach(btn=>btn.addEventListener("click",()=>{
-      selectedMemberId=btn.dataset.petMember;
-      renderPanel();
-    }));
-    panel.querySelector("#petTouchButton")?.addEventListener("click",animatePet);
-    panel.querySelector('[data-pet-touch]')?.addEventListener("click",animatePet);
+  function setOpen(open){
+    const host=document.querySelector("#floatingPetHost"),card=document.querySelector("#petFloatCard");
+    if(!host||!card)return;
+    host.classList.toggle("pet-open",!!open);
+    card.setAttribute("aria-hidden",open?"false":"true");
   }
 
   function animatePet(){
-    const pet=$("#cleaningPetPanel")?.querySelector(".p708-pet");
-    const hearts=$("#petHearts");
+    const pet=document.querySelector("#petFloatVisual .p708-pet");
+    const hearts=document.querySelector("#petFloatHearts");
     if(!pet||!hearts)return;
     pet.classList.remove("pet-bounce");
     void pet.offsetWidth;
     pet.classList.add("pet-bounce");
-    hearts.innerHTML='<i>💗</i><i>✨</i><i>💖</i>';
+    hearts.innerHTML="<i>💗</i><i>✨</i><i>💖</i>";
     setTimeout(()=>{hearts.innerHTML="";pet.classList.remove("pet-bounce");},900);
   }
 
+  function openGarden(){
+    if(typeof showPage==="function")showPage("home");
+    setOpen(false);
+    setTimeout(()=>document.querySelector("#homePetGarden")?.scrollIntoView({behavior:"smooth",block:"center"}),120);
+  }
+
+  function bindWidgetEvents(host){
+    const orb=host.querySelector("#petFloatOrb");
+    const close=host.querySelector("#petFloatClose");
+    const touch=host.querySelector("#petFloatTouch");
+    const garden=host.querySelector("#petFloatGarden");
+    let drag=null;
+
+    orb.addEventListener("pointerdown",event=>{
+      if(event.button!==undefined&&event.button!==0)return;
+      const rect=host.getBoundingClientRect();
+      drag={pointerId:event.pointerId,startX:event.clientX,startY:event.clientY,offsetX:event.clientX-rect.left,offsetY:event.clientY-rect.top,moved:false};
+      orb.setPointerCapture?.(event.pointerId);
+      host.classList.add("pet-dragging");
+    });
+    orb.addEventListener("pointermove",event=>{
+      if(!drag||event.pointerId!==drag.pointerId)return;
+      const distance=Math.hypot(event.clientX-drag.startX,event.clientY-drag.startY);
+      if(distance>5)drag.moved=true;
+      if(!drag.moved)return;
+      event.preventDefault();
+      applyPosition(host,event.clientX-drag.offsetX,event.clientY-drag.offsetY);
+    });
+    const finishDrag=event=>{
+      if(!drag||event.pointerId!==drag.pointerId)return;
+      const moved=drag.moved;
+      drag=null;
+      host.classList.remove("pet-dragging");
+      const rect=host.getBoundingClientRect();
+      if(moved){
+        applyPosition(host,rect.left,rect.top,{save:true,snap:true});
+        suppressClickUntil=Date.now()+350;
+      }
+    };
+    orb.addEventListener("pointerup",finishDrag);
+    orb.addEventListener("pointercancel",finishDrag);
+    orb.addEventListener("click",()=>{
+      if(Date.now()<suppressClickUntil)return;
+      animatePet();
+      setOpen(!host.classList.contains("pet-open"));
+    });
+    orb.addEventListener("keydown",event=>{
+      if(event.key!=="Enter"&&event.key!==" ")return;
+      event.preventDefault();animatePet();setOpen(!host.classList.contains("pet-open"));
+    });
+    close?.addEventListener("click",()=>setOpen(false));
+    touch?.addEventListener("click",animatePet);
+    garden?.addEventListener("click",openGarden);
+    window.addEventListener("resize",()=>{
+      const rect=host.getBoundingClientRect();
+      applyPosition(host,rect.left,rect.top,{save:true});
+    },{passive:true});
+  }
+
+  function refreshWidget(){
+    ensureStyles();
+    document.querySelector("#cleaningPetPanel")?.remove();
+    const host=ensureWidget();
+    const member=currentMember();
+    const active=authSession?.status==="active"&&member;
+    host.classList.toggle("pet-hidden",!active);
+    if(!active)return;
+
+    const stats=statsFor(member),stage=S.petStage(stats.current),progress=S.petProgress(stats.current);
+    const nextText=stage.next==null?"Đã đạt cấp cao nhất":`Còn ${Math.max(0,stage.next-stats.current)} tuần để pet tiến hóa`;
+    host.querySelector("#petFloatVisual").innerHTML=petFace(stage,member.name,false);
+    host.querySelector("#petPopupScene").innerHTML=petFace(stage,member.name,true);
+    host.querySelector("#petFloatFire").textContent=`🔥 ${stats.current}`;
+    host.querySelector("#petFloatOwner").textContent=`Pet của ${member.name}`;
+    host.querySelector("#petFloatStage").textContent=stage.name;
+    host.querySelector("#petFloatStatus").textContent=S.streakStatusLabel(stats.status);
+    host.querySelector("#petFloatProgress").style.width=`${progress}%`;
+    host.querySelector("#petFloatNext").textContent=nextText;
+    host.querySelector("#petFloatCurrent").textContent=stats.current;
+    host.querySelector("#petFloatBest").textContent=stats.best;
+    host.querySelector("#petFloatGood").textContent=stats.completedWeeks;
+    host.querySelector("#petFloatOrb").setAttribute("aria-label",`Pet của ${member.name}, streak ${stats.current} tuần. Chạm để mở, kéo để di chuyển.`);
+  }
+
   function decorateMemberRows(){
-    const rows=$("#cleanMemberList")?.querySelectorAll(".member-row")||[];
+    const rows=document.querySelector("#cleanMemberList")?.querySelectorAll(".member-row")||[];
     rows.forEach((row,index)=>{
       const member=state.members[index];if(!member)return;
       const stats=statsFor(member),stage=S.petStage(stats.current);
@@ -123,11 +247,25 @@
     });
   }
 
+  function selectMember(memberId,{open=false}={}){
+    if(!state.members.some(m=>m.id===memberId))return;
+    selectedMemberId=memberId;
+    refreshWidget();
+    if(open)setOpen(true);
+  }
+
+  const baseRenderCleaning=renderCleaning;
   renderCleaning=function(){
     baseRenderCleaning();
     decorateMemberRows();
-    renderPanel();
+    refreshWidget();
   };
 
+  if(typeof renderHome==="function"){
+    const baseRenderHomePet=renderHome;
+    renderHome=function(){baseRenderHomePet();refreshWidget();};
+  }
+
+  globalThis.P708PetWidget={refresh:refreshWidget,selectMember,open:()=>setOpen(true),close:()=>setOpen(false),touch:animatePet};
   ensureStyles();
 })();
