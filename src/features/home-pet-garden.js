@@ -37,16 +37,19 @@
     const mine=typeof myMemberId==="function"?myMemberId():null;
     section.innerHTML=`
       <div class="pet-garden-heading-simple">
-        <div><p class="eyebrow">P708 PETS</p><h2>Pet của thành viên</h2><p>Chạm vào pet để gọi bé ra màn hình.</p></div>
+        <div><p class="eyebrow">P708 PETS</p><h2>Pet của thành viên</h2><p>Bạn chỉ có thể gọi và tương tác với pet của chính mình.</p></div>
       </div>
       <div class="pet-garden-grid">
         ${members.map((member,index)=>{
           const stats=statsFor(member),stage=S.petStage(stats.current),isMine=member.id===mine;
-          return `<button class="pet-garden-card ${isMine?"mine":""}" type="button" data-garden-member="${member.id}" style="--pet-delay:${(index%8)*-.18}s" aria-label="Pet của ${esc(member.name)}, streak ${stats.current} tuần">
+          const tag=isMine?"button":"div";
+          const attrs=isMine?`type="button" data-garden-member="${member.id}"`:`data-garden-locked="${member.id}" aria-disabled="true"`;
+          return `<${tag} class="pet-garden-card ${isMine?"mine":"pet-locked"}" ${attrs} style="--pet-delay:${(index%8)*-.18}s" aria-label="Pet của ${esc(member.name)}, streak ${stats.current} tuần${isMine?", pet của bạn":", chỉ chủ sở hữu mới có thể gọi"}">
             <span class="garden-mini-pet">${petMarkup(stage,member,index)}</span>
             <span class="garden-owner-name">${esc(member.name)}</span>
             <span class="garden-streak-line">${isMine?'<i class="mine-dot"></i>':""}<span>${esc(stage.name)} · 🔥 ${stats.current}</span></span>
-          </button>`;
+            ${isMine?'':`<span class="garden-pet-lock">🔒 Pet riêng</span>`}
+          </${tag}>`;
         }).join("")}
       </div>`;
 
