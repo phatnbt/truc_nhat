@@ -48,7 +48,6 @@
             <span class="garden-mini-pet">${petMarkup(stage,member,index)}</span>
             <span class="garden-owner-name">${esc(member.name)}</span>
             <span class="garden-streak-line">${isMine?'<i class="mine-dot"></i>':""}<span>${esc(stage.name)} · 🔥 ${stats.current}</span></span>
-            ${isMine?'':`<span class="garden-pet-lock">🔒 Pet riêng</span>`}
           </${tag}>`;
         }).join("")}
       </div>`;
