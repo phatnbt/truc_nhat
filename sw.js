@@ -1,4 +1,4 @@
-const CACHE_NAME="p708-manager-v5-pet-streak-20260907-1";
+const CACHE_NAME="p708-manager-v5-pet-garden-20260907-2";
 const APP_SHELL=[
   "./",
   "./index.html",
@@ -37,6 +37,7 @@ const APP_SHELL=[
   "./src/features/billing-membership-exclusion.js",
   "./src/features/billing-cycle-history.js",
   "./src/features/home-enhancements.js",
+  "./src/features/home-pet-garden.js",
   "./src/features/notification-enhancements.js",
   "./src/features/today-calendar.js",
   "./src/features/mobile-install-bridge.js",
