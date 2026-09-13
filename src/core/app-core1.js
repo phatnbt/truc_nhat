@@ -6,15 +6,8 @@ const TASKS = [
   {id:"tham",name:"Giặt thảm",emoji:"🧺",w:2},
   {id:"rac",name:"Vứt rác, bình nước",emoji:"🗑️",w:2}
 ];
-const FIREBASE_CONFIG = {
-  apiKey:"[REDACTED_FIREBASE_WEB_API_KEY]",
-  authDomain:"p708-room-manager.firebaseapp.com",
-  projectId:"p708-room-manager",
-  storageBucket:"p708-room-manager.firebasestorage.app",
-  messagingSenderId:"1073859440549",
-  appId:"1:1073859440549:web:21879794f23e4d2ecc824c",
-  measurementId:"G-PEW1YC01GY"
-};
+const FIREBASE_CONFIG = Object.freeze({...globalThis.P708_FIREBASE_CONFIG});
+try{delete globalThis.P708_FIREBASE_CONFIG;}catch{globalThis.P708_FIREBASE_CONFIG=undefined;}
 const ROOM_CODE = "P708";
 const CACHE_KEY = "P708_MANAGER_STATE_V5";
 const UI_KEY = "P708_MANAGER_UI_V5";
