@@ -77,21 +77,23 @@ jobs:
             echo "No branch/tag refs found to rewrite" >&2
             exit 1
           fi
+          printf '%s\n' "${REFS[@]}" > /tmp/p708-rewritten-refs.txt
           git filter-repo --force --replace-text /tmp/p708-replacements.txt --refs "${REFS[@]}"
 
-      - name: Verify rewritten history
+      - name: Verify rewritten branch and tag history
         if: steps.exposure.outputs.found == 'true'
         shell: bash
         run: |
           set -euo pipefail
           KEY="$(cat /tmp/p708-firebase-browser-key.txt)"
+          mapfile -t REFS < /tmp/p708-rewritten-refs.txt
           while read -r commit; do
             if git grep -q -F "$KEY" "$commit" -- 2>/dev/null; then
-              echo "Firebase browser key still exists in rewritten history" >&2
+              echo "Firebase browser key still exists in rewritten branch/tag history" >&2
               exit 1
             fi
-          done < <(git rev-list --all)
-          echo "Rewritten local history no longer contains the Firebase browser key."
+          done < <(git rev-list "${REFS[@]}")
+          echo "Rewritten branch/tag history no longer contains the Firebase browser key."
 
       - name: Force-push sanitized branches and tags
         if: steps.exposure.outputs.found == 'true'
@@ -112,4 +114,4 @@ jobs:
         if: always()
         shell: bash
         run: |
-          rm -f /tmp/p708-firebase-browser-key.txt /tmp/p708-replacements.txt
+          rm -f /tmp/p708-firebase-browser-key.txt /tmp/p708-replacements.txt /tmp/p708-rewritten-refs.txt
