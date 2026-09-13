@@ -49,6 +49,14 @@ jobs:
         with:
           node-version: "22"
 
+      - name: Scan repository for exposed credentials
+        if: steps.credentials.outputs.available == 'true'
+        run: node .github/security-scan.test.mjs
+
+      - name: Validate before deploy
+        if: steps.credentials.outputs.available == 'true'
+        run: node .github/validate.mjs
+
       - name: Authenticate to Google Cloud
         if: steps.credentials.outputs.available == 'true'
         uses: google-github-actions/auth@v3
@@ -58,14 +66,6 @@ jobs:
       - name: Install Firebase CLI
         if: steps.credentials.outputs.available == 'true'
         run: npm install --global firebase-tools
-
-      - name: Scan repository for exposed credentials
-        if: steps.credentials.outputs.available == 'true'
-        run: node .github/security-scan.test.mjs
-
-      - name: Validate before deploy
-        if: steps.credentials.outputs.available == 'true'
-        run: node .github/validate.mjs
 
       - name: Deploy Hosting and Firestore Rules
         if: steps.credentials.outputs.available == 'true'
