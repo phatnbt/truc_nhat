@@ -48,10 +48,12 @@ assert.match(css,/@keyframes pet-blink/);
 assert.match(css,/width:52px;height:52px/);
 assert.doesNotMatch(css,/\.pet-float-card\{/);
 
-assert.match(loader,/home-pet-garden\.js\?v=20260907-5/);
-assert.match(loader,/cleaning-pet-streak\.js\?v=20260907-5/);
-assert.match(sw,/p708-manager-v5-pet-owner-20260907-5/);
+// Runtime version may advance for unrelated UI/security fixes. Verify the features
+// are still part of the boot graph and PWA shell instead of pinning an old version.
+assert.match(loader,/home-pet-garden\.js\?v=\d{8}-\d+/);
+assert.match(loader,/cleaning-pet-streak\.js\?v=\d{8}-\d+/);
 assert.match(sw,/home-pet-garden\.js/);
+assert.match(sw,/cleaning-pet-streak\.js/);
 assert.match(sw,/cleaning-pet\.css/);
 
 console.log("Pet ownership isolation and compact pet UI regression tests passed.");
