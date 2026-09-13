@@ -1,0 +1,92 @@
+name: Firebase API Key Hardening
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/firebase-api-key-hardening.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: p708-firebase-api-key-hardening
+  cancel-in-progress: false
+
+jobs:
+  restrict-browser-key:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Check Firebase credentials
+        id: credentials
+        shell: bash
+        env:
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_P708_ROOM_MANAGER }}
+        run: |
+          if [ -z "$FIREBASE_SERVICE_ACCOUNT" ]; then
+            echo "available=false" >> "$GITHUB_OUTPUT"
+            echo "Missing FIREBASE_SERVICE_ACCOUNT_P708_ROOM_MANAGER" >&2
+            exit 1
+          fi
+          echo "available=true" >> "$GITHUB_OUTPUT"
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v3
+        with:
+          credentials_json: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_P708_ROOM_MANAGER }}
+
+      - name: Setup gcloud
+        uses: google-github-actions/setup-gcloud@v3
+        with:
+          project_id: p708-room-manager
+
+      - name: Discover active Firebase browser key
+        id: firebase-key
+        shell: bash
+        run: |
+          set -euo pipefail
+          CONFIG="$(curl --fail --silent --show-error --retry 3 https://p708-room-manager.web.app/__/firebase/init.json)"
+          KEY="$(printf '%s' "$CONFIG" | jq -r '.apiKey // empty')"
+          if [ -z "$KEY" ]; then
+            echo "Firebase Hosting runtime config did not return apiKey" >&2
+            exit 1
+          fi
+          echo "::add-mask::$KEY"
+          KEY_RESOURCE="$(gcloud services api-keys lookup "$KEY" --project=p708-room-manager --format='value(name)')"
+          if [ -z "$KEY_RESOURCE" ]; then
+            echo "Could not resolve Firebase browser API key resource" >&2
+            exit 1
+          fi
+          echo "resource=$KEY_RESOURCE" >> "$GITHUB_OUTPUT"
+
+      - name: Restrict browser key to approved web origins
+        shell: bash
+        env:
+          KEY_RESOURCE: ${{ steps.firebase-key.outputs.resource }}
+        run: |
+          set -euo pipefail
+          gcloud services api-keys update "$KEY_RESOURCE" \
+            --project=p708-room-manager \
+            --append \
+            --allowed-referrers="https://p708-room-manager.web.app/*,https://p708-room-manager.firebaseapp.com/*,https://phatnbt.github.io/*" \
+            --quiet
+
+      - name: Verify restrictions
+        shell: bash
+        env:
+          KEY_RESOURCE: ${{ steps.firebase-key.outputs.resource }}
+        run: |
+          set -euo pipefail
+          gcloud services api-keys describe "$KEY_RESOURCE" --project=p708-room-manager --format=json > /tmp/key.json
+          jq -e '
+            .restrictions.browserKeyRestrictions.allowedReferrers as $r
+            | ($r | index("https://p708-room-manager.web.app/*")) != null
+            and ($r | index("https://p708-room-manager.firebaseapp.com/*")) != null
+            and ($r | index("https://phatnbt.github.io/*")) != null
+          ' /tmp/key.json >/dev/null
+          echo "Firebase browser API key application restrictions verified."
