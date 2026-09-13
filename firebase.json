@@ -17,7 +17,6 @@
       ".env.*",
       "*.local",
       "firebase-config.local.js",
-      "firebase-config.runtime.json",
       "service-account*.json",
       "*-firebase-adminsdk-*.json",
       "credentials*.json",
@@ -36,6 +35,14 @@
           {"key": "X-Frame-Options", "value": "DENY"},
           {"key": "Content-Security-Policy", "value": "frame-ancestors 'none'; object-src 'none'; base-uri 'self'"},
           {"key": "Permissions-Policy", "value": "camera=(), microphone=(), geolocation=()"}
+        ]
+      },
+      {
+        "source": "/firebase-config.runtime.json",
+        "headers": [
+          {"key": "Access-Control-Allow-Origin", "value": "https://phatnbt.github.io"},
+          {"key": "Vary", "value": "Origin"},
+          {"key": "Cache-Control", "value": "no-store, max-age=0"}
         ]
       },
       {
