@@ -11,6 +11,20 @@
 - Quản trị tài khoản có nút **Xóa hoàn toàn**: xóa quyền, memberData, access request, task submissions, audit log của tài khoản và xóa luôn Firebase Authentication của dự án.
 - Code giao diện được tách thành `index.html`, `styles.css`, `app.js`, `p708-secure-sync-engine.js`.
 
+## Firebase web config và API key
+
+Không hardcode Firebase web config trong source GitHub. `src/boot/app-loader.js` lấy config runtime từ Firebase Hosting reserved endpoint `/__/firebase/init.json` rồi mới khởi tạo Firebase SDK. `sw.js` bỏ qua namespace `/__/` để Service Worker không cache hoặc thay đổi reserved Firebase responses.
+
+Firebase Web API key là cấu hình client, không phải service-account secret. Người dùng vẫn có thể nhìn thấy config từ DevTools/network khi ứng dụng chạy; vì vậy không được dùng API key làm cơ chế phân quyền. Lớp bảo mật thực tế của P708 gồm:
+
+- Firebase Authentication để xác định UID.
+- Firestore Security Rules để giới hạn dữ liệu và thao tác theo role/memberId.
+- GitHub Actions Secret cho Firebase service account; credential này không nằm trong repository.
+- Repository secret scan chạy ở CI để chặn key/token/private key bị commit nhầm.
+- Nên bật API-key application restrictions và Firebase App Check trong Firebase/Google Cloud Console khi đưa app ra sử dụng rộng hơn.
+
+Do Firebase web config từng tồn tại trong lịch sử Git, nếu muốn loại bỏ dấu vết cũ hoàn toàn thì cần rotate/restrict API key cũ và/hoặc rewrite Git history. Xóa chuỗi khỏi branch hiện tại không xóa được commit lịch sử.
+
 ## Lưu ý quan trọng về “xóa email hoàn toàn”
 
 Nút **Xóa hoàn toàn** xóa tài khoản người khác khỏi Firebase Authentication của project P708 và xóa các document tài khoản chứa email/UID trong Firestore. Tên lịch sử trong lịch trực/hóa đơn vẫn được giữ để không làm sai dữ liệu sổ cũ. Không thể dùng nút này để xóa tài khoản trưởng phòng chính hoặc tài khoản đang đăng nhập.
@@ -58,7 +72,7 @@ cd functions && npm install && cd ..
 firebase deploy --only hosting,firestore:rules,functions
 ```
 
-Hosting hiện dùng thư mục root (`"public": "."`) và đã ignore `functions/**`, rules, README và các file cấu hình. Việc này sửa lỗi cấu hình cũ trỏ vào thư mục `public/` trong khi repo không có thư mục đó.
+Hosting hiện dùng thư mục root (`"public": "."`) và ignore `functions/**`, rules, README và các file cấu hình. Việc này sửa lỗi cấu hình cũ trỏ vào thư mục `public/` trong khi repo không có thư mục đó.
 
 ## Kiểm tra trước khi chia link
 
