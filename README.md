@@ -33,6 +33,16 @@
 - Mọi thay đổi vào `main` phải qua workflow `P708 Production QA`.
 - Firebase Hosting và Firestore Rules được deploy tự động khi workflow production chạy thành công.
 
+## Bảo mật cấu hình Firebase
+
+Firebase web config không còn được hardcode trong source GitHub. Khi chạy production trên Firebase Hosting, `src/boot/app-loader.js` lấy cấu hình runtime từ reserved endpoint `/__/firebase/init.json` rồi mới khởi tạo Firebase SDK. Service worker không chặn hoặc cache namespace `/__/`.
+
+`P708 Production QA` chạy thêm `security-scan.test.mjs` để chặn commit có dấu hiệu chứa Google/Firebase API key, private key/service-account, GitHub token, OpenAI-style key, Slack token hoặc AWS access key.
+
+Các credential thật như Firebase service account chỉ được dùng qua GitHub Actions Secrets. File `.env`, service-account JSON và config local đã được đưa vào `.gitignore`.
+
+> Lưu ý: Firebase Web API key bản chất là cấu hình phía client và có thể quan sát từ trình duyệt/network khi ứng dụng chạy. Bảo mật dữ liệu phải dựa vào Firebase Authentication, Firestore Security Rules, App Check và API-key restrictions — không dựa vào việc giấu chuỗi API key.
+
 ## Tài liệu
 
 - [Firebase Free Edition](docs/README_FREE_EDITION.md)
