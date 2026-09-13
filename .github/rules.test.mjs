@@ -18,15 +18,17 @@ const env=await initializeTestEnvironment({projectId,firestore:{rules}});
 const roomPayload={
   members:{
     m1:{id:"m1",name:"Member One"},
-    m2:{id:"m2",name:"Member Two"}
+    m2:{id:"m2",name:"Member Two"},
+    m3:{id:"m3",name:"Legacy Member"}
   },
-  presence:{m1:true,m2:true},
+  presence:{m1:true,m2:true,m3:true},
   schedules:{
     [weekStart]:{
       id:"schedule-1",weekStart,
       assignments:[
         {taskId:"lavabo",task:"Lavabo - Toilet",personId:"m1",personName:"Member One",cut:false,completed:false},
-        {taskId:"san",task:"Sàn NVS - cống",personId:"m2",personName:"Member Two",cut:false,completed:false}
+        {taskId:"san",task:"Sàn NVS - cống",personId:"m2",personName:"Member Two",cut:false,completed:false},
+        {taskId:"quet",task:"Quét nhà",personId:"m3",personName:"Legacy Member",cut:false,completed:false}
       ]
     }
   },
@@ -42,14 +44,18 @@ await env.withSecurityRulesDisabled(async context=>{
   await setDoc(doc(db,`rooms/${roomId}/access/delegated`),{email:"delegated@example.com",displayName:"Delegated Admin",role:"admin",memberId:null,active:true});
   await setDoc(doc(db,`rooms/${roomId}/access/member1`),{email:"m1@example.com",displayName:"Member One",role:"member",memberId:"m1",active:true});
   await setDoc(doc(db,`rooms/${roomId}/access/member2`),{email:"m2@example.com",displayName:"Member Two",role:"member",memberId:"m2",active:true});
+  // Legacy access record intentionally has no displayName. Production had older records like this.
+  await setDoc(doc(db,`rooms/${roomId}/access/legacy`),{email:"legacy@example.com",role:"member",memberId:"m3",active:true});
   await setDoc(doc(db,`rooms/${roomId}/memberData/member1`),{memberId:"m1",presence:true,billingMonths:{},updatedBy:"member1",updatedAt:Timestamp.now()});
   await setDoc(doc(db,`rooms/${roomId}/memberData/member2`),{memberId:"m2",presence:true,billingMonths:{},updatedBy:"member2",updatedAt:Timestamp.now()});
+  await setDoc(doc(db,`rooms/${roomId}/memberData/legacy`),{memberId:"m3",presence:true,billingMonths:{},updatedBy:"legacy",updatedAt:Timestamp.now()});
   await setDoc(doc(db,`rooms/${roomId}/taskSubmissions/other-task`),{roomCode:roomId,actorUid:"member2",actorName:"Member Two",memberId:"m2",scheduleId:"schedule-1",weekStart,taskId:"san",taskName:"Sàn NVS - cống",status:"submitted",submittedAt:Timestamp.now(),updatedAt:Timestamp.now()});
 });
 
 const admin=env.authenticatedContext("admin",{email:"admin@example.com",name:"Primary Admin"}).firestore();
 const delegated=env.authenticatedContext("delegated",{email:"delegated@example.com",name:"Delegated Admin"}).firestore();
 const member1=env.authenticatedContext("member1",{email:"m1@example.com",name:"Member One"}).firestore();
+const legacy=env.authenticatedContext("legacy",{email:"legacy@example.com",name:"Legacy Member"}).firestore();
 const outsider=env.authenticatedContext("outsider",{email:"outsider@example.com",name:"Outsider"}).firestore();
 const anon=env.unauthenticatedContext().firestore();
 
@@ -60,11 +66,7 @@ try{
 
   await assertFails(updateDoc(doc(member1,`rooms/${roomId}`),{revision:2}));
   await assertSucceeds(updateDoc(doc(delegated,`rooms/${roomId}`),{
-    revision:2,
-    payload:roomPayload,
-    lastAdminUid:"delegated",
-    lastDeviceId:"rules-test",
-    updatedAt:serverTimestamp()
+    revision:2,payload:roomPayload,lastAdminUid:"delegated",lastDeviceId:"rules-test",updatedAt:serverTimestamp()
   }));
 
   await assertSucceeds(getDoc(doc(member1,`rooms/${roomId}/memberData/member1`)));
@@ -93,6 +95,17 @@ try{
     roomCode:roomId,actorUid:"member1",actorName:"Admin giả",memberId:"m1",scheduleId:"schedule-1",
     weekStart,taskId:"lavabo",taskName:"Lavabo - Toilet",status:"submitted",
     submittedAt:serverTimestamp(),updatedAt:serverTimestamp()
+  }));
+
+  // Critical regression: member can submit their own assigned task even when the old access doc has no displayName.
+  await assertSucceeds(setDoc(doc(legacy,`rooms/${roomId}/taskSubmissions/legacy-quet`),{
+    roomCode:roomId,actorUid:"legacy",actorName:"Legacy Member",memberId:"m3",scheduleId:"schedule-1",
+    weekStart,taskId:"quet",taskName:"Quét nhà",status:"submitted",
+    submittedAt:serverTimestamp(),updatedAt:serverTimestamp()
+  }));
+  await assertSucceeds(setDoc(doc(legacy,`rooms/${roomId}/auditLogs/legacy-submit-log`),{
+    roomCode:roomId,actorUid:"legacy",actorName:"Legacy Member",actorEmail:"legacy@example.com",role:"member",
+    action:"SUBMIT_TASK",summary:"Báo hoàn thành: Quét nhà",targetMemberId:"m3",deviceId:"test",createdAt:serverTimestamp()
   }));
 
   await assertSucceeds(getDoc(doc(member1,`rooms/${roomId}/taskSubmissions/member1-lavabo`)));
