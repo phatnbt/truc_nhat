@@ -1,0 +1,32 @@
+# Local environment / credentials
+.env
+.env.*
+!.env.example
+*.local
+firebase-config.local.js
+firebase-config.runtime.json
+service-account*.json
+*-firebase-adminsdk-*.json
+credentials*.json
+secrets*.json
+.runtimeconfig.json
+
+# Firebase / local tooling
+.firebase/
+.firebaserc
+firebase-debug.log
+firestore-debug.log
+ui-debug.log
+
+# Dependencies / build output
+node_modules/
+functions/node_modules/
+dist/
+build/
+coverage/
+
+# OS / editors
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
