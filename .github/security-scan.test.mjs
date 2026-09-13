@@ -47,12 +47,18 @@ const appCore=fs.readFileSync(path.join(root,"src/core/app-core1.js"),"utf8");
 const loader=fs.readFileSync(path.join(root,"src/boot/app-loader.js"),"utf8");
 const sw=fs.readFileSync(path.join(root,"sw.js"),"utf8");
 const deploy=fs.readFileSync(path.join(root,".github/workflows/firebase-deploy.yml"),"utf8");
+const hosting=JSON.parse(fs.readFileSync(path.join(root,"firebase.json"),"utf8"));
 
 if(/apiKey\s*:\s*["'][^"']+["']/.test(appCore))findings.push("Firebase apiKey vẫn bị hardcode trong src/core/app-core1.js");
 if(!loader.includes('/__/firebase/init.json'))findings.push("app-loader chưa dùng Firebase Hosting runtime config endpoint");
 if(!sw.includes('url.pathname.startsWith("/__/"'))findings.push("service worker chưa bỏ qua Firebase reserved /__/ namespace");
 if(!deploy.includes('secrets.FIREBASE_SERVICE_ACCOUNT_P708_ROOM_MANAGER'))findings.push("Firebase deploy workflow không dùng GitHub Secret cho service account");
 if(/credentials_json:\s*['"]?\{/.test(deploy))findings.push("Service-account JSON có dấu hiệu bị inline trong workflow");
+
+const hostingIgnore=new Set(hosting.hosting?.ignore||[]);
+for(const pattern of [".git/**",".github/**",".env",".env.*","service-account*.json","*-firebase-adminsdk-*.json","credentials*.json","secrets*.json","functions/**","**/node_modules/**"]){
+  if(!hostingIgnore.has(pattern))findings.push(`Firebase Hosting chưa ignore credential path: ${pattern}`);
+}
 
 if(findings.length){
   for(const finding of [...new Set(findings)])console.error(`SECRET-SCAN FAIL: ${finding}`);
