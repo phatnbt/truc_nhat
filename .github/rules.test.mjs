@@ -6,7 +6,7 @@ import {
 } from "@firebase/rules-unit-testing";
 import {
   doc, collection, query, where, getDoc, getDocs, setDoc, updateDoc, deleteDoc,
-  serverTimestamp, Timestamp
+  runTransaction, serverTimestamp, Timestamp
 } from "firebase/firestore";
 
 const projectId="demo-p708-production-audit";
@@ -28,7 +28,8 @@ const roomPayload={
       assignments:[
         {taskId:"lavabo",task:"Lavabo - Toilet",personId:"m1",personName:"Member One",cut:false,completed:false},
         {taskId:"san",task:"Sàn NVS - cống",personId:"m2",personName:"Member Two",cut:false,completed:false},
-        {taskId:"quet",task:"Quét nhà",personId:"m3",personName:"Legacy Member",cut:false,completed:false}
+        {taskId:"quet",task:"Quét nhà",personId:"m3",personName:"Legacy Member",cut:false,completed:false},
+        {taskId:"lau",task:"Lau nhà",personId:"m1",personName:"Member One",cut:false,completed:false}
       ]
     }
   },
@@ -49,7 +50,7 @@ await env.withSecurityRulesDisabled(async context=>{
   await setDoc(doc(db,`rooms/${roomId}/memberData/member1`),{memberId:"m1",presence:true,billingMonths:{},updatedBy:"member1",updatedAt:Timestamp.now()});
   await setDoc(doc(db,`rooms/${roomId}/memberData/member2`),{memberId:"m2",presence:true,billingMonths:{},updatedBy:"member2",updatedAt:Timestamp.now()});
   await setDoc(doc(db,`rooms/${roomId}/memberData/legacy`),{memberId:"m3",presence:true,billingMonths:{},updatedBy:"legacy",updatedAt:Timestamp.now()});
-  await setDoc(doc(db,`rooms/${roomId}/taskSubmissions/other-task`),{roomCode:roomId,actorUid:"member2",actorName:"Member Two",memberId:"m2",scheduleId:"schedule-1",weekStart,taskId:"san",taskName:"Sàn NVS - cống",status:"submitted",submittedAt:Timestamp.now(),updatedAt:Timestamp.now()});
+  await setDoc(doc(db,`rooms/${roomId}/taskSubmissions/${weekStart}__san__m2`),{roomCode:roomId,actorUid:"member2",actorName:"Member Two",memberId:"m2",scheduleId:"schedule-1",weekStart,taskId:"san",taskName:"Sàn NVS - cống",status:"submitted",submittedAt:Timestamp.now(),updatedAt:Timestamp.now()});
 });
 
 const admin=env.authenticatedContext("admin",{email:"admin@example.com",name:"Primary Admin"}).firestore();
@@ -81,24 +82,38 @@ try{
     memberId:"m2",presence:false,billingMonths:{},updatedBy:"member1",updatedAt:serverTimestamp()
   }));
 
-  await assertSucceeds(setDoc(doc(member1,`rooms/${roomId}/taskSubmissions/member1-lavabo`),{
-    roomCode:roomId,actorUid:"member1",actorName:"Member One",memberId:"m1",scheduleId:"schedule-1",
-    weekStart,taskId:"lavabo",taskName:"Lavabo - Toilet",status:"submitted",
-    submittedAt:serverTimestamp(),updatedAt:serverTimestamp()
+  // Exact app flow: submitTask() performs a transaction and reads the deterministic
+  // task document before creating it. Missing-doc reads must be permitted, while
+  // existing submissions from another account stay private.
+  const ownTaskRef=doc(member1,`rooms/${roomId}/taskSubmissions/${weekStart}__lavabo__m1`);
+  await assertSucceeds(runTransaction(member1,async tx=>{
+    const old=await tx.get(ownTaskRef);
+    if(old.exists())throw new Error("Expected a new task submission");
+    tx.set(ownTaskRef,{
+      roomCode:roomId,actorUid:"member1",actorName:"Member One",memberId:"m1",scheduleId:"schedule-1",
+      weekStart,taskId:"lavabo",taskName:"Lavabo - Toilet",status:"submitted",
+      submittedAt:serverTimestamp(),updatedAt:serverTimestamp()
+    });
   }));
-  await assertFails(setDoc(doc(member1,`rooms/${roomId}/taskSubmissions/member1-san`),{
+
+  await assertFails(setDoc(doc(member1,`rooms/${roomId}/taskSubmissions/${weekStart}__san__m1`),{
     roomCode:roomId,actorUid:"member1",actorName:"Member One",memberId:"m1",scheduleId:"schedule-1",
     weekStart,taskId:"san",taskName:"Sàn NVS - cống",status:"submitted",
     submittedAt:serverTimestamp(),updatedAt:serverTimestamp()
   }));
-  await assertFails(setDoc(doc(member1,`rooms/${roomId}/taskSubmissions/member1-forged-name`),{
+  await assertFails(setDoc(doc(member1,`rooms/${roomId}/taskSubmissions/arbitrary-duplicate`),{
+    roomCode:roomId,actorUid:"member1",actorName:"Member One",memberId:"m1",scheduleId:"schedule-1",
+    weekStart,taskId:"lau",taskName:"Lau nhà",status:"submitted",
+    submittedAt:serverTimestamp(),updatedAt:serverTimestamp()
+  }));
+  await assertFails(setDoc(doc(member1,`rooms/${roomId}/taskSubmissions/${weekStart}__lau__m1`),{
     roomCode:roomId,actorUid:"member1",actorName:"Admin giả",memberId:"m1",scheduleId:"schedule-1",
-    weekStart,taskId:"lavabo",taskName:"Lavabo - Toilet",status:"submitted",
+    weekStart,taskId:"lau",taskName:"Lau nhà",status:"submitted",
     submittedAt:serverTimestamp(),updatedAt:serverTimestamp()
   }));
 
-  // Critical regression: member can submit their own assigned task even when the old access doc has no displayName.
-  await assertSucceeds(setDoc(doc(legacy,`rooms/${roomId}/taskSubmissions/legacy-quet`),{
+  // Legacy account can still complete its own assignment using the Google token name.
+  await assertSucceeds(setDoc(doc(legacy,`rooms/${roomId}/taskSubmissions/${weekStart}__quet__m3`),{
     roomCode:roomId,actorUid:"legacy",actorName:"Legacy Member",memberId:"m3",scheduleId:"schedule-1",
     weekStart,taskId:"quet",taskName:"Quét nhà",status:"submitted",
     submittedAt:serverTimestamp(),updatedAt:serverTimestamp()
@@ -108,8 +123,8 @@ try{
     action:"SUBMIT_TASK",summary:"Báo hoàn thành: Quét nhà",targetMemberId:"m3",deviceId:"test",createdAt:serverTimestamp()
   }));
 
-  await assertSucceeds(getDoc(doc(member1,`rooms/${roomId}/taskSubmissions/member1-lavabo`)));
-  await assertFails(getDoc(doc(member1,`rooms/${roomId}/taskSubmissions/other-task`)));
+  await assertSucceeds(getDoc(ownTaskRef));
+  await assertFails(getDoc(doc(member1,`rooms/${roomId}/taskSubmissions/${weekStart}__san__m2`)));
   await assertSucceeds(getDocs(query(collection(member1,`rooms/${roomId}/taskSubmissions`),where("actorUid","==","member1"))));
   await assertFails(getDocs(collection(member1,`rooms/${roomId}/taskSubmissions`)));
 
