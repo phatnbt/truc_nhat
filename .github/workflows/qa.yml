@@ -28,6 +28,9 @@ jobs:
           cache: npm
           cache-dependency-path: functions/package.json
 
+      - name: Repository secret exposure scan
+        run: node .github/security-scan.test.mjs
+
       - name: Static project validation
         run: node .github/validate.mjs
 
