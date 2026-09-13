@@ -45,12 +45,6 @@ jobs:
         with:
           project_id: p708-room-manager
 
-      - name: Enable API Keys API
-        shell: bash
-        run: |
-          set -euo pipefail
-          gcloud services enable apikeys.googleapis.com --project=p708-room-manager --quiet
-
       - name: Discover active Firebase browser key
         id: firebase-key
         shell: bash
