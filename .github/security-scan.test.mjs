@@ -1,24 +1,14 @@
 import fs from "node:fs";
 import path from "node:path";
+import {execFileSync} from "node:child_process";
 
 const root=process.cwd();
-const ignoredDirs=new Set([".git","node_modules","dist","build","coverage",".firebase"]);
 const textExt=/\.(?:js|mjs|cjs|ts|html|css|json|yml|yaml|md|rules|webmanifest|txt)$/i;
 const explicitFiles=new Set([".gitignore",".firebaserc.example"]);
 const findings=[];
 
-function walk(dir){
-  const entries=fs.readdirSync(dir,{withFileTypes:true});
-  for(const entry of entries){
-    if(entry.isDirectory()&&ignoredDirs.has(entry.name))continue;
-    const full=path.join(dir,entry.name);
-    if(entry.isDirectory())walk(full);
-    else{
-      const relative=path.relative(root,full).replaceAll("\\","/");
-      if(textExt.test(entry.name)||explicitFiles.has(relative))scan(relative,full);
-    }
-  }
-}
+const tracked=execFileSync("git",["ls-files","-z"],{cwd:root,encoding:"utf8"})
+  .split("\0").filter(Boolean);
 
 const patterns=[
   ["Google/Firebase API key",/AIza[0-9A-Za-z_-]{30,}/g],
@@ -30,7 +20,10 @@ const patterns=[
   ["AWS access key",/AKIA[0-9A-Z]{16}/g]
 ];
 
-function scan(relative,full){
+function scan(relative){
+  if(!textExt.test(relative)&&!explicitFiles.has(relative))return;
+  const full=path.join(root,relative);
+  if(!fs.existsSync(full))return;
   const source=fs.readFileSync(full,"utf8");
   for(const [label,pattern] of patterns){
     pattern.lastIndex=0;
@@ -41,13 +34,14 @@ function scan(relative,full){
   }
 }
 
-walk(root);
+tracked.forEach(scan);
 
 const appCore=fs.readFileSync(path.join(root,"src/core/app-core1.js"),"utf8");
 const loader=fs.readFileSync(path.join(root,"src/boot/app-loader.js"),"utf8");
 const sw=fs.readFileSync(path.join(root,"sw.js"),"utf8");
 const deploy=fs.readFileSync(path.join(root,".github/workflows/firebase-deploy.yml"),"utf8");
 const hosting=JSON.parse(fs.readFileSync(path.join(root,"firebase.json"),"utf8"));
+const gitignore=fs.readFileSync(path.join(root,".gitignore"),"utf8");
 
 if(/apiKey\s*:\s*["'][^"']+["']/.test(appCore))findings.push("Firebase apiKey vẫn bị hardcode trong src/core/app-core1.js");
 if(!loader.includes('/__/firebase/init.json'))findings.push("app-loader chưa dùng Firebase Hosting runtime config endpoint");
@@ -55,13 +49,17 @@ if(!sw.includes('url.pathname.startsWith("/__/"'))findings.push("service worker 
 if(!deploy.includes('secrets.FIREBASE_SERVICE_ACCOUNT_P708_ROOM_MANAGER'))findings.push("Firebase deploy workflow không dùng GitHub Secret cho service account");
 if(/credentials_json:\s*['"]?\{/.test(deploy))findings.push("Service-account JSON có dấu hiệu bị inline trong workflow");
 
+const requiredIgnores=[".git/**",".github/**",".env",".env.*","service-account*.json","*-firebase-adminsdk-*.json","credentials*.json","secrets*.json","gha-creds-*.json","functions/**","**/node_modules/**"];
 const hostingIgnore=new Set(hosting.hosting?.ignore||[]);
-for(const pattern of [".git/**",".github/**",".env",".env.*","service-account*.json","*-firebase-adminsdk-*.json","credentials*.json","secrets*.json","functions/**","**/node_modules/**"]){
+for(const pattern of requiredIgnores){
   if(!hostingIgnore.has(pattern))findings.push(`Firebase Hosting chưa ignore credential path: ${pattern}`);
+}
+for(const pattern of [".env",".env.*","service-account*.json","*-firebase-adminsdk-*.json","credentials*.json","secrets*.json","gha-creds-*.json"]){
+  if(!gitignore.split(/\r?\n/).includes(pattern))findings.push(`.gitignore chưa chặn credential path: ${pattern}`);
 }
 
 if(findings.length){
   for(const finding of [...new Set(findings)])console.error(`SECRET-SCAN FAIL: ${finding}`);
   process.exit(1);
 }
-console.log("Repository secret exposure scan PASSED: no hardcoded API/private credentials detected in current tree.");
+console.log(`Repository secret exposure scan PASSED: ${tracked.length} tracked files checked; no hardcoded API/private credentials detected.`);
