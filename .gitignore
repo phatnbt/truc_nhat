@@ -9,6 +9,7 @@ service-account*.json
 *-firebase-adminsdk-*.json
 credentials*.json
 secrets*.json
+gha-creds-*.json
 .runtimeconfig.json
 
 # Firebase / local tooling
