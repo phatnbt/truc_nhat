@@ -1,0 +1,115 @@
+name: Security History Scrub
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/security-history-scrub.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: p708-security-history-scrub
+  cancel-in-progress: false
+
+jobs:
+  scrub-firebase-browser-key:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout complete history
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: true
+
+      - name: Resolve current Firebase browser key without logging it
+        id: key
+        shell: bash
+        run: |
+          set -euo pipefail
+          CONFIG="$(curl --fail --silent --show-error --retry 3 https://p708-room-manager.web.app/__/firebase/init.json)"
+          KEY="$(printf '%s' "$CONFIG" | jq -r '.apiKey // empty')"
+          if [ -z "$KEY" ]; then
+            echo "Firebase Hosting runtime config did not return apiKey" >&2
+            exit 1
+          fi
+          echo "::add-mask::$KEY"
+          printf '%s' "$KEY" > /tmp/p708-firebase-browser-key.txt
+
+      - name: Check whether tracked Git history still contains the key
+        id: exposure
+        shell: bash
+        run: |
+          set -euo pipefail
+          KEY="$(cat /tmp/p708-firebase-browser-key.txt)"
+          FOUND=false
+          while read -r commit; do
+            if git grep -q -F "$KEY" "$commit" -- 2>/dev/null; then
+              FOUND=true
+              break
+            fi
+          done < <(git rev-list --all)
+          echo "found=$FOUND" >> "$GITHUB_OUTPUT"
+          if [ "$FOUND" = "true" ]; then
+            echo "Historical Firebase browser key occurrence detected; starting rewrite."
+          else
+            echo "No Firebase browser key occurrence remains in reachable Git history."
+          fi
+
+      - name: Install git-filter-repo
+        if: steps.exposure.outputs.found == 'true'
+        run: python -m pip install --disable-pip-version-check --no-input git-filter-repo
+
+      - name: Rewrite all branches and tags
+        if: steps.exposure.outputs.found == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          KEY="$(cat /tmp/p708-firebase-browser-key.txt)"
+          git checkout --detach
+          git fetch origin '+refs/heads/*:refs/heads/*' '+refs/tags/*:refs/tags/*' --prune --force
+          printf 'literal:%s==>[REDACTED_FIREBASE_WEB_API_KEY]\n' "$KEY" > /tmp/p708-replacements.txt
+          mapfile -t REFS < <(git for-each-ref --format='%(refname)' refs/heads refs/tags)
+          if [ "${#REFS[@]}" -eq 0 ]; then
+            echo "No branch/tag refs found to rewrite" >&2
+            exit 1
+          fi
+          git filter-repo --force --replace-text /tmp/p708-replacements.txt --refs "${REFS[@]}"
+
+      - name: Verify rewritten history
+        if: steps.exposure.outputs.found == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          KEY="$(cat /tmp/p708-firebase-browser-key.txt)"
+          while read -r commit; do
+            if git grep -q -F "$KEY" "$commit" -- 2>/dev/null; then
+              echo "Firebase browser key still exists in rewritten history" >&2
+              exit 1
+            fi
+          done < <(git rev-list --all)
+          echo "Rewritten local history no longer contains the Firebase browser key."
+
+      - name: Force-push sanitized branches and tags
+        if: steps.exposure.outputs.found == 'true'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          git remote remove origin 2>/dev/null || true
+          git remote add origin "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+          git push --force origin 'refs/heads/*:refs/heads/*'
+          if git show-ref --tags --quiet; then
+            git push --force origin 'refs/tags/*:refs/tags/*'
+          fi
+          echo "Sanitized history force-pushed. Existing local clones must re-clone or hard-reset."
+
+      - name: Cleanup sensitive temp files
+        if: always()
+        shell: bash
+        run: |
+          rm -f /tmp/p708-firebase-browser-key.txt /tmp/p708-replacements.txt
