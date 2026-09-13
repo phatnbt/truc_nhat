@@ -22,6 +22,7 @@
       "*-firebase-adminsdk-*.json",
       "credentials*.json",
       "secrets*.json",
+      "gha-creds-*.json",
       ".runtimeconfig.json",
       "functions/**",
       "**/node_modules/**"
