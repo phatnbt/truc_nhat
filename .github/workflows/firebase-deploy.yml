@@ -67,9 +67,46 @@ jobs:
         if: steps.credentials.outputs.available == 'true'
         run: npm install --global firebase-tools
 
+      - name: Generate runtime Firebase config
+        if: steps.credentials.outputs.available == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl --fail --silent --show-error --location \
+            "https://p708-room-manager.web.app/__/firebase/init.json" \
+            -o firebase-config.runtime.json
+          node - <<'NODE'
+          const fs=require('fs');
+          const config=JSON.parse(fs.readFileSync('firebase-config.runtime.json','utf8'));
+          if(!config.apiKey || !config.authDomain || config.projectId!=='p708-room-manager' || !config.appId){
+            throw new Error('Generated Firebase runtime config is invalid.');
+          }
+          NODE
+
       - name: Deploy Hosting and Firestore Rules
         if: steps.credentials.outputs.available == 'true'
         run: firebase deploy --only hosting,firestore:rules --project p708-room-manager --non-interactive
+
+      - name: Verify public runtime config endpoint
+        if: steps.credentials.outputs.available == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl --fail --silent --show-error --location \
+            -H "Origin: https://phatnbt.github.io" \
+            "https://p708-room-manager.web.app/firebase-config.runtime.json" \
+            -o /tmp/p708-runtime-config.json
+          node - <<'NODE'
+          const fs=require('fs');
+          const config=JSON.parse(fs.readFileSync('/tmp/p708-runtime-config.json','utf8'));
+          if(!config.apiKey || config.projectId!=='p708-room-manager' || !config.appId){
+            throw new Error('Deployed Firebase runtime config is invalid.');
+          }
+          NODE
+          curl --fail --silent --show-error --head \
+            -H "Origin: https://phatnbt.github.io" \
+            "https://p708-room-manager.web.app/firebase-config.runtime.json" \
+            | grep -qi '^access-control-allow-origin: https://phatnbt.github.io'
 
       - name: Deployment summary
         if: always()
