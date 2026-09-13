@@ -1,0 +1,61 @@
+import fs from "node:fs";
+import path from "node:path";
+
+const root=process.cwd();
+const ignoredDirs=new Set([".git","node_modules","dist","build","coverage",".firebase"]);
+const textExt=/\.(?:js|mjs|cjs|ts|html|css|json|yml|yaml|md|rules|webmanifest|txt)$/i;
+const explicitFiles=new Set([".gitignore",".firebaserc.example"]);
+const findings=[];
+
+function walk(dir){
+  const entries=fs.readdirSync(dir,{withFileTypes:true});
+  for(const entry of entries){
+    if(entry.isDirectory()&&ignoredDirs.has(entry.name))continue;
+    const full=path.join(dir,entry.name);
+    if(entry.isDirectory())walk(full);
+    else{
+      const relative=path.relative(root,full).replaceAll("\\","/");
+      if(textExt.test(entry.name)||explicitFiles.has(relative))scan(relative,full);
+    }
+  }
+}
+
+const patterns=[
+  ["Google/Firebase API key",/AIza[0-9A-Za-z_-]{30,}/g],
+  ["private key",/-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----/g],
+  ["service-account private_key",/"private_key"\s*:\s*"-----BEGIN/g],
+  ["GitHub token",/(?:gh[pousr]_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,})/g],
+  ["OpenAI-style secret",/sk-[A-Za-z0-9_-]{24,}/g],
+  ["Slack token",/xox[baprs]-[A-Za-z0-9-]{20,}/g],
+  ["AWS access key",/AKIA[0-9A-Z]{16}/g]
+];
+
+function scan(relative,full){
+  const source=fs.readFileSync(full,"utf8");
+  for(const [label,pattern] of patterns){
+    pattern.lastIndex=0;
+    if(pattern.test(source))findings.push(`${label}: ${relative}`);
+  }
+  if(/(?:client_secret|private_key_id)\s*["']?\s*[:=]\s*["'][^"'\n]{12,}["']/i.test(source)){
+    findings.push(`Credential field with literal value: ${relative}`);
+  }
+}
+
+walk(root);
+
+const appCore=fs.readFileSync(path.join(root,"src/core/app-core1.js"),"utf8");
+const loader=fs.readFileSync(path.join(root,"src/boot/app-loader.js"),"utf8");
+const sw=fs.readFileSync(path.join(root,"sw.js"),"utf8");
+const deploy=fs.readFileSync(path.join(root,".github/workflows/firebase-deploy.yml"),"utf8");
+
+if(/apiKey\s*:\s*["'][^"']+["']/.test(appCore))findings.push("Firebase apiKey vẫn bị hardcode trong src/core/app-core1.js");
+if(!loader.includes('/__/firebase/init.json'))findings.push("app-loader chưa dùng Firebase Hosting runtime config endpoint");
+if(!sw.includes('url.pathname.startsWith("/__/"'))findings.push("service worker chưa bỏ qua Firebase reserved /__/ namespace");
+if(!deploy.includes('secrets.FIREBASE_SERVICE_ACCOUNT_P708_ROOM_MANAGER'))findings.push("Firebase deploy workflow không dùng GitHub Secret cho service account");
+if(/credentials_json:\s*['"]?\{/.test(deploy))findings.push("Service-account JSON có dấu hiệu bị inline trong workflow");
+
+if(findings.length){
+  for(const finding of [...new Set(findings)])console.error(`SECRET-SCAN FAIL: ${finding}`);
+  process.exit(1);
+}
+console.log("Repository secret exposure scan PASSED: no hardcoded API/private credentials detected in current tree.");
