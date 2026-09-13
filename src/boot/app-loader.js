@@ -1,11 +1,47 @@
-import { createP708SecureEngine } from "../core/p708-secure-sync-engine.js?v=20260907-7";
-import { createP708AuthoritativeRepair } from "../core/p708-authoritative-repair.js?v=20260907-7";
-import { createP708CanonicalMappingRepair } from "../core/p708-canonical-mapping-repair.js?v=20260907-7";
-import * as P708BillingCycle from "../core/billing-cycle-period.js?v=20260907-7";
-import * as P708CleaningFairness from "../core/cleaning-fairness.js?v=20260907-7";
-import * as P708CleaningStreak from "../core/cleaning-streak.js?v=20260907-7";
-import { deleteScheduleAuthoritatively, restoreScheduleWeek } from "../core/cleaning-schedule-store.js?v=20260907-7";
+import { createP708SecureEngine } from "../core/p708-secure-sync-engine.js?v=20260913-1";
+import { createP708AuthoritativeRepair } from "../core/p708-authoritative-repair.js?v=20260913-1";
+import { createP708CanonicalMappingRepair } from "../core/p708-canonical-mapping-repair.js?v=20260913-1";
+import * as P708BillingCycle from "../core/billing-cycle-period.js?v=20260913-1";
+import * as P708CleaningFairness from "../core/cleaning-fairness.js?v=20260913-1";
+import * as P708CleaningStreak from "../core/cleaning-streak.js?v=20260913-1";
+import { deleteScheduleAuthoritatively, restoreScheduleWeek } from "../core/cleaning-schedule-store.js?v=20260913-1";
 
+const FIREBASE_RUNTIME_ENDPOINT="/__/firebase/init.json";
+
+function validFirebaseConfig(config){
+  return !!config
+    && typeof config==="object"
+    && typeof config.apiKey==="string"
+    && config.apiKey.length>10
+    && typeof config.authDomain==="string"
+    && config.authDomain.length>3
+    && typeof config.projectId==="string"
+    && config.projectId.length>2
+    && typeof config.appId==="string"
+    && config.appId.length>5;
+}
+
+async function loadFirebaseRuntimeConfig(){
+  const override=globalThis.P708_FIREBASE_CONFIG_OVERRIDE;
+  if(validFirebaseConfig(override))return Object.freeze({...override});
+
+  let response;
+  try{
+    response=await fetch(FIREBASE_RUNTIME_ENDPOINT,{
+      cache:"no-store",
+      credentials:"same-origin",
+      headers:{Accept:"application/json"}
+    });
+  }catch(error){
+    throw new Error(`Không tải được cấu hình Firebase runtime: ${error?.message||"lỗi mạng"}`);
+  }
+  if(!response.ok)throw new Error(`Không tải được cấu hình Firebase runtime (${response.status}). Ứng dụng production phải chạy trên Firebase Hosting.`);
+  const config=await response.json();
+  if(!validFirebaseConfig(config))throw new Error("Cấu hình Firebase runtime không hợp lệ.");
+  return Object.freeze({...config});
+}
+
+globalThis.P708_FIREBASE_CONFIG=await loadFirebaseRuntimeConfig();
 globalThis.createP708SecureEngine = createP708SecureEngine;
 globalThis.createP708AuthoritativeRepair = createP708AuthoritativeRepair;
 globalThis.createP708CanonicalMappingRepair = createP708CanonicalMappingRepair;
@@ -16,29 +52,29 @@ globalThis.deleteScheduleAuthoritatively = deleteScheduleAuthoritatively;
 globalThis.restoreScheduleWeek = restoreScheduleWeek;
 
 const parts = [
-  "../core/app-core1.js?v=20260907-7",
-  "../core/app-core2.js?v=20260907-7",
-  "../features/app-actions1.js?v=20260907-7",
-  "../features/cleaning-fairness-upgrade.js?v=20260907-7",
-  "../features/app-actions2.js?v=20260907-7",
-  "../features/cleaning-delete-fix.js?v=20260907-7",
-  "../features/app-dashboard.js?v=20260907-7",
-  "../features/app-render.js?v=20260907-7",
-  "../features/cleaning-pet-streak.js?v=20260907-7",
-  "../features/app-integrity-fixes.js?v=20260907-7",
-  "../features/inactive-mapping-dedup-fix.js?v=20260907-7",
-  "../features/canonical-identity-repair.js?v=20260907-7",
-  "../features/billing-membership-exclusion.js?v=20260907-7",
-  "../features/billing-cycle-history.js?v=20260907-7",
-  "../features/billing-canonical-repair.js?v=20260907-7",
-  "../features/home-enhancements.js?v=20260907-7",
-  "../features/home-pet-garden.js?v=20260907-7",
-  "../features/ui-icon-polish.js?v=20260907-7",
-  "./app-start.js?v=20260907-7",
-  "../features/notification-enhancements.js?v=20260907-7",
-  "../features/today-calendar.js?v=20260907-7",
-  "../features/mobile-install-bridge.js?v=20260907-7",
-  "../features/mobile-install-guide.js?v=20260907-7"
+  "../core/app-core1.js?v=20260913-1",
+  "../core/app-core2.js?v=20260913-1",
+  "../features/app-actions1.js?v=20260913-1",
+  "../features/cleaning-fairness-upgrade.js?v=20260913-1",
+  "../features/app-actions2.js?v=20260913-1",
+  "../features/cleaning-delete-fix.js?v=20260913-1",
+  "../features/app-dashboard.js?v=20260913-1",
+  "../features/app-render.js?v=20260913-1",
+  "../features/cleaning-pet-streak.js?v=20260913-1",
+  "../features/app-integrity-fixes.js?v=20260913-1",
+  "../features/inactive-mapping-dedup-fix.js?v=20260913-1",
+  "../features/canonical-identity-repair.js?v=20260913-1",
+  "../features/billing-membership-exclusion.js?v=20260913-1",
+  "../features/billing-cycle-history.js?v=20260913-1",
+  "../features/billing-canonical-repair.js?v=20260913-1",
+  "../features/home-enhancements.js?v=20260913-1",
+  "../features/home-pet-garden.js?v=20260913-1",
+  "../features/ui-icon-polish.js?v=20260913-1",
+  "./app-start.js?v=20260913-1",
+  "../features/notification-enhancements.js?v=20260913-1",
+  "../features/today-calendar.js?v=20260913-1",
+  "../features/mobile-install-bridge.js?v=20260913-1",
+  "../features/mobile-install-guide.js?v=20260913-1"
 ];
 
 for (const src of parts) {
