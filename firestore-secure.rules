@@ -6,6 +6,7 @@ service cloud.firestore {
     function configPath(roomId) { return /databases/$(database)/documents/rooms/$(roomId)/security/config; }
     function roomPath(roomId) { return /databases/$(database)/documents/rooms/$(roomId); }
     function accessPath(roomId, uid) { return /databases/$(database)/documents/rooms/$(roomId)/access/$(uid); }
+    function taskSubmissionPath(roomId, submissionId) { return /databases/$(database)/documents/rooms/$(roomId)/taskSubmissions/$(submissionId); }
 
     function isPrimaryAdmin(roomId) {
       return signedIn()
@@ -206,8 +207,14 @@ service cloud.firestore {
       }
 
       match /taskSubmissions/{submissionId} {
-        allow read: if isAdmin(roomId) || (signedIn() && hasActiveAccess(roomId) && resource.data.actorUid == request.auth.uid);
+        // submitTask() first reads its deterministic document inside a transaction.
+        // A missing document contains no resource.data, so explicitly allow that
+        // existence check for active members while keeping existing submissions private.
+        allow read: if isAdmin(roomId)
+          || (signedIn() && hasActiveAccess(roomId)
+            && (!exists(taskSubmissionPath(roomId, submissionId)) || resource.data.actorUid == request.auth.uid));
         allow create: if signedIn() && hasActiveAccess(roomId) && validTaskIdentity(roomId)
+          && submissionId == request.resource.data.weekStart + '__' + request.resource.data.taskId + '__' + request.resource.data.memberId
           && request.resource.data.status == 'submitted'
           && request.resource.data.submittedAt == request.time
           && request.resource.data.updatedAt == request.time
