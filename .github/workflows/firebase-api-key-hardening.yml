@@ -72,7 +72,6 @@ jobs:
           set -euo pipefail
           gcloud services api-keys update "$KEY_RESOURCE" \
             --project=p708-room-manager \
-            --append \
             --allowed-referrers="https://p708-room-manager.web.app/*,https://p708-room-manager.firebaseapp.com/*,https://phatnbt.github.io/*" \
             --quiet
 
@@ -85,7 +84,8 @@ jobs:
           gcloud services api-keys describe "$KEY_RESOURCE" --project=p708-room-manager --format=json > /tmp/key.json
           jq -e '
             .restrictions.browserKeyRestrictions.allowedReferrers as $r
-            | ($r | index("https://p708-room-manager.web.app/*")) != null
+            | ($r | length) == 3
+            and ($r | index("https://p708-room-manager.web.app/*")) != null
             and ($r | index("https://p708-room-manager.firebaseapp.com/*")) != null
             and ($r | index("https://phatnbt.github.io/*")) != null
           ' /tmp/key.json >/dev/null
