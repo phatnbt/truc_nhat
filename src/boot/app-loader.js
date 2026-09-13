@@ -7,6 +7,7 @@ import * as P708CleaningStreak from "../core/cleaning-streak.js?v=20260913-1";
 import { deleteScheduleAuthoritatively, restoreScheduleWeek } from "../core/cleaning-schedule-store.js?v=20260913-1";
 
 const FIREBASE_RUNTIME_ENDPOINT="/__/firebase/init.json";
+const FIREBASE_RUNTIME_FALLBACK="https://p708-room-manager.web.app/firebase-config.runtime.json";
 
 function validFirebaseConfig(config){
   return !!config
@@ -21,24 +22,37 @@ function validFirebaseConfig(config){
     && config.appId.length>5;
 }
 
+async function fetchFirebaseConfig(url,{sameOrigin=false}={}){
+  const response=await fetch(url,{
+    cache:"no-store",
+    credentials:sameOrigin?"same-origin":"omit",
+    mode:sameOrigin?"same-origin":"cors",
+    headers:{Accept:"application/json"}
+  });
+  if(!response.ok)throw new Error(`${response.status}`);
+  const config=await response.json();
+  if(!validFirebaseConfig(config))throw new Error("invalid-config");
+  return Object.freeze({...config});
+}
+
 async function loadFirebaseRuntimeConfig(){
   const override=globalThis.P708_FIREBASE_CONFIG_OVERRIDE;
   if(validFirebaseConfig(override))return Object.freeze({...override});
 
-  let response;
+  const errors=[];
   try{
-    response=await fetch(FIREBASE_RUNTIME_ENDPOINT,{
-      cache:"no-store",
-      credentials:"same-origin",
-      headers:{Accept:"application/json"}
-    });
+    return await fetchFirebaseConfig(FIREBASE_RUNTIME_ENDPOINT,{sameOrigin:true});
   }catch(error){
-    throw new Error(`Không tải được cấu hình Firebase runtime: ${error?.message||"lỗi mạng"}`);
+    errors.push(`same-origin:${error?.message||"error"}`);
   }
-  if(!response.ok)throw new Error(`Không tải được cấu hình Firebase runtime (${response.status}). Ứng dụng production phải chạy trên Firebase Hosting.`);
-  const config=await response.json();
-  if(!validFirebaseConfig(config))throw new Error("Cấu hình Firebase runtime không hợp lệ.");
-  return Object.freeze({...config});
+
+  try{
+    return await fetchFirebaseConfig(FIREBASE_RUNTIME_FALLBACK);
+  }catch(error){
+    errors.push(`firebase-hosting:${error?.message||"error"}`);
+  }
+
+  throw new Error(`Không tải được cấu hình Firebase runtime (${errors.join(", ")}).`);
 }
 
 globalThis.P708_FIREBASE_CONFIG=await loadFirebaseRuntimeConfig();
