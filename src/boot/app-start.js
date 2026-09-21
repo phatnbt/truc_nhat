@@ -36,6 +36,8 @@ function scheduleReminderNotifications(force=false){
 }
 
 async function startCloud(){
+  let bootReady=false;
+  const signalBootReady=()=>{if(bootReady)return;bootReady=true;window.dispatchEvent(new Event("p708:boot-ready"));};
   let initialShape;
   try{initialShape=toSyncShape(state);}catch(e){
     state=normalizeState(state);initialShape=toSyncShape(state);
@@ -51,7 +53,7 @@ async function startCloud(){
       renderAll();
     },
     onStatus:status=>{syncStatus={mode:status.mode||"online",text:status.text||"Đã đồng bộ"};renderSync();},
-    onSession:session=>{authSession={...authSession,...session};renderAuthGate();renderAll();},
+    onSession:session=>{authSession={...authSession,...session};renderAuthGate();signalBootReady();renderAll();},
     onAdminData:data=>{
       if(data.requests!==undefined)accessRequests=data.requests;
       if(data.accesses!==undefined)accessAccounts=data.accesses;
@@ -63,7 +65,7 @@ async function startCloud(){
   try{await realtimeEngine.start();}
   catch(e){
     authSession={...authSession,status:"error"};syncStatus={mode:"offline",text:e?.message||"Không thể kết nối"};
-    renderAuthGate();renderSync();toast(e?.message||"Không thể khởi động ứng dụng",6000);
+    renderAuthGate();renderSync();toast(e?.message||"Không thể khởi động ứng dụng",6000);signalBootReady();
   }
 }
 
@@ -125,7 +127,7 @@ function bindStaticEvents(){
 async function registerPwa(){
   if(!("serviceWorker" in navigator)||location.protocol==="file:")return;
   try{
-    const reg=await navigator.serviceWorker.register("./sw.js?v=20260827-2",{scope:"./"});
+    const reg=await navigator.serviceWorker.register("./sw.js?v=20260921-8",{scope:"./"});
     setTimeout(()=>reg.update().catch(()=>{}),1500);
   }catch(e){console.warn("PWA",e);}
 }

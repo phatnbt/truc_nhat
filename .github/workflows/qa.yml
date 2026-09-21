@@ -34,6 +34,9 @@ jobs:
       - name: Static project validation
         run: node .github/validate.mjs
 
+      - name: Boot watchdog and stale-cache recovery tests
+        run: node .github/boot-recovery.test.mjs
+
       - name: Duplicate member and mapping regression tests
         run: node .github/dedup.test.mjs
 
