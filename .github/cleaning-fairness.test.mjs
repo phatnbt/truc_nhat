@@ -2,10 +2,11 @@ import assert from "node:assert/strict";
 import {
   absenceCreditForWeek,
   absenceCreditBreakdown,
-  historicalFairnessLoad
+  historicalFairnessLoad,
+  actualCleaningPoints
 } from "../src/core/cleaning-fairness.js";
 
-const weights={lavabo:5,san:5,lau:4,quet:3,tham:2,rac:2};
+const weights={lavabo:5,san:5,lau:4,quet:3,tham:2,rac:4};
 const members=["A","B","C","D","E"].map(id=>({id,name:id}));
 
 function week(weekStart,absentIds=[]){
@@ -13,6 +14,14 @@ function week(weekStart,absentIds=[]){
   const tasks=["lavabo","san","lau","quet","tham","rac"];
   const assignments=tasks.map((taskId,i)=>({taskId,personId:present[i%present.length]?.id||null,cut:false}));
   return {weekStart,assignments,absentMemberIds:absentIds,absentNames:absentIds};
+}
+
+// Visible cleaning points are actual assignments only and respect an admin reset.
+{
+  const schedules=[week("2026-09-01",[]),week("2026-09-08",[])];
+  assert.equal(actualCleaningPoints({schedules,memberId:"A",weights}),18);
+  assert.equal(actualCleaningPoints({schedules,memberId:"A",weights,afterWeek:"2026-09-01"}),9);
+  assert.equal(actualCleaningPoints({schedules,memberId:"B",weights,afterWeek:"2026-09-01"}),5);
 }
 
 // One isolated week of absence must NOT receive fairness credit.

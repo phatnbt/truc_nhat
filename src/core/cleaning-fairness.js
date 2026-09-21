@@ -29,6 +29,15 @@ export function assignedLoad(schedule,weights={}){
     .reduce((sum,a)=>sum+effectiveTaskWeight(a.taskId,weights,3),0);
 }
 
+export function actualCleaningPoints({schedules=[],memberId,beforeWeek="9999-99-99",afterWeek="",weights={}}={}){
+  if(!memberId)return 0;
+  return (schedules||[])
+    .filter(s=>s?.weekStart&&s.weekStart<beforeWeek&&(!afterWeek||s.weekStart>afterWeek))
+    .reduce((sum,s)=>sum+(s.assignments||[])
+      .filter(a=>a?.personId===memberId&&!a.cut)
+      .reduce((points,a)=>points+effectiveTaskWeight(a.taskId,weights,3),0),0);
+}
+
 export function activeAssigneeCount(schedule){
   return new Set((schedule?.assignments||[])
     .filter(a=>a&&!a.cut&&a.personId)

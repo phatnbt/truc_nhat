@@ -4,7 +4,7 @@ const TASKS = [
   {id:"quet",name:"Quét nhà",emoji:"🧹",w:3},
   {id:"lau",name:"Lau nhà",emoji:"🪣",w:4},
   {id:"tham",name:"Giặt thảm",emoji:"🧺",w:2},
-  {id:"rac",name:"Vứt rác, bình nước",emoji:"🗑️",w:2}
+  {id:"rac",name:"Vứt rác và chà tường",emoji:"🗑️",w:4}
 ];
 const FIREBASE_CONFIG = Object.freeze({...globalThis.P708_FIREBASE_CONFIG});
 try{delete globalThis.P708_FIREBASE_CONFIG;}catch{globalThis.P708_FIREBASE_CONFIG=undefined;}
@@ -41,7 +41,7 @@ function nextMonday(){ const d=new Date(); d.setHours(0,0,0,0); const day=d.getD
 function weekRange(v){ const s=parseDate(v); if(Number.isNaN(s.getTime()))return String(v||""); const e=addDays(s,6); const f=d=>new Intl.DateTimeFormat("vi-VN",{day:"2-digit",month:"2-digit",year:"numeric"}).format(d); return `${f(s)} – ${f(e)}`; }
 function timeMs(v){ const n=Date.parse(v||""); return Number.isFinite(n)?n:0; }
 function toast(message,duration=3000){ const el=$("#toast"); if(!el)return; el.textContent=message; el.classList.add("show"); clearTimeout(toast.timer); toast.timer=setTimeout(()=>el.classList.remove("show"),duration); }
-function defaultState(){ return {members:[],presence:{},schedules:[],billing:{selectedMonth:todayMonth(),months:[]},settings:{weights:Object.fromEntries(TASKS.map(t=>[t.id,t.w]))},updatedAt:""}; }
+function defaultState(){ return {members:[],presence:{},schedules:[],billing:{selectedMonth:todayMonth(),months:[]},settings:{weights:Object.fromEntries(TASKS.map(t=>[t.id,t.w])),cleaningPointsResetThrough:"",cleaningPointsResetAt:""},updatedAt:""}; }
 function defaultUi(){ return {selectedMonth:todayMonth(),selectedScheduleId:null,activeBillPersonId:null}; }
 
 function normalizeState(input){
@@ -51,6 +51,11 @@ function normalizeState(input){
   s.schedules=Array.isArray(s.schedules)?s.schedules:[];
   s.settings={...defaultState().settings,...(s.settings||{})};
   s.settings.weights={...defaultState().settings.weights,...(s.settings.weights||{})};
+  // The cleaning task catalog is authoritative; migrate the old 2-point
+  // "trash, water bottle" value on every client that still has cached state.
+  s.settings.weights.rac=4;
+  s.settings.cleaningPointsResetThrough=validDateKey(s.settings.cleaningPointsResetThrough)?s.settings.cleaningPointsResetThrough:"";
+  s.settings.cleaningPointsResetAt=String(s.settings.cleaningPointsResetAt||"");
   for(const task of TASKS){const value=Number(s.settings.weights[task.id]);s.settings.weights[task.id]=Number.isFinite(value)&&value>=0?value:task.w;}
   s.billing=s.billing&&typeof s.billing==="object"?s.billing:{selectedMonth:todayMonth(),months:[]};
   s.billing.selectedMonth=validMonthKey(s.billing.selectedMonth)?s.billing.selectedMonth:todayMonth();
@@ -75,7 +80,9 @@ function normalizeState(input){
     schedule.updatedAt||=schedule.createdAt||s.updatedAt||"";
     schedule.assignments=schedule.assignments.filter(a=>a&&typeof a==="object").map(a=>{
       a.completed=!!a.completed;a.cut=!!a.cut;
-      a.taskId=String(a.taskId||"");a.task=String(a.task||TASKS.find(t=>t.id===a.taskId)?.name||a.taskId).slice(0,120);
+      a.taskId=String(a.taskId||"");
+      const canonicalTask=TASKS.find(t=>t.id===a.taskId);
+      a.task=String(canonicalTask?.name||a.task||a.taskId).slice(0,120);
       a.personId=a.personId?String(a.personId):null;a.personName=String(a.personName||"").slice(0,80);
       return a;
     });

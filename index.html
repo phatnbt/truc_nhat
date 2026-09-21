@@ -133,7 +133,7 @@
         </header>
         <div class="two-col">
           <aside class="card sidebar-card">
-            <div class="card-head"><div><h2>Thành viên</h2><p>Trạng thái có mặt tuần này.</p></div><button class="btn small soft admin-only" id="allPresentButton" type="button">Có mặt hết</button></div>
+            <div class="card-head"><div><h2>Thành viên</h2><p>Trưởng phòng xem điểm trực và trạng thái có mặt.</p></div><div class="button-row admin-only"><button class="btn small soft" id="allPresentButton" type="button">Có mặt hết</button><button class="btn small danger" id="resetCleaningPointsButton" type="button">Reset điểm</button></div></div>
             <div class="card-body">
               <div class="add-member admin-only"><input id="cleanMemberName" placeholder="Tên thành viên"><button class="btn primary" id="addMemberButton" type="button">Thêm</button></div>
               <div class="member-list" id="cleanMemberList"></div>
@@ -216,6 +216,6 @@
   <div class="modal" id="accessModal"><div class="modal-card access-modal-card"><div class="card-head"><div><h3>Tài khoản & phân quyền</h3><p>Bản Free có thể xóa dữ liệu và quyền của tài khoản khỏi P708; Firebase Authentication của người khác được quản lý trong Firebase Console.</p></div><button class="icon-btn" data-close="accessModal" type="button">✕</button></div><div id="accessModalBody"></div><div class="modal-actions"><button class="btn" id="signOutButton" type="button">Đăng xuất</button><button class="btn primary" data-close="accessModal" type="button">Đóng</button></div></div></div>
 
   <div class="toast" id="toast"></div>
-  <script type="module" src="./app.js?v=20260819-6"></script>
+  <script type="module" src="./app.js?v=20260921-1"></script>
 </body>
 </html>

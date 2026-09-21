@@ -34,7 +34,7 @@ const roomPayload={
     }
   },
   billingMonths:{},
-  settings:{weights:{lavabo:5,san:5,quet:3,lau:4,tham:2,rac:2}}
+  settings:{weights:{lavabo:5,san:5,quet:3,lau:4,tham:2,rac:4}}
 };
 
 await env.withSecurityRulesDisabled(async context=>{

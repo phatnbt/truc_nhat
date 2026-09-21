@@ -4,8 +4,9 @@
 
   historicalPoints=function(memberId,beforeWeek="9999-99-99"){
     const member=state.members.find(m=>m.id===memberId);
+    const resetThrough=cleaningPointsResetThrough();
     return F.historicalFairnessLoad({
-      schedules:state.schedules,
+      schedules:state.schedules.filter(s=>!resetThrough||s.weekStart>resetThrough),
       member,
       beforeWeek,
       weights:state.settings.weights,
@@ -44,7 +45,7 @@
       return {taskId:task.id,task:task.name,personId:chosen.id,personName:chosen.name,completed:false,cut:false};
     });
 
-    if(absent===1)assignments.push({taskId:"rac",task:"Vứt rác, bình nước",personId:null,personName:"Tạm cắt",completed:false,cut:true});
+    if(absent===1)assignments.push({taskId:"rac",task:"Vứt rác và chà tường",personId:null,personName:"Tạm cắt",completed:false,cut:true});
 
     const old=state.schedules.find(s=>s.weekStart===week);
     if(old&&!confirm("Tuần này đã có lịch. Ghi đè? Mọi trạng thái hoàn thành của tuần này sẽ được tạo lại."))return;

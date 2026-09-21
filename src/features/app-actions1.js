@@ -1,9 +1,35 @@
-function historicalPoints(memberId,beforeWeek="9999-99-99"){
+function cleaningPointsResetThrough(){
+  return validDateKey(state.settings?.cleaningPointsResetThrough)?state.settings.cleaningPointsResetThrough:"";
+}
+function memberCleaningPoints(memberId,beforeWeek="9999-99-99"){
+  const options={
+    schedules:state.schedules,
+    memberId,
+    beforeWeek,
+    afterWeek:cleaningPointsResetThrough(),
+    weights:state.settings.weights
+  };
+  if(globalThis.P708CleaningFairness?.actualCleaningPoints)return globalThis.P708CleaningFairness.actualCleaningPoints(options);
   return state.schedules
-    .filter(s=>s.weekStart<beforeWeek)
+    .filter(s=>s.weekStart<beforeWeek&&(!options.afterWeek||s.weekStart>options.afterWeek))
     .reduce((sum,s)=>sum+s.assignments
       .filter(a=>a.personId===memberId&&!a.cut)
       .reduce((z,a)=>z+(state.settings.weights[a.taskId]??3),0),0);
+}
+function historicalPoints(memberId,beforeWeek="9999-99-99"){
+  return memberCleaningPoints(memberId,beforeWeek);
+}
+async function resetAllCleaningPoints(){
+  if(!requireAdmin())return;
+  const latestWeek=state.schedules.reduce((latest,s)=>s.weekStart>latest?s.weekStart:latest,"");
+  if(!latestWeek)return toast("Chưa có điểm trực nhật để reset");
+  if(!confirm("Reset điểm trực nhật của tất cả thành viên về 0? Lịch sử phân công vẫn được giữ lại."))return;
+  state.settings.cleaningPointsResetThrough=latestWeek;
+  state.settings.cleaningPointsResetAt=nowIso();
+  await persist("Đã reset điểm trực nhật",{
+    action:"RESET_CLEANING_POINTS",
+    summary:`Reset điểm trực nhật của tất cả thành viên qua tuần ${latestWeek}`
+  });
 }
 function previousAssignment(memberId,taskId,beforeWeek){
   return [...state.schedules]
@@ -76,7 +102,7 @@ async function createSchedule(){
     loads[chosen.id].week+=task.w;loads[chosen.id].count++;
     return {taskId:task.id,task:task.name,personId:chosen.id,personName:chosen.name,completed:false,cut:false};
   });
-  if(absent===1)assignments.push({taskId:"rac",task:"Vứt rác, bình nước",personId:null,personName:"Tạm cắt",completed:false,cut:true});
+  if(absent===1)assignments.push({taskId:"rac",task:"Vứt rác và chà tường",personId:null,personName:"Tạm cắt",completed:false,cut:true});
 
   const old=state.schedules.find(s=>s.weekStart===week);
   if(old&&!confirm("Tuần này đã có lịch. Ghi đè? Mọi trạng thái hoàn thành của tuần này sẽ được tạo lại."))return;

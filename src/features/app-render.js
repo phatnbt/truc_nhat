@@ -2,7 +2,8 @@ function renderCleaning(){
   const list=$("#cleanMemberList");if(!list)return;
   list.innerHTML=state.members.length?state.members.map(m=>{
     const mine=m.id===myMemberId(),editable=canEditMember(m.id);
-    return `<div class="member-row"><button class="presence ${state.presence[m.id]===false?"off":""}" data-presence="${m.id}" type="button" ${editable?"":"disabled"} aria-label="${state.presence[m.id]===false?"Đánh dấu có mặt":"Đánh dấu vắng"}: ${esc(m.name)}"></button><div><b>${esc(m.name)} ${mine?'<span class="badge success">Bạn</span>':""}</b><small>${state.presence[m.id]===false?"⚪ Vắng":"🟢 Có mặt"}${editable?"":" · Chỉ xem"}</small></div>${isAdmin()?`<button class="btn small danger" data-remove-member="${m.id}" type="button">Xóa</button>`:""}</div>`;
+    const pointText=isAdmin()?` · <b>${memberCleaningPoints(m.id)} điểm trực</b>`:"";
+    return `<div class="member-row"><button class="presence ${state.presence[m.id]===false?"off":""}" data-presence="${m.id}" type="button" ${editable?"":"disabled"} aria-label="${state.presence[m.id]===false?"Đánh dấu có mặt":"Đánh dấu vắng"}: ${esc(m.name)}"></button><div><b>${esc(m.name)} ${mine?'<span class="badge success">Bạn</span>':""}</b><small>${state.presence[m.id]===false?"⚪ Vắng":"🟢 Có mặt"}${pointText}${editable?"":" · Chỉ xem"}</small></div>${isAdmin()?`<button class="btn small danger" data-remove-member="${m.id}" type="button">Xóa</button>`:""}</div>`;
   }).join(""):'<div class="empty">Chưa có thành viên.</div>';
   $$('[data-presence]').forEach(btn=>btn.addEventListener("click",()=>togglePresence(btn.dataset.presence)));
   $$('[data-remove-member]').forEach(btn=>btn.addEventListener("click",()=>removeMember(btn.dataset.removeMember)));

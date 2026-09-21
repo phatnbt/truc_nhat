@@ -79,6 +79,7 @@ function bindStaticEvents(){
   $("#addMemberButton")?.addEventListener("click",addMember);
   $("#cleanMemberName")?.addEventListener("keydown",e=>{if(e.key==="Enter")addMember();});
   $("#allPresentButton")?.addEventListener("click",setAllPresent);
+  $("#resetCleaningPointsButton")?.addEventListener("click",resetAllCleaningPoints);
   $("#createScheduleButton")?.addEventListener("click",createSchedule);
   $("#deleteScheduleButton")?.addEventListener("click",deleteSchedule);
   $("#manualScheduleButton")?.addEventListener("click",openManual);
