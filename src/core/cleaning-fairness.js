@@ -91,12 +91,17 @@ export function longAbsenceCredit(options={}){
   return absenceCreditBreakdown(options).reduce((sum,row)=>sum+row.credit,0);
 }
 
-export function historicalFairnessLoad({schedules=[],member,beforeWeek="9999-99-99",weights={},minStreakWeeks=2}={}){
+export function cleaningPointAdjustment(value){
+  const adjustment=Number(value);
+  return Number.isFinite(adjustment)&&adjustment>=0?adjustment:0;
+}
+
+export function historicalFairnessLoad({schedules=[],member,beforeWeek="9999-99-99",weights={},minStreakWeeks=2,manualAdjustment=0}={}){
   if(!member)return 0;
   const actual=(schedules||[])
     .filter(s=>s?.weekStart<beforeWeek)
     .reduce((sum,s)=>sum+(s.assignments||[])
       .filter(a=>a?.personId===member.id&&!a.cut)
       .reduce((z,a)=>z+effectiveTaskWeight(a.taskId,weights,3),0),0);
-  return actual+longAbsenceCredit({schedules,member,beforeWeek,weights,minStreakWeeks});
+  return actual+longAbsenceCredit({schedules,member,beforeWeek,weights,minStreakWeeks})+cleaningPointAdjustment(manualAdjustment);
 }

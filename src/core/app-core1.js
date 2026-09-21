@@ -41,7 +41,7 @@ function nextMonday(){ const d=new Date(); d.setHours(0,0,0,0); const day=d.getD
 function weekRange(v){ const s=parseDate(v); if(Number.isNaN(s.getTime()))return String(v||""); const e=addDays(s,6); const f=d=>new Intl.DateTimeFormat("vi-VN",{day:"2-digit",month:"2-digit",year:"numeric"}).format(d); return `${f(s)} – ${f(e)}`; }
 function timeMs(v){ const n=Date.parse(v||""); return Number.isFinite(n)?n:0; }
 function toast(message,duration=3000){ const el=$("#toast"); if(!el)return; el.textContent=message; el.classList.add("show"); clearTimeout(toast.timer); toast.timer=setTimeout(()=>el.classList.remove("show"),duration); }
-function defaultState(){ return {members:[],presence:{},schedules:[],billing:{selectedMonth:todayMonth(),months:[]},settings:{weights:Object.fromEntries(TASKS.map(t=>[t.id,t.w])),cleaningPointsResetThrough:"",cleaningPointsResetAt:""},updatedAt:""}; }
+function defaultState(){ return {members:[],presence:{},schedules:[],billing:{selectedMonth:todayMonth(),months:[]},settings:{weights:Object.fromEntries(TASKS.map(t=>[t.id,t.w])),cleaningPointAdjustments:{},cleaningPointsResetThrough:"",cleaningPointsResetAt:""},updatedAt:""}; }
 function defaultUi(){ return {selectedMonth:todayMonth(),selectedScheduleId:null,activeBillPersonId:null}; }
 
 function normalizeState(input){
@@ -51,6 +51,7 @@ function normalizeState(input){
   s.schedules=Array.isArray(s.schedules)?s.schedules:[];
   s.settings={...defaultState().settings,...(s.settings||{})};
   s.settings.weights={...defaultState().settings.weights,...(s.settings.weights||{})};
+  s.settings.cleaningPointAdjustments=s.settings.cleaningPointAdjustments&&typeof s.settings.cleaningPointAdjustments==="object"&&!Array.isArray(s.settings.cleaningPointAdjustments)?s.settings.cleaningPointAdjustments:{};
   // The cleaning task catalog is authoritative; migrate the old 2-point
   // "trash, water bottle" value on every client that still has cached state.
   s.settings.weights.rac=4;
@@ -73,6 +74,10 @@ function normalizeState(input){
     else s.presence[copy.id]=s.presence[copy.id]!==false;
     return copy;
   });
+  s.settings.cleaningPointAdjustments=Object.fromEntries(s.members.map(member=>{
+    const value=Number(s.settings.cleaningPointAdjustments[member.id]);
+    return [member.id,Number.isFinite(value)&&value>=0?value:0];
+  }).filter(([,value])=>value>0));
 
   s.schedules=s.schedules.filter(schedule=>schedule&&validDateKey(schedule.weekStart)).map(schedule=>{
     schedule.id=String(schedule.id||uid());

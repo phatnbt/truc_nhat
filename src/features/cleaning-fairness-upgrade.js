@@ -10,7 +10,8 @@
       member,
       beforeWeek,
       weights:state.settings.weights,
-      minStreakWeeks:2
+      minStreakWeeks:2,
+      manualAdjustment:state.settings?.cleaningPointAdjustments?.[memberId]
     });
   };
 

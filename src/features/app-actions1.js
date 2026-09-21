@@ -17,7 +17,8 @@ function memberCleaningPoints(memberId,beforeWeek="9999-99-99"){
       .reduce((z,a)=>z+(state.settings.weights[a.taskId]??3),0),0);
 }
 function historicalPoints(memberId,beforeWeek="9999-99-99"){
-  return memberCleaningPoints(memberId,beforeWeek);
+  const adjustment=Math.max(0,Number(state.settings?.cleaningPointAdjustments?.[memberId])||0);
+  return memberCleaningPoints(memberId,beforeWeek)+adjustment;
 }
 function formatCleaningPoints(value){
   return new Intl.NumberFormat("vi-VN",{maximumFractionDigits:1}).format(Math.max(0,Number(value)||0));
@@ -25,13 +26,15 @@ function formatCleaningPoints(value){
 async function resetAllCleaningPoints(){
   if(!requireAdmin())return;
   const latestWeek=state.schedules.reduce((latest,s)=>s.weekStart>latest?s.weekStart:latest,"");
-  if(!latestWeek)return toast("Chưa có điểm trực nhật để reset");
+  const hasAdjustment=Object.values(state.settings?.cleaningPointAdjustments||{}).some(value=>Number(value)>0);
+  if(!latestWeek&&!hasAdjustment)return toast("Chưa có điểm trực nhật để reset");
   if(!confirm("Reset điểm trực nhật của tất cả thành viên về 0? Lịch sử phân công vẫn được giữ lại."))return;
-  state.settings.cleaningPointsResetThrough=latestWeek;
+  if(latestWeek)state.settings.cleaningPointsResetThrough=latestWeek;
   state.settings.cleaningPointsResetAt=nowIso();
+  state.settings.cleaningPointAdjustments={};
   await persist("Đã reset điểm trực nhật",{
     action:"RESET_CLEANING_POINTS",
-    summary:`Reset điểm trực nhật của tất cả thành viên qua tuần ${latestWeek}`
+    summary:latestWeek?`Reset điểm trực nhật của tất cả thành viên qua tuần ${latestWeek}`:"Reset điểm cộng trực nhật của tất cả thành viên"
   });
 }
 function previousAssignment(memberId,taskId,beforeWeek){

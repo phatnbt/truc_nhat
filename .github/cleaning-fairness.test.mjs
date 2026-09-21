@@ -3,7 +3,8 @@ import {
   absenceCreditForWeek,
   absenceCreditBreakdown,
   historicalFairnessLoad,
-  actualCleaningPoints
+  actualCleaningPoints,
+  cleaningPointAdjustment
 } from "../src/core/cleaning-fairness.js";
 
 const weights={lavabo:5,san:5,lau:4,quet:3,tham:2,rac:4};
@@ -14,6 +15,15 @@ function week(weekStart,absentIds=[]){
   const tasks=["lavabo","san","lau","quet","tham","rac"];
   const assignments=tasks.map((taskId,i)=>({taskId,personId:present[i%present.length]?.id||null,cut:false}));
   return {weekStart,assignments,absentMemberIds:absentIds,absentNames:absentIds};
+}
+
+// Manual manager adjustments participate in fairness without rewriting history.
+{
+  const schedules=[week("2026-09-01",[])];
+  const base=historicalFairnessLoad({schedules,member:members[0],weights});
+  assert.equal(historicalFairnessLoad({schedules,member:members[0],weights,manualAdjustment:3}),base+3);
+  assert.equal(cleaningPointAdjustment(-3),0);
+  assert.equal(cleaningPointAdjustment("invalid"),0);
 }
 
 // Visible cleaning points are actual assignments only and respect an admin reset.

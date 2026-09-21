@@ -4,7 +4,7 @@ import assert from "node:assert/strict";
 
 let source=fs.readFileSync("src/core/p708-authoritative-repair.js","utf8");
 source=source
-  .replace(/import[\s\S]*?from\s+"[^"]+";\n/g,"")
+  .replace(/import[\s\S]*?from\s+"[^"]+";\r?\n/g,"")
   .replace("export function createP708AuthoritativeRepair","function createP708AuthoritativeRepair");
 source+=`\nglobalThis.__repairTest={stableStringify,activeMappedMemberDocs,overlayMemberData};\n`;
 

@@ -2,7 +2,7 @@ import { createP708SecureEngine } from "../core/p708-secure-sync-engine.js?v=202
 import { createP708AuthoritativeRepair } from "../core/p708-authoritative-repair.js?v=20260913-1";
 import { createP708CanonicalMappingRepair } from "../core/p708-canonical-mapping-repair.js?v=20260913-1";
 import * as P708BillingCycle from "../core/billing-cycle-period.js?v=20260913-1";
-import * as P708CleaningFairness from "../core/cleaning-fairness.js?v=20260921-1";
+import * as P708CleaningFairness from "../core/cleaning-fairness.js?v=20260921-2";
 import * as P708CleaningStreak from "../core/cleaning-streak.js?v=20260921-3";
 import { deleteScheduleAuthoritatively, restoreScheduleWeek } from "../core/cleaning-schedule-store.js?v=20260913-1";
 
@@ -66,10 +66,10 @@ globalThis.deleteScheduleAuthoritatively = deleteScheduleAuthoritatively;
 globalThis.restoreScheduleWeek = restoreScheduleWeek;
 
 const parts = [
-  "../core/app-core1.js?v=20260921-1",
+  "../core/app-core1.js?v=20260921-2",
   "../core/app-core2.js?v=20260913-1",
-  "../features/app-actions1.js?v=20260921-2",
-  "../features/cleaning-fairness-upgrade.js?v=20260921-1",
+  "../features/app-actions1.js?v=20260921-3",
+  "../features/cleaning-fairness-upgrade.js?v=20260921-2",
   "../features/app-actions2.js?v=20260921-1",
   "../features/cleaning-delete-fix.js?v=20260913-1",
   "../features/app-dashboard.js?v=20260913-1",
