@@ -19,6 +19,9 @@ function memberCleaningPoints(memberId,beforeWeek="9999-99-99"){
 function historicalPoints(memberId,beforeWeek="9999-99-99"){
   return memberCleaningPoints(memberId,beforeWeek);
 }
+function formatCleaningPoints(value){
+  return new Intl.NumberFormat("vi-VN",{maximumFractionDigits:1}).format(Math.max(0,Number(value)||0));
+}
 async function resetAllCleaningPoints(){
   if(!requireAdmin())return;
   const latestWeek=state.schedules.reduce((latest,s)=>s.weekStart>latest?s.weekStart:latest,"");
