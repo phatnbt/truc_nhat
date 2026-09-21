@@ -80,6 +80,12 @@ if(exists("index.html")){
   }
 }
 
+if(exists("src/features/app-render.js")){
+  const renderSource=read("src/features/app-render.js");
+  if(!/formatCleaningPoints\(totalPoints\).*điểm/.test(renderSource))fail("Danh sách thành viên phải hiển thị tổng điểm trực nhật");
+  if(/\(thực\s|\+\s*ảo\s/.test(renderSource))fail("Không hiển thị chi tiết điểm thực/ảo trong danh sách thành viên");
+}
+
 const loaderPath="src/boot/app-loader.js";
 if(exists(loaderPath)){
   const loaderDir=path.dirname(loaderPath);
