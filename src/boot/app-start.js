@@ -58,8 +58,7 @@ async function startCloud(){
       if(data.logs!==undefined)auditLogs=data.logs;
       renderAll();
     },
-    onTaskData:data=>{taskSubmissions=data||[];renderAll();},
-    onPetData:data=>{petStatus=data||{mode:"idle"};globalThis.P708PetWidget?.refresh?.();globalThis.renderHomePetGarden?.();}
+    onTaskData:data=>{taskSubmissions=data||[];renderAll();}
   });
   try{await realtimeEngine.start();}
   catch(e){

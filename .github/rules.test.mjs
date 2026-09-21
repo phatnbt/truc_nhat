@@ -51,14 +51,11 @@ await env.withSecurityRulesDisabled(async context=>{
   await setDoc(doc(db,`rooms/${roomId}/memberData/member2`),{memberId:"m2",presence:true,billingMonths:{},updatedBy:"member2",updatedAt:Timestamp.now()});
   await setDoc(doc(db,`rooms/${roomId}/memberData/legacy`),{memberId:"m3",presence:true,billingMonths:{},updatedBy:"legacy",updatedAt:Timestamp.now()});
   await setDoc(doc(db,`rooms/${roomId}/taskSubmissions/${weekStart}__san__m2`),{roomCode:roomId,actorUid:"member2",actorName:"Member Two",memberId:"m2",scheduleId:"schedule-1",weekStart,taskId:"san",taskName:"Sàn NVS - cống",status:"submitted",submittedAt:Timestamp.now(),updatedAt:Timestamp.now()});
-  await setDoc(doc(db,`rooms/${roomId}/petProfiles/member1`),{uid:"member1",roomCode:roomId,memberId:"m1",xp:20,currentStreak:1,bestStreak:1,lastCheckInDate:"2026-08-31",unlockedStages:[0],updatedAt:Timestamp.now()});
-  await setDoc(doc(db,`rooms/${roomId}/petCheckins/member1_2026-08-31`),{uid:"member1",roomCode:roomId,memberId:"m1",dateKey:"2026-08-31",xpAwarded:20,activityId:`${weekStart}__lavabo__m1`,createdAt:Timestamp.now()});
 });
 
 const admin=env.authenticatedContext("admin",{email:"admin@example.com",name:"Primary Admin"}).firestore();
 const delegated=env.authenticatedContext("delegated",{email:"delegated@example.com",name:"Delegated Admin"}).firestore();
 const member1=env.authenticatedContext("member1",{email:"m1@example.com",name:"Member One"}).firestore();
-const member2=env.authenticatedContext("member2",{email:"m2@example.com",name:"Member Two"}).firestore();
 const legacy=env.authenticatedContext("legacy",{email:"legacy@example.com",name:"Legacy Member"}).firestore();
 const outsider=env.authenticatedContext("outsider",{email:"outsider@example.com",name:"Outsider"}).firestore();
 const anon=env.unauthenticatedContext().firestore();
@@ -130,15 +127,6 @@ try{
   await assertFails(getDoc(doc(member1,`rooms/${roomId}/taskSubmissions/${weekStart}__san__m2`)));
   await assertSucceeds(getDocs(query(collection(member1,`rooms/${roomId}/taskSubmissions`),where("actorUid","==","member1"))));
   await assertFails(getDocs(collection(member1,`rooms/${roomId}/taskSubmissions`)));
-
-  await assertSucceeds(getDoc(doc(member1,`rooms/${roomId}/petProfiles/member1`)));
-  await assertFails(getDoc(doc(member1,`rooms/${roomId}/petProfiles/member2`)));
-  await assertSucceeds(getDoc(doc(delegated,`rooms/${roomId}/petProfiles/member1`)));
-  await assertFails(getDoc(doc(outsider,`rooms/${roomId}/petProfiles/member1`)));
-  await assertFails(setDoc(doc(member1,`rooms/${roomId}/petProfiles/member1`),{uid:"member1",xp:9999}));
-  await assertSucceeds(getDoc(doc(member1,`rooms/${roomId}/petCheckins/member1_2026-08-31`)));
-  await assertFails(getDoc(doc(member2,`rooms/${roomId}/petCheckins/member1_2026-08-31`)));
-  await assertFails(setDoc(doc(member1,`rooms/${roomId}/petCheckins/forged`),{uid:"member1",dateKey:"2026-08-31",xpAwarded:20}));
 
   await assertSucceeds(setDoc(doc(member1,`rooms/${roomId}/auditLogs/member-log`),{
     roomCode:roomId,actorUid:"member1",actorName:"Member One",actorEmail:"m1@example.com",role:"member",

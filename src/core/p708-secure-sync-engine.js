@@ -9,7 +9,6 @@ import {
   doc, collection, query, where, orderBy, limit, onSnapshot, runTransaction, serverTimestamp,
   setDoc, deleteDoc, getDoc, getDocs, writeBatch, Timestamp, increment
 } from "https://www.gstatic.com/firebasejs/12.16.0/firebase-firestore.js";
-import { getFunctions, httpsCallable } from "https://www.gstatic.com/firebasejs/12.16.0/firebase-functions.js";
 
 const clone=value=>value==null?value:JSON.parse(JSON.stringify(value));
 const isObject=value=>value!==null&&typeof value==="object"&&!Array.isArray(value);
@@ -91,15 +90,14 @@ function taskDocId(weekStart,taskId,memberId){
 }
 function escapeRegExp(value){return String(value||"").replace(/[.*+?^${}()|[\]\\]/g,"\\$&");}
 
-export function createP708SecureEngine({firebaseConfig,roomCode,deviceId,initialShape,onShape,onStatus,onSession,onAdminData,onTaskData,onPetData}){
+export function createP708SecureEngine({firebaseConfig,roomCode,deviceId,initialShape,onShape,onStatus,onSession,onAdminData,onTaskData}){
   if(!firebaseConfig?.apiKey)throw new Error("Chưa cấu hình Firebase.");
   const appName="p708-secure-manager-v5";
   const app=getApps().some(x=>x.name===appName)?getApp(appName):initializeApp(firebaseConfig,appName);
   let db;
   try{db=initializeFirestore(app,{localCache:persistentLocalCache({tabManager:persistentMultipleTabManager()})});}
   catch{db=getFirestore(app);}
-  const auth=getAuth(app),provider=new GoogleAuthProvider(),functions=getFunctions(app,"us-central1");
-  const getPetStatusCall=httpsCallable(functions,"getP708PetStatus"),checkInPetCall=httpsCallable(functions,"checkInP708Pet");
+  const auth=getAuth(app),provider=new GoogleAuthProvider();
   provider.setCustomParameters({prompt:"select_account"});
   const roomRef=doc(db,"rooms",roomCode),configRef=doc(db,"rooms",roomCode,"security","config");
   const accessCollection=collection(db,"rooms",roomCode,"access"),
@@ -111,7 +109,6 @@ export function createP708SecureEngine({firebaseConfig,roomCode,deviceId,initial
   let user=null,access=null,ownRequest=null,adminExists=false,
     remoteShape=clone(initialShape)||{},optimisticShape=clone(initialShape)||{},
     memberDataByUid=new Map(),accessByUid=new Map(),started=false,repairingPrimaryAccess=false,memberDataReady=false;
-  let petData={mode:"idle",profile:{xp:0,currentStreak:0,bestStreak:0,unlockedStages:[0]}};
   let authUnsub=null,configUnsub=null,accessUnsub=null,requestUnsub=null,
     roomUnsub=null,memberDataUnsub=null,adminAccessUnsub=null,adminRequestsUnsub=null,
     auditUnsub=null,taskUnsub=null;
@@ -125,7 +122,6 @@ export function createP708SecureEngine({firebaseConfig,roomCode,deviceId,initial
     ...extra
   });
   const emitAdminData=(requests=null,accesses=null,logs=null)=>onAdminData?.({requests:requests??undefined,accesses:accesses??undefined,logs:logs??undefined});
-  const emitPetData=next=>{petData={...petData,...clone(next||{})};onPetData?.(clone(petData));};
   const rebuild=()=>{
     optimisticShape=overlayMemberData(remoteShape||{},memberDataByUid);
     onShape?.(clone(optimisticShape),{role:access?.role||null,memberId:access?.memberId||null});
@@ -142,25 +138,6 @@ export function createP708SecureEngine({firebaseConfig,roomCode,deviceId,initial
       targetMemberId:audit.targetMemberId?String(audit.targetMemberId):null,
       deviceId:String(deviceId||"").slice(0,160),createdAt:serverTimestamp()
     });
-  };
-
-  const loadPetStatus=async()=>{
-    if(!user||!hasAccess()||!access?.memberId){emitPetData({mode:"idle",error:"",canCheckIn:false,eligibleActivityId:null});return null;}
-    emitPetData({mode:"loading",error:"",leveledUp:false,awarded:false});
-    try{
-      const result=await getPetStatusCall({roomCode}),data=result?.data||{};
-      emitPetData({...data,mode:"ready",error:"",awarded:false,leveledUp:false});return data;
-    }catch(error){emitPetData({mode:"error",error:error?.message||"Không tải được Streak Pet"});return null;}
-  };
-  const checkInPet=async activityId=>{
-    if(!user||!hasAccess()||!access?.memberId)throw new Error("Tài khoản chưa liên kết thành viên.");
-    const id=String(activityId||petData.eligibleActivityId||"");
-    if(!id)throw new Error("Chưa có hoạt động hợp lệ để điểm danh.");
-    emitPetData({mode:"loading",error:"",leveledUp:false,awarded:false,eligibleActivityId:id});
-    try{
-      const result=await checkInPetCall({roomCode,activityId:id}),data=result?.data||{};
-      emitPetData({...data,mode:"ready",error:"",checkedInToday:true,canCheckIn:false,eligibleActivityId:null});return data;
-    }catch(error){emitPetData({mode:"error",error:error?.message||"Không thể điểm danh",eligibleActivityId:id});throw error;}
   };
 
   const mappedMemberChanges=(nextShape,previousShape)=>{
@@ -214,7 +191,7 @@ export function createP708SecureEngine({firebaseConfig,roomCode,deviceId,initial
         memberDataByUid=snap.exists()?new Map([[snap.id,{uid:snap.id,...snap.data()}]]):new Map();memberDataReady=true;rebuild();
       },e=>{memberDataReady=false;emitStatus("offline","Không thể đọc dữ liệu cá nhân",{error:e});});
     }
-    startTaskListener();if(isAdmin())startAdminListeners();void loadPetStatus();
+    startTaskListener();if(isAdmin())startAdminListeners();
   };
   const handleAccessChange=next=>{
     const oldRole=access?.role;access=next?.active?next:null;
@@ -240,7 +217,7 @@ export function createP708SecureEngine({firebaseConfig,roomCode,deviceId,initial
   };
   const clearUserListeners=()=>{
     configUnsub?.();accessUnsub?.();requestUnsub?.();configUnsub=accessUnsub=requestUnsub=null;
-    stopDataListeners();access=null;ownRequest=null;adminExists=false;petData={mode:"idle",profile:{xp:0,currentStreak:0,bestStreak:0,unlockedStages:[0]}};onPetData?.(clone(petData));
+    stopDataListeners();access=null;ownRequest=null;adminExists=false;
   };
   const onlineHandler=()=>emitStatus("syncing","Đang kết nối lại…");
   const offlineHandler=()=>emitStatus("offline","Mất kết nối · dữ liệu được giữ trên thiết bị");
@@ -364,9 +341,7 @@ export function createP708SecureEngine({firebaseConfig,roomCode,deviceId,initial
         tx.set(ref,{status:"submitted",submittedAt:serverTimestamp(),updatedAt:serverTimestamp()},{merge:true});
       }else tx.set(ref,{roomCode,actorUid:user.uid,actorName:access.displayName||user.displayName||user.email||"Thành viên",memberId,scheduleId,weekStart,taskId,taskName:assignment.task||taskName||taskId,status:"submitted",submittedAt:serverTimestamp(),updatedAt:serverTimestamp()});
     });
-    await writeAudit({action:"SUBMIT_TASK",summary:`Báo hoàn thành: ${assignment.task||taskName||taskId}`,targetMemberId:memberId});
-    let pet=null,petError="";try{pet=await checkInPet(id);}catch(error){petError=error?.message||"Không thể điểm danh Streak Pet";}
-    return {id,pet,petError};
+    await writeAudit({action:"SUBMIT_TASK",summary:`Báo hoàn thành: ${assignment.task||taskName||taskId}`,targetMemberId:memberId});return {id};
   };
   const reviewTask=async({submissionId,status,note=""})=>{
     if(!isAdmin())throw new Error("Chỉ trưởng phòng được xác nhận.");if(!navigator.onLine)throw new Error("Đang ngoại tuyến.");if(!["approved","rejected"].includes(status))throw new Error("Trạng thái không hợp lệ.");
@@ -440,5 +415,5 @@ export function createP708SecureEngine({firebaseConfig,roomCode,deviceId,initial
   };
   const flush=forceSync;
   const stop=()=>{authUnsub?.();clearUserListeners();window.removeEventListener("online",onlineHandler);window.removeEventListener("offline",offlineHandler);started=false;};
-  return {start,stop,signInGoogle,signOut,claimAdmin,requestAccess,cancelAccessRequest,approveRequest,updateAccess,revokeAccess,recordShape,submitTask,reviewTask,reconcileTaskSubmissions,deleteTaskSubmissionsForWeek,deleteAccountFromRoom,cleanupAuditLogs,loadPetStatus,checkInPet,forceSync,flush};
+  return {start,stop,signInGoogle,signOut,claimAdmin,requestAccess,cancelAccessRequest,approveRequest,updateAccess,revokeAccess,recordShape,submitTask,reviewTask,reconcileTaskSubmissions,deleteTaskSubmissionsForWeek,deleteAccountFromRoom,cleanupAuditLogs,forceSync,flush};
 }

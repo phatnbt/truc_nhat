@@ -1,8 +1,0 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" role="img" aria-labelledby="title desc">
-  <title id="title">Mèo Mây</title><desc id="desc">Thú cưng mây hình mèo màu xanh trời.</desc>
-  <defs><linearGradient id="body" x1="48" y1="38" x2="207" y2="221" gradientUnits="userSpaceOnUse"><stop stop-color="#fff"/><stop offset=".55" stop-color="#bdeaff"/><stop offset="1" stop-color="#83b7f5"/></linearGradient><radialGradient id="glow"><stop stop-color="#fff"/><stop offset="1" stop-color="#6bd0ff" stop-opacity="0"/></radialGradient></defs>
-  <circle cx="128" cy="126" r="112" fill="url(#glow)" opacity=".8"/><ellipse cx="128" cy="222" rx="70" ry="13" fill="#425a9a" opacity=".17"/>
-  <path d="M64 91 80 35l41 39M192 91l-16-56-41 39" fill="url(#body)" stroke="#5689cf" stroke-width="7" stroke-linejoin="round"/><path d="m76 60 6-13 18 19M180 60l-6-13-18 19" fill="none" stroke="#ffa9c5" stroke-width="7" stroke-linecap="round"/>
-  <path d="M55 145c0-42 33-74 73-74s73 32 73 74c22 18 10 54-18 56-13 22-43 25-56 8-19 18-50 11-57-13-31-7-36-43-15-51Z" fill="url(#body)" stroke="#5689cf" stroke-width="7" stroke-linejoin="round"/>
-  <ellipse cx="100" cy="139" rx="8" ry="12" fill="#233653"/><ellipse cx="156" cy="139" rx="8" ry="12" fill="#233653"/><circle cx="97" cy="135" r="2.5" fill="#fff"/><circle cx="153" cy="135" r="2.5" fill="#fff"/><path d="m122 155 6 5 6-5" fill="#ff8fb4" stroke="#774a68" stroke-width="3" stroke-linejoin="round"/><path d="M128 160c-2 10-11 12-18 7m18-7c2 10 11 12 18 7" fill="none" stroke="#774a68" stroke-width="4" stroke-linecap="round"/><path d="M89 157 53 151m38 17-35 7m111-18 36-6m-38 17 35 7" stroke="#6482b2" stroke-width="4" stroke-linecap="round" opacity=".65"/>
-</svg>

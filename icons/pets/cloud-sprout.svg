@@ -1,8 +1,0 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" role="img" aria-labelledby="title desc">
-  <title id="title">Mầm Mây</title><desc id="desc">Thú cưng mây non màu xanh với mầm lá nhỏ.</desc>
-  <defs><linearGradient id="body" x1="50" y1="38" x2="196" y2="218" gradientUnits="userSpaceOnUse"><stop stop-color="#fff"/><stop offset="1" stop-color="#b8d8ff"/></linearGradient><radialGradient id="glow"><stop stop-color="#fff" stop-opacity=".9"/><stop offset="1" stop-color="#8db9ff" stop-opacity="0"/></radialGradient></defs>
-  <circle cx="128" cy="126" r="110" fill="url(#glow)"/><ellipse cx="128" cy="220" rx="66" ry="13" fill="#5166a5" opacity=".16"/>
-  <path d="M116 65c-11-22 6-38 24-41 4 18-3 34-24 41Z" fill="#68d391"/><path d="M116 65c1-19-14-29-29-28-1 17 10 29 29 28Z" fill="#9ae6b4"/>
-  <path d="M65 143c0-31 24-56 55-57 15-28 62-15 62 18 28 4 39 42 18 61 10 34-25 61-54 43-23 25-66 12-67-22-26-7-34-36-14-43Z" fill="url(#body)" stroke="#6f8fd5" stroke-width="6" stroke-linejoin="round"/>
-  <ellipse cx="104" cy="145" rx="8" ry="11" fill="#263453"/><ellipse cx="154" cy="145" rx="8" ry="11" fill="#263453"/><circle cx="101" cy="141" r="2.5" fill="#fff"/><circle cx="151" cy="141" r="2.5" fill="#fff"/><path d="M116 164c8 8 17 8 25 0" fill="none" stroke="#774a68" stroke-width="5" stroke-linecap="round"/><ellipse cx="88" cy="161" rx="13" ry="7" fill="#ff9fbd" opacity=".38"/><ellipse cx="169" cy="161" rx="13" ry="7" fill="#ff9fbd" opacity=".38"/>
-</svg>

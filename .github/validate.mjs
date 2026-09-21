@@ -17,18 +17,15 @@ const required=[
   "src/boot/app-loader.js","src/boot/app-start.js",
   "src/core/app-core1.js","src/core/app-core2.js","src/core/p708-secure-sync-engine.js","src/core/p708-authoritative-repair.js",
   "src/core/p708-identity-plan.js","src/core/p708-canonical-mapping-repair.js",
-  "src/core/cleaning-streak.js",
   "src/features/app-actions1.js","src/features/app-actions2.js","src/features/app-dashboard.js",
   "src/features/app-render.js","src/features/app-integrity-fixes.js","src/features/inactive-mapping-dedup-fix.js",
   "src/features/canonical-identity-repair.js","src/features/billing-stable-repair.js","src/features/billing-canonical-repair.js","src/features/home-enhancements.js",
-  "src/features/cleaning-pet-streak.js","src/features/home-pet-garden.js",
   "src/features/notification-enhancements.js","src/features/today-calendar.js",
   "src/features/mobile-install-bridge.js","src/features/mobile-install-guide.js","sw.js",
   "manifest.webmanifest","firebase.json","firestore-secure.rules","offline.html",
   "icons/icon-32.png","icons/icon-192.png","icons/icon-512.png","icons/icon-maskable-512.png",
   "docs/VALIDATION.json","docs/README_FREE_EDITION.md","docs/README_P708_SECURE.md",
-  "functions/index.js","functions/pet-streak.js","functions/package.json",
-  "icons/pets/cloud-sprout.svg","icons/pets/cloud-cat.svg","icons/pets/cloud-guardian.svg","icons/pets/cloud-celestial.svg"
+  "functions/index.js","functions/package.json"
 ];
 for(const file of required)if(!exists(file))fail(`Thiếu file bắt buộc: ${file}`);
 
@@ -42,7 +39,6 @@ const classicJs=[
   "src/features/app-actions1.js","src/features/app-actions2.js","src/features/app-dashboard.js",
   "src/features/app-render.js","src/features/app-integrity-fixes.js","src/features/inactive-mapping-dedup-fix.js",
   "src/features/canonical-identity-repair.js","src/features/billing-stable-repair.js","src/features/billing-canonical-repair.js","src/features/home-enhancements.js",
-  "src/features/cleaning-pet-streak.js","src/features/home-pet-garden.js",
   "src/boot/app-start.js","src/features/notification-enhancements.js","src/features/today-calendar.js",
   "src/features/mobile-install-bridge.js","src/features/mobile-install-guide.js","sw.js"
 ];
@@ -52,7 +48,7 @@ for(const file of classicJs){
 }
 const moduleJs=[
   "app.js","src/boot/app-loader.js","src/core/p708-secure-sync-engine.js","src/core/p708-authoritative-repair.js",
-  "src/core/p708-identity-plan.js","src/core/p708-canonical-mapping-repair.js","src/core/cleaning-streak.js"
+  "src/core/p708-identity-plan.js","src/core/p708-canonical-mapping-repair.js"
 ];
 for(const file of moduleJs){
   if(!exists(file))continue;
@@ -62,10 +58,9 @@ for(const file of moduleJs){
   fs.rmSync(temp,{force:true});
   if(result.status!==0)fail(`Module syntax lỗi ${file}: ${(result.stderr||result.stdout).trim()}`);
 }
-for(const file of ["functions/index.js","functions/pet-streak.js"]){
-  if(!exists(file))continue;
-  const result=spawnSync(process.execPath,["--check",path.join(root,file)],{encoding:"utf8"});
-  if(result.status!==0)fail(`Functions syntax lỗi ${file}: ${(result.stderr||result.stdout).trim()}`);
+if(exists("functions/index.js")){
+  const result=spawnSync(process.execPath,["--check",path.join(root,"functions/index.js")],{encoding:"utf8"});
+  if(result.status!==0)fail(`Functions syntax lỗi: ${(result.stderr||result.stdout).trim()}`);
 }
 
 const textFiles=required.filter(file=>exists(file)&&/\.(?:js|html|css|json|webmanifest|rules)$/.test(file));

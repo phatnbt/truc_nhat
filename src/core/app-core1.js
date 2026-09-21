@@ -126,7 +126,6 @@ let accessRequests=[];
 let accessAccounts=[];
 let auditLogs=[];
 let taskSubmissions=[];
-let petStatus={mode:"idle",profile:{xp:0,currentStreak:0,bestStreak:0,unlockedStages:[0]}};
 let auditFilters={member:"all",action:"all",query:""};
 let realtimeEngine=null;
 let syncStatus={mode:"loading",text:"Đang kết nối…"};

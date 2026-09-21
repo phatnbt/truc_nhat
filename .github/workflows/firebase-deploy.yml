@@ -83,13 +83,9 @@ jobs:
           }
           NODE
 
-      - name: Install Cloud Functions dependencies
+      - name: Deploy Hosting and Firestore Rules
         if: steps.credentials.outputs.available == 'true'
-        run: npm ci --prefix functions --ignore-scripts --no-audit --no-fund
-
-      - name: Deploy Hosting, Firestore Rules and Cloud Functions
-        if: steps.credentials.outputs.available == 'true'
-        run: firebase deploy --only hosting,firestore:rules,functions --project p708-room-manager --non-interactive
+        run: firebase deploy --only hosting,firestore:rules --project p708-room-manager --non-interactive
 
       - name: Verify public runtime config endpoint
         if: steps.credentials.outputs.available == 'true'

@@ -48,23 +48,19 @@ rooms/P708/access/{uid}
 rooms/P708/accessRequests/{uid}
 rooms/P708/memberData/{uid}
 rooms/P708/taskSubmissions/{submissionId}
-rooms/P708/petProfiles/{uid}
-rooms/P708/petCheckins/{uid}_{YYYY-MM-DD}
 rooms/P708/auditLogs/{logId}
 ```
 
 ## Cloud Functions
 
-Các callable functions:
+Hai callable functions mới:
 
 - `deleteP708Account`: xóa hoàn toàn tài khoản người khác khỏi hệ thống P708.
 - `cleanupP708AuditLogs`: xóa audit log cũ hơn thời gian lưu trữ, tối thiểu 30 ngày.
-- `getP708PetStatus`: trả trạng thái pet/XP/streak và hoạt động hợp lệ theo dữ liệu server.
-- `checkInP708Pet`: cộng đúng 20 XP trong transaction idempotent, dùng ngày `Asia/Ho_Chi_Minh` tại server.
 
 Project dùng Node.js 22.
 
-> Cloud Functions cần project Firebase ở gói hỗ trợ triển khai Functions (thường là Blaze). Nếu chưa triển khai Functions, phần Dashboard/lịch/điện nước vẫn hoạt động nhưng “Xóa hoàn toàn”, “Dọn log >30 ngày” và Streak Pet sẽ không hoạt động đầy đủ.
+> Cloud Functions cần project Firebase ở gói hỗ trợ triển khai Functions (thường là Blaze). Nếu chưa nâng gói, phần Dashboard/lịch/điện nước vẫn hoạt động nhưng hai thao tác server-side “Xóa hoàn toàn” và “Dọn log >30 ngày” sẽ chưa chạy được.
 
 ## Deploy
 

@@ -2,21 +2,10 @@ const { onCall, HttpsError } = require("firebase-functions/https");
 const { initializeApp, getApps } = require("firebase-admin/app");
 const { getAuth } = require("firebase-admin/auth");
 const { getFirestore, Timestamp, FieldValue } = require("firebase-admin/firestore");
-const {
-  PetCheckInError,
-  checkInPetTransaction,
-  getPetStatus
-} = require("./pet-streak");
 
 if (!getApps().length) initializeApp();
 const db = getFirestore();
 const auth = getAuth();
-
-function petHttpsError(error) {
-  if (error instanceof PetCheckInError) return new HttpsError(error.code, error.message);
-  console.error("P708 pet function failed", error);
-  return new HttpsError("internal", "Không thể cập nhật Streak Pet lúc này.");
-}
 
 function validRoomCode(value) {
   return /^[A-Za-z0-9_-]{1,40}$/.test(String(value || ""));
@@ -111,7 +100,6 @@ exports.deleteP708Account = onCall({ region: "us-central1", timeoutSeconds: 60 }
   const accessRef = db.doc(`rooms/${roomCode}/access/${targetUid}`);
   const requestRef = db.doc(`rooms/${roomCode}/accessRequests/${targetUid}`);
   const memberDataRef = db.doc(`rooms/${roomCode}/memberData/${targetUid}`);
-  const petProfileRef = db.doc(`rooms/${roomCode}/petProfiles/${targetUid}`);
   const roomRef = db.doc(`rooms/${roomCode}`);
 
   const target = await db.runTransaction(async tx => {
@@ -134,16 +122,12 @@ exports.deleteP708Account = onCall({ region: "us-central1", timeoutSeconds: 60 }
     tx.delete(accessRef);
     tx.delete(requestRef);
     tx.delete(memberDataRef);
-    tx.delete(petProfileRef);
     return accessData || {};
   });
 
   const targetEmail = String(target?.email || "");
   const taskDeleted = await deleteQueryInBatches(
     db.collection(`rooms/${roomCode}/taskSubmissions`).where("actorUid", "==", targetUid)
-  );
-  const petCheckinsDeleted = await deleteQueryInBatches(
-    db.collection(`rooms/${roomCode}/petCheckins`).where("uid", "==", targetUid)
   );
   const auditRedacted = await redactAuditIdentity(roomCode, targetUid, targetEmail);
 
@@ -168,7 +152,7 @@ exports.deleteP708Account = onCall({ region: "us-central1", timeoutSeconds: 60 }
     createdAt: Timestamp.now()
   });
 
-  return { deleted: true, authDeleted, taskDeleted, petCheckinsDeleted, auditRedacted, targetMemberId: target?.memberId || null };
+  return { deleted: true, authDeleted, taskDeleted, auditRedacted, targetMemberId: target?.memberId || null };
 });
 
 exports.cleanupP708AuditLogs = onCall({ region: "us-central1", timeoutSeconds: 60 }, async request => {
@@ -194,30 +178,4 @@ exports.cleanupP708AuditLogs = onCall({ region: "us-central1", timeoutSeconds: 6
     createdAt: Timestamp.now()
   });
   return { deletedCount, retentionDays, cutoff: cutoff.toDate().toISOString() };
-});
-
-exports.getP708PetStatus = onCall({ region: "us-central1", timeoutSeconds: 30 }, async request => {
-  try {
-    return await getPetStatus({
-      db,
-      uid: request.auth?.uid,
-      roomCode: String(request.data?.roomCode || "").trim()
-    });
-  } catch (error) {
-    throw petHttpsError(error);
-  }
-});
-
-exports.checkInP708Pet = onCall({ region: "us-central1", timeoutSeconds: 30 }, async request => {
-  try {
-    return await checkInPetTransaction({
-      db,
-      FieldValue,
-      uid: request.auth?.uid,
-      roomCode: String(request.data?.roomCode || "").trim(),
-      activityId: String(request.data?.activityId || "").trim()
-    });
-  } catch (error) {
-    throw petHttpsError(error);
-  }
 });

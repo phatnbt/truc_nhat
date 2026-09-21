@@ -25,7 +25,6 @@ functions/node_modules/
 dist/
 build/
 coverage/
-graphify-out/
 
 # OS / editors
 .DS_Store
