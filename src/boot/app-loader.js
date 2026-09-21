@@ -39,11 +39,13 @@ async function loadFirebaseRuntimeConfig(){
   const override=globalThis.P708_FIREBASE_CONFIG_OVERRIDE;
   if(validFirebaseConfig(override))return Object.freeze({...override});
 
-  const errors=[];
-  try{
-    return await fetchFirebaseConfig(FIREBASE_RUNTIME_ENDPOINT,{sameOrigin:true});
-  }catch(error){
-    errors.push(`same-origin:${error?.message||"error"}`);
+  const errors=[],isFirebaseHosting=/\.(?:web\.app|firebaseapp\.com)$/i.test(location.hostname);
+  if(isFirebaseHosting){
+    try{
+      return await fetchFirebaseConfig(FIREBASE_RUNTIME_ENDPOINT,{sameOrigin:true});
+    }catch(error){
+      errors.push(`same-origin:${error?.message||"error"}`);
+    }
   }
 
   try{
@@ -55,6 +57,7 @@ async function loadFirebaseRuntimeConfig(){
   throw new Error(`Không tải được cấu hình Firebase runtime (${errors.join(", ")}).`);
 }
 
+globalThis.P708SetBootProgress?.("Đang kết nối dữ liệu…","Đang xác nhận cấu hình an toàn của phòng P708.");
 globalThis.P708_FIREBASE_CONFIG=await loadFirebaseRuntimeConfig();
 globalThis.createP708SecureEngine = createP708SecureEngine;
 globalThis.createP708AuthoritativeRepair = createP708AuthoritativeRepair;
@@ -91,13 +94,15 @@ const parts = [
   "../features/mobile-install-guide.js?v=20260913-1"
 ];
 
-for (const src of parts) {
-  await new Promise((resolve, reject) => {
+let loadedParts=0;
+globalThis.P708SetBootProgress?.("Đang nạp giao diện…",`Đã tải 0/${parts.length} thành phần.`);
+await Promise.all(parts.map(src=>new Promise((resolve, reject) => {
     const script = document.createElement("script");
     script.src = new URL(src, import.meta.url).href;
+    // Dynamic classic scripts with async=false download concurrently but execute
+    // in insertion order, preserving the existing dependency chain.
     script.async = false;
-    script.onload = resolve;
+    script.onload = ()=>{loadedParts++;globalThis.P708SetBootProgress?.("Đang nạp giao diện…",`Đã tải ${loadedParts}/${parts.length} thành phần.`);resolve();};
     script.onerror = () => reject(new Error(`Không thể tải ${src}`));
     document.head.appendChild(script);
-  });
-}
+  })));

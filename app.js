@@ -1,4 +1,13 @@
-const BOOT_VERSION = "20260921-8";
+const BOOT_VERSION = "20260921-9";
+
+function setBootProgress(title,detail){
+  const box=document.querySelector("#authGateContent");
+  if(!box||!box.textContent.includes("Đang khởi động")&&!box.dataset.bootProgress)return;
+  box.dataset.bootProgress="1";
+  box.innerHTML=`<h2>${title}</h2><p>${detail}</p>`;
+}
+globalThis.P708SetBootProgress=setBootProgress;
+setBootProgress("Đang tải ứng dụng…","Đang chuẩn bị các thành phần cần thiết.");
 
 globalThis.P708InstallPrompt = null;
 window.addEventListener("beforeinstallprompt",event=>{
@@ -26,7 +35,9 @@ function showBootFailure(error){
   const gate=document.querySelector("#authGate");
   gate?.classList.remove("hidden");
   if(!box)return;
+  delete box.dataset.bootProgress;
   box.innerHTML=`<h2>Không thể khởi động ứng dụng</h2><p>Một tệp ứng dụng cũ có thể đang bị giữ trong bộ nhớ đệm. Hãy làm mới bộ nhớ đệm rồi thử lại.</p><div class="auth-actions"><button class="btn primary" id="repairBootButton" type="button">Làm mới ứng dụng</button></div><small style="display:block;margin-top:12px;color:#667085">${String(error?.message||error||"Lỗi tải ứng dụng").replaceAll("&","&amp;").replaceAll("<","&lt;").replaceAll(">","&gt;").replaceAll('"',"&quot;")}</small>`;
+  window.dispatchEvent(new Event("p708:boot-ready"));
   document.querySelector("#repairBootButton")?.addEventListener("click",async()=>{
     try{
       if("caches" in window){const keys=await caches.keys();await Promise.all(keys.filter(k=>k.startsWith("p708-manager-")).map(k=>caches.delete(k)));}

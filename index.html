@@ -213,7 +213,7 @@
   <div class="toast" id="toast"></div>
   <script>
     (()=>{
-      const repairKey="P708_BOOT_REPAIR_20260921_8",baseUrl=new URL("./",location.href).href;
+      const repairKey="P708_BOOT_REPAIR_20260921_9",baseUrl=new URL("./",location.href).href;
       let timer=null;
       const clearAppShell=async()=>{
         try{if("caches" in window){const keys=await caches.keys();await Promise.all(keys.filter(key=>key.startsWith("p708-manager-")).map(key=>caches.delete(key)));}}catch{}
@@ -223,7 +223,7 @@
       const markRepaired=()=>{try{sessionStorage.setItem(repairKey,"1");}catch{}};
       const reload=async()=>{await clearAppShell();location.replace(`${location.pathname}?boot-repair=${Date.now()}${location.hash||""}`);};
       const showRecovery=()=>{
-        const box=document.querySelector("#authGateContent");if(!box||!box.textContent.includes("Đang khởi động"))return;
+        const box=document.querySelector("#authGateContent");if(!box||(!box.textContent.includes("Đang khởi động")&&!box.dataset.bootProgress))return;
         if(!wasRepaired()){markRepaired();void reload();return;}
         box.innerHTML='<h2>Khởi động mất nhiều thời gian</h2><p>Bộ nhớ ứng dụng có thể đang giữ phiên bản cũ. Hãy kiểm tra mạng rồi thử làm mới an toàn.</p><div class="auth-actions"><button class="btn primary" id="bootRetryButton" type="button">Làm mới ứng dụng</button></div>';
         document.querySelector("#bootRetryButton")?.addEventListener("click",()=>void reload());
@@ -232,6 +232,6 @@
       window.addEventListener("p708:boot-ready",()=>{clearTimeout(timer);try{sessionStorage.removeItem(repairKey);}catch{}},{once:true});
     })();
   </script>
-  <script type="module" src="./app.js?v=20260921-8"></script>
+  <script type="module" src="./app.js?v=20260921-9"></script>
 </body>
 </html>
