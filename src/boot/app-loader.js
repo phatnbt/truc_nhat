@@ -66,7 +66,7 @@ globalThis.deleteScheduleAuthoritatively = deleteScheduleAuthoritatively;
 globalThis.restoreScheduleWeek = restoreScheduleWeek;
 
 const parts = [
-  "../core/app-core1.js?v=20260921-2",
+  "../core/app-core1.js?v=20260921-3",
   "../core/app-core2.js?v=20260913-1",
   "../features/app-actions1.js?v=20260921-3",
   "../features/cleaning-fairness-upgrade.js?v=20260921-2",

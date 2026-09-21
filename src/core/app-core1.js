@@ -1,5 +1,5 @@
 const TASKS = [
-  {id:"lavabo",name:"Lavabo - Toilet",emoji:"🚽",w:5},
+  {id:"lavabo",name:"Lavabo - Toilet",emoji:"🚽",w:4},
   {id:"san",name:"Sàn NVS - cống",emoji:"🧼",w:5},
   {id:"quet",name:"Quét nhà",emoji:"🧹",w:3},
   {id:"lau",name:"Lau nhà",emoji:"🪣",w:4},
@@ -52,8 +52,9 @@ function normalizeState(input){
   s.settings={...defaultState().settings,...(s.settings||{})};
   s.settings.weights={...defaultState().settings.weights,...(s.settings.weights||{})};
   s.settings.cleaningPointAdjustments=s.settings.cleaningPointAdjustments&&typeof s.settings.cleaningPointAdjustments==="object"&&!Array.isArray(s.settings.cleaningPointAdjustments)?s.settings.cleaningPointAdjustments:{};
-  // The cleaning task catalog is authoritative; migrate the old 2-point
-  // "trash, water bottle" value on every client that still has cached state.
+  // The cleaning task catalog is authoritative; migrate legacy task weights
+  // on every client that still has cached or persisted state.
+  s.settings.weights.lavabo=4;
   s.settings.weights.rac=4;
   s.settings.cleaningPointsResetThrough=validDateKey(s.settings.cleaningPointsResetThrough)?s.settings.cleaningPointsResetThrough:"";
   s.settings.cleaningPointsResetAt=String(s.settings.cleaningPointsResetAt||"");

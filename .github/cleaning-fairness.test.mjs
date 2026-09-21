@@ -7,7 +7,7 @@ import {
   cleaningPointAdjustment
 } from "../src/core/cleaning-fairness.js";
 
-const weights={lavabo:5,san:5,lau:4,quet:3,tham:2,rac:4};
+const weights={lavabo:4,san:5,lau:4,quet:3,tham:2,rac:4};
 const members=["A","B","C","D","E"].map(id=>({id,name:id}));
 
 function week(weekStart,absentIds=[]){
@@ -29,8 +29,8 @@ function week(weekStart,absentIds=[]){
 // Visible cleaning points are actual assignments only and respect an admin reset.
 {
   const schedules=[week("2026-09-01",[]),week("2026-09-08",[])];
-  assert.equal(actualCleaningPoints({schedules,memberId:"A",weights}),18);
-  assert.equal(actualCleaningPoints({schedules,memberId:"A",weights,afterWeek:"2026-09-01"}),9);
+  assert.equal(actualCleaningPoints({schedules,memberId:"A",weights}),16);
+  assert.equal(actualCleaningPoints({schedules,memberId:"A",weights,afterWeek:"2026-09-01"}),8);
   assert.equal(actualCleaningPoints({schedules,memberId:"B",weights,afterWeek:"2026-09-01"}),5);
 }
 
