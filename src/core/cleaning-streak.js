@@ -71,11 +71,11 @@ export function memberStreak({schedules=[],member,now=Date.now()}={}){
 
 export function petStage(streak=0){
   const n=Math.max(0,Number(streak)||0);
-  if(n>=10)return {level:4,name:"Siêu chăm",emoji:"🐦",next:null};
-  if(n>=6)return {level:3,name:"Lớn nhanh",emoji:"🐥",next:10};
-  if(n>=3)return {level:2,name:"Bé khỏe",emoji:"🐤",next:6};
-  if(n>=1)return {level:1,name:"Mới nở",emoji:"🐣",next:3};
-  return {level:0,name:"Trứng",emoji:"🥚",next:1};
+  if(n>=10)return {level:4,name:"Thần Thú P708",emoji:"🌟",asset:"./icons/pets/cloud-celestial.svg",next:null};
+  if(n>=6)return {level:3,name:"Linh Thú Mây",emoji:"⭐",asset:"./icons/pets/cloud-guardian.svg",next:10};
+  if(n>=3)return {level:2,name:"Mèo Mây",emoji:"☁️",asset:"./icons/pets/cloud-cat.svg",next:6};
+  if(n>=1)return {level:1,name:"Mầm Mây",emoji:"🌱",asset:"./icons/pets/cloud-sprout.svg",next:3};
+  return {level:0,name:"Trứng Mây",emoji:"🥚",asset:"./icons/pets/cloud-egg.svg",next:1};
 }
 
 export function petProgress(streak=0){

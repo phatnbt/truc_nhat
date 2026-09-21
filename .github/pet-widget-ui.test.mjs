@@ -14,6 +14,8 @@ assert.match(widget,/requestAnimationFrame/);
 assert.match(widget,/localStorage\.setItem/);
 assert.match(widget,/snap:true/);
 assert.match(widget,/P708PetWidget/);
+assert.match(widget,/<img src=/);
+assert.match(widget,/stage\.asset/);
 assert.match(widget,/document\.querySelector\("#cleaningPetPanel"\)\?\.remove\(\)/);
 assert.match(widget,/document\.querySelector\("#petFloatCard"\)\?\.remove\(\)/);
 assert.doesNotMatch(widget,/class="pet-float-card"/);
@@ -45,6 +47,7 @@ assert.match(css,/touch-action:none/);
 assert.match(css,/--pet-safe-bottom/);
 assert.match(css,/@keyframes pet-idle/);
 assert.match(css,/@keyframes pet-blink/);
+assert.match(css,/@keyframes pet-aura-pulse/);
 assert.match(css,/width:52px;height:52px/);
 assert.doesNotMatch(css,/\.pet-float-card\{/);
 
@@ -55,5 +58,9 @@ assert.match(loader,/cleaning-pet-streak\.js\?v=\d{8}-\d+/);
 assert.match(sw,/home-pet-garden\.js/);
 assert.match(sw,/cleaning-pet-streak\.js/);
 assert.match(sw,/cleaning-pet\.css/);
+for(const asset of ["cloud-egg.svg","cloud-sprout.svg","cloud-cat.svg","cloud-guardian.svg","cloud-celestial.svg"]){
+  assert.ok(fs.existsSync(`icons/pets/${asset}`),`missing ${asset}`);
+  assert.match(sw,new RegExp(asset.replace(".","\\.")));
+}
 
 console.log("Pet ownership isolation and compact pet UI regression tests passed.");

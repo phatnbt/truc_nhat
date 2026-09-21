@@ -48,11 +48,15 @@ const NOW=Date.UTC(2026,9,30);
 }
 
 // Pet evolution remains bounded and deterministic.
-assert.equal(petStage(0).emoji,"🥚");
-assert.equal(petStage(1).emoji,"🐣");
+assert.equal(petStage(0).name,"Trứng Mây");
+assert.match(petStage(0).asset,/cloud-egg\.svg$/);
+assert.match(petStage(1).asset,/cloud-sprout\.svg$/);
 assert.equal(petStage(3).level,2);
+assert.match(petStage(3).asset,/cloud-cat\.svg$/);
 assert.equal(petStage(6).level,3);
+assert.match(petStage(6).asset,/cloud-guardian\.svg$/);
 assert.equal(petStage(10).level,4);
+assert.match(petStage(10).asset,/cloud-celestial\.svg$/);
 assert.equal(petProgress(10),100);
 
 console.log("Cleaning mini pet streak tests passed.");

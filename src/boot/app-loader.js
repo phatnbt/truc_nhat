@@ -3,7 +3,7 @@ import { createP708AuthoritativeRepair } from "../core/p708-authoritative-repair
 import { createP708CanonicalMappingRepair } from "../core/p708-canonical-mapping-repair.js?v=20260913-1";
 import * as P708BillingCycle from "../core/billing-cycle-period.js?v=20260913-1";
 import * as P708CleaningFairness from "../core/cleaning-fairness.js?v=20260921-1";
-import * as P708CleaningStreak from "../core/cleaning-streak.js?v=20260913-1";
+import * as P708CleaningStreak from "../core/cleaning-streak.js?v=20260921-3";
 import { deleteScheduleAuthoritatively, restoreScheduleWeek } from "../core/cleaning-schedule-store.js?v=20260913-1";
 
 const FIREBASE_RUNTIME_ENDPOINT="/__/firebase/init.json";
@@ -74,7 +74,7 @@ const parts = [
   "../features/cleaning-delete-fix.js?v=20260913-1",
   "../features/app-dashboard.js?v=20260913-1",
   "../features/app-render.js?v=20260921-2",
-  "../features/cleaning-pet-streak.js?v=20260913-1",
+  "../features/cleaning-pet-streak.js?v=20260921-3",
   "../features/app-integrity-fixes.js?v=20260913-1",
   "../features/inactive-mapping-dedup-fix.js?v=20260913-1",
   "../features/canonical-identity-repair.js?v=20260913-1",
@@ -82,7 +82,7 @@ const parts = [
   "../features/billing-cycle-history.js?v=20260913-1",
   "../features/billing-canonical-repair.js?v=20260913-1",
   "../features/home-enhancements.js?v=20260913-1",
-  "../features/home-pet-garden.js?v=20260913-1",
+  "../features/home-pet-garden.js?v=20260921-3",
   "../features/ui-icon-polish.js?v=20260913-2",
   "./app-start.js?v=20260921-1",
   "../features/notification-enhancements.js?v=20260913-1",

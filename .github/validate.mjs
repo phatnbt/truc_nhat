@@ -24,6 +24,7 @@ const required=[
   "src/features/mobile-install-bridge.js","src/features/mobile-install-guide.js","sw.js",
   "manifest.webmanifest","firebase.json","firestore-secure.rules","offline.html",
   "icons/icon-32.png","icons/icon-192.png","icons/icon-512.png","icons/icon-maskable-512.png",
+  "icons/pets/cloud-egg.svg","icons/pets/cloud-sprout.svg","icons/pets/cloud-cat.svg","icons/pets/cloud-guardian.svg","icons/pets/cloud-celestial.svg",
   "docs/VALIDATION.json","docs/README_FREE_EDITION.md","docs/README_P708_SECURE.md",
   "functions/index.js","functions/package.json"
 ];

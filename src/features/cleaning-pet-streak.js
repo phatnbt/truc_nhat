@@ -11,7 +11,7 @@
     if(document.querySelector('link[data-cleaning-pet="1"]'))return;
     const link=document.createElement("link");
     link.rel="stylesheet";
-    link.href="./cleaning-pet.css?v=20260907-4";
+    link.href="./cleaning-pet.css?v=20260921-3";
     link.dataset.cleaningPet="1";
     document.head.appendChild(link);
   }
@@ -37,10 +37,10 @@
 
   function petFace(stage,memberName,size="float"){
     const safe=esc(memberName||"Pet P708");
-    return `<div class="p708-pet stage-${stage.level} pet-${size}" data-pet-touch="1" role="img" aria-label="Pet của ${safe}">
+    const asset=esc(stage.asset||"./icons/pets/cloud-egg.svg");
+    return `<div class="p708-pet stage-${stage.level} pet-${size}" data-pet-touch="1" role="img" aria-label="${esc(stage.name)} của ${safe}">
       <span class="pet-aura"></span>
-      <span class="pet-ears"><i></i><i></i></span>
-      <span class="pet-body"><i class="pet-eye left"></i><i class="pet-eye right"></i><i class="pet-mouth"></i><i class="pet-cheek left"></i><i class="pet-cheek right"></i><b>${stage.emoji}</b></span>
+      <img src="${asset}" alt="" draggable="false">
       <span class="pet-shadow"></span>
     </div>`;
   }
