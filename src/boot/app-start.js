@@ -95,6 +95,10 @@ function bindStaticEvents(){
   $("#syncBillingMembersButton")?.addEventListener("click",syncBillingMembers);
   $("#addBillingPersonButton")?.addEventListener("click",()=>openModal("memberModal"));
   $("#confirmAddBillingPersonButton")?.addEventListener("click",addBillingPerson);
+  $("#billingPeriodStart")?.addEventListener("input",()=>globalThis.P708BillingCycleUi?.updateBillingPeriodEditorNotice?.());
+  $("#billingPeriodEnd")?.addEventListener("input",()=>globalThis.P708BillingCycleUi?.updateBillingPeriodEditorNotice?.());
+  $("#resetBillingPeriodButton")?.addEventListener("click",()=>globalThis.resetBillingPeriodEditor?.());
+  $("#saveBillingPeriodButton")?.addEventListener("click",()=>globalThis.saveBillingPeriodEditor?.());
   $("#billNewPersonName")?.addEventListener("keydown",e=>{if(e.key==="Enter")addBillingPerson();});
   $("#removeBillingPersonButton")?.addEventListener("click",removeBillingPerson);
   $("#markStayButton")?.addEventListener("click",()=>applyStayRange(true));

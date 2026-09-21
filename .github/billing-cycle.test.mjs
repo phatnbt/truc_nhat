@@ -4,16 +4,23 @@ import {
   BILLING_CYCLE_CUTOVER_MONTH,
   BILLING_CYCLE_START_DAY,
   BILLING_CYCLE_END_DAY,
+  MAX_CUSTOM_PERIOD_DAYS,
+  assertBillingPeriodUpdate,
   cycleBounds,
   currentPeriodMonth,
+  dateRangeKeys,
+  formatDateRange,
   isCycleMonth,
   periodDateKeys,
+  rangesOverlap,
+  resolveCycleBounds,
   shiftMonth
 } from "../src/core/billing-cycle-period.js";
 
 assert.equal(BILLING_CYCLE_CUTOVER_MONTH,"2026-09");
 assert.equal(BILLING_CYCLE_START_DAY,30);
 assert.equal(BILLING_CYCLE_END_DAY,29);
+assert.equal(MAX_CUSTOM_PERIOD_DAYS,62);
 assert.equal(isCycleMonth("2026-08"),false);
 assert.equal(isCycleMonth("2026-09"),true);
 assert.deepEqual(cycleBounds("2026-09"),{
@@ -64,12 +71,56 @@ assert.equal(shiftMonth("2027-01",-1),"2026-12");
 assert.equal(currentPeriodMonth(new Date(2026,7,29,12)),"2026-08");
 assert.equal(currentPeriodMonth(new Date(2026,7,30,12)),"2026-09");
 
+// Trưởng phòng có thể chỉnh riêng từng kỳ mà không làm đổi quy ước mặc định.
+const custom=resolveCycleBounds("2026-10","2026-10-03","2026-11-01");
+assert.deepEqual(custom,{month:"2026-10",start:"2026-10-03",end:"2026-11-01",endExclusive:"2026-11-02"});
+const customDates=periodDateKeys("2026-10",custom);
+assert.equal(customDates[0],"2026-10-03");
+assert.equal(customDates.at(-1),"2026-11-01");
+assert.equal(customDates.length,30);
+assert.equal(cycleBounds("2026-10").start,"2026-09-30","custom range must not mutate the default rule");
+assert.equal(dateRangeKeys("2026-02-30","2026-03-01").length,0,"invalid calendar dates must be rejected");
+assert.equal(dateRangeKeys("2026-10-05","2026-10-04").length,0,"reversed ranges must be rejected");
+assert.equal(dateRangeKeys("2026-01-01","2026-03-03").length,62);
+assert.equal(dateRangeKeys("2026-01-01","2026-03-04").length,0,"ranges over the safety limit must be rejected");
+assert.equal(rangesOverlap("2026-09-30","2026-10-29","2026-10-29","2026-11-29"),true,"shared boundary dates overlap");
+assert.equal(rangesOverlap("2026-09-30","2026-10-28","2026-10-29","2026-11-29"),false);
+assert.equal(formatDateRange("2026-10-03","2026-11-01"),"03/10/2026 – 01/11/2026");
+
+const baseBill={month:"2026-10",cycleMode:"28-27",cycleStart:"2026-09-30",cycleEnd:"2026-10-29",closed:false,people:{}};
+const updatedBill={...baseBill,cycleStart:"2026-10-01",cycleEnd:"2026-10-28"};
+const updateAudit={action:"UPDATE_BILLING_PERIOD",periodMonth:"2026-10",expectedPeriodExists:true,expectedPeriodStart:"2026-09-30",expectedPeriodEnd:"2026-10-29"};
+assert.equal(assertBillingPeriodUpdate({billingMonths:{"2026-10":baseBill}},{billingMonths:{"2026-10":updatedBill}},updateAudit),true);
+assert.throws(()=>assertBillingPeriodUpdate(
+  {billingMonths:{"2026-10":{...baseBill,cycleStart:"2026-10-02"}}},
+  {billingMonths:{"2026-10":updatedBill}},updateAudit
+),/thiết bị khác/,"a concurrent edit must not be overwritten");
+assert.throws(()=>assertBillingPeriodUpdate(
+  {billingMonths:{"2026-10":{...baseBill,closed:true}}},
+  {billingMonths:{"2026-10":updatedBill}},updateAudit
+),/đã được chốt/);
+assert.throws(()=>assertBillingPeriodUpdate(
+  {billingMonths:{"2026-10":{...baseBill,people:{p1:{paid:true,paidAmount:1000}}}}},
+  {billingMonths:{"2026-10":updatedBill}},updateAudit
+),/đã có thanh toán/);
+assert.throws(()=>assertBillingPeriodUpdate(
+  {billingMonths:{"2026-10":baseBill}},
+  {billingMonths:{"2026-10":{...updatedBill,cycleEnd:"2026-10-30"},"2026-11":{month:"2026-11",cycleMode:"28-27",cycleStart:"2026-10-30",cycleEnd:"2026-11-29",people:{}}}},updateAudit
+),/bị trùng/);
+
 const feature=fs.readFileSync(new URL("../src/features/billing-cycle-history.js",import.meta.url),"utf8");
+const secureEngine=fs.readFileSync(new URL("../src/core/p708-secure-sync-engine.js",import.meta.url),"utf8");
+assert.ok(secureEngine.includes("assertBillingPeriodUpdate(serverPayload,mergedShape,audit)"),"period guard must run inside the Firestore transaction");
 for(const required of [
   "Period.periodDateKeys",
   "billingPeriodPrev",
   "billingPeriodNext",
   "billingPeriodCurrent",
+  "billingPeriodEdit",
+  "UPDATE_BILLING_PERIOD",
+  "overlappingCycleBill",
+  "billHasPaymentRecords",
+  "Keep valid historical date keys",
   "touchstart",
   "touchend",
   "Vuốt ngang",

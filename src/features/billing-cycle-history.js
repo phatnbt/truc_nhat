@@ -2,7 +2,7 @@
   const Period=globalThis.P708BillingCycle;
   if(!Period)throw new Error("Billing cycle utilities are not available");
 
-  const VERSION="20260828-1";
+  const VERSION="20260921-2";
   const nameKey=value=>String(value||"").normalize("NFKC").trim().replace(/\s+/g," ").toLocaleLowerCase("vi-VN");
   const isCycleBill=bill=>bill?.cycleMode==="28-27";
   const baseNormalizeState=normalizeState;
@@ -17,9 +17,16 @@
     if(!match)return String(value||"");
     return `${match[3]}/${match[2]}/${match[1]}`;
   }
+  function resolvedCycleBounds(bill){
+    if(!bill||!validMonthKey(bill.month))return null;
+    return Period.resolveCycleBounds(bill.month,bill.cycleStart,bill.cycleEnd);
+  }
   function calendarDateKeys(bill){
     if(!bill||!validMonthKey(bill.month))return [];
-    if(isCycleBill(bill))return Period.periodDateKeys(bill.month);
+    if(isCycleBill(bill)){
+      const bounds=resolvedCycleBounds(bill);
+      return Period.periodDateKeys(bill.month,bounds);
+    }
     const [year,month]=bill.month.split("-").map(Number),count=monthDays(bill.month),result=[];
     for(let day=1;day<=count;day++)result.push(`${year}-${String(month).padStart(2,"0")}-${String(day).padStart(2,"0")}`);
     return result;
@@ -28,14 +35,17 @@
     if(isCycleBill(bill))return dateKey;
     return String(Number(String(dateKey||"").slice(-2))||0);
   }
-  function cleanCycleDays(rawDays,month){
-    const allowed=Period.periodDateKeys(month),allowedSet=new Set(allowed),output={};
+  function cleanCycleDays(rawDays,bill){
+    const allowed=calendarDateKeys(bill),allowedSet=new Set(allowed),output={};
     const raw=rawDays&&typeof rawDays==="object"&&!Array.isArray(rawDays)?rawDays:{};
-    for(const date of allowed)output[date]=raw[date]===true;
+    // Keep valid historical date keys even when the manager narrows a period.
+    // They stay outside the calculation, but are recoverable if the range is expanded again.
+    for(const [key,value] of Object.entries(raw))if(Period.parseDateKey(key))output[key]=value===true;
+    for(const date of allowed)if(!(date in output))output[date]=false;
     for(const [legacyKey,value] of Object.entries(raw)){
       if(value!==true||/^\d{4}-\d{2}-\d{2}$/.test(legacyKey))continue;
       const day=Number(legacyKey);if(!Number.isInteger(day)||day<1||day>31)continue;
-      const targetMonth=day>=28?Period.shiftMonth(month,-1):month;
+      const targetMonth=day>=28?Period.shiftMonth(bill.month,-1):bill.month;
       const candidate=`${targetMonth}-${String(day).padStart(2,"0")}`;
       if(allowedSet.has(candidate))output[candidate]=true;
     }
@@ -62,14 +72,16 @@
     const normalized=baseNormalizeState(prepared);
     for(const bill of normalized.billing?.months||[]){
       if(!isCycleBill(bill))continue;
-      const bounds=Period.cycleBounds(bill.month);
-      bill.cycleStart=bounds?.start||bill.cycleStart||"";
-      bill.cycleEnd=bounds?.end||bill.cycleEnd||"";
+      const bounds=resolvedCycleBounds(bill);
+      bill.cycleStart=bounds?.start||"";
+      bill.cycleEnd=bounds?.end||"";
+      const defaults=Period.cycleBounds(bill.month);
+      bill.cycleCustomized=!!defaults&&(bill.cycleStart!==defaults.start||bill.cycleEnd!==defaults.end);
       bill.dayMode="date";
       const monthMap=captures.get(bill.month)||new Map();
       for(const person of bill.people||[]){
         const raw=monthMap.get(cycleCaptureKey(person))||{};
-        person.days=cleanCycleDays(raw,bill.month);
+        person.days=cleanCycleDays(raw,bill);
       }
     }
     return normalized;
@@ -94,14 +106,16 @@
   stayCount=function(person,bill=currentBill()){
     if(!person||!bill)return 0;
     if(!isCycleBill(bill))return baseStayCount(person,bill);
-    return Period.periodDateKeys(bill.month).reduce((sum,date)=>sum+(person.days?.[date]===true?1:0),0);
+    return calendarDateKeys(bill).reduce((sum,date)=>sum+(person.days?.[date]===true?1:0),0);
   };
 
   function ensureCycleMetadata(bill){
     if(!bill||!Period.isCycleMonth(bill.month))return bill;
     if(!isCycleBill(bill))return bill;
-    const bounds=Period.cycleBounds(bill.month);
+    const bounds=resolvedCycleBounds(bill);
     bill.cycleStart=bounds.start;bill.cycleEnd=bounds.end;bill.dayMode="date";
+    const defaults=Period.cycleBounds(bill.month);
+    bill.cycleCustomized=bill.cycleStart!==defaults.start||bill.cycleEnd!==defaults.end;
     return bill;
   }
   function allPeriodDays(bill,value=true){
@@ -110,6 +124,7 @@
   function mergePersonRows(bill,target,source){
     target.days=target.days&&typeof target.days==="object"?target.days:{};
     const sourceDays=source?.days&&typeof source.days==="object"?source.days:{};
+    if(isCycleBill(bill))for(const [key,value] of Object.entries(sourceDays))if(Period.parseDateKey(key)&&value===true)target.days[key]=true;
     for(const date of calendarDateKeys(bill)){
       const key=storageKeyForDate(bill,date);
       target.days[key]=target.days[key]===true||sourceDays[key]===true;
@@ -291,7 +306,7 @@
     if(bill.closed)return toast("Kỳ đã chốt sổ");
     if(!["all","weekdays","none"].includes(mode))return toast("Chế độ không hợp lệ");
     if(mode==="none"&&!confirm("Bỏ toàn bộ ngày ở trong kỳ?"))return;
-    person.days={};
+    person.days=person.days&&typeof person.days==="object"?{...person.days}:{};
     for(const dateKey of calendarDateKeys(bill)){
       const parts=dateKey.split("-").map(Number),date=new Date(parts[0],parts[1]-1,parts[2]),dow=date.getDay();
       person.days[storageKeyForDate(bill,dateKey)]=mode==="all"||(mode==="weekdays"&&dow!==0&&dow!==6);
@@ -300,6 +315,83 @@
     persist("Đã cập nhật nhanh ngày ở",{action:"PRESET_BILL_DAYS",summary:`${person.name}: cập nhật nhanh ngày ở ${billingPeriodTitle(bill.month)}`,targetMemberId:person.memberId||null});
   };
 
+  let billingPeriodSavePending=false;
+  function periodRangeText(bill){
+    const bounds=resolvedCycleBounds(bill);
+    return bounds?Period.formatDateRange(bounds.start,bounds.end):"";
+  }
+  function billHasPaymentRecords(bill){
+    return (bill?.people||[]).some(person=>person?.paid===true||(Number(person?.paidAmount)||0)>0||person?.paidAt);
+  }
+  function overlappingCycleBill(month,start,end){
+    return (state.billing?.months||[]).find(other=>{
+      if(other?.month===month||!isCycleBill(other))return false;
+      const bounds=resolvedCycleBounds(other);
+      return !!bounds&&Period.rangesOverlap(start,end,bounds.start,bounds.end);
+    })||null;
+  }
+  function updateBillingPeriodEditorNotice(){
+    const start=$("#billingPeriodStart")?.value||"",end=$("#billingPeriodEnd")?.value||"",notice=$("#billingPeriodEditorWarning");
+    if(!notice)return;
+    const dates=Period.dateRangeKeys(start,end);
+    notice.textContent=dates.length
+      ?`${dates.length} ngày · Tiền điện nước sẽ tự tính lại theo số ngày ở trong khoảng này.`
+      :`Ngày bắt đầu phải trước ngày kết thúc và kỳ không được dài quá ${Period.MAX_CUSTOM_PERIOD_DAYS} ngày.`;
+    notice.classList.toggle("period-editor-error",!dates.length);
+  }
+  function openBillingPeriodEditor(){
+    if(!requireAdmin())return;
+    const bill=periodBillForDisplay();
+    if(!isCycleBill(bill))return toast("Chỉ chỉnh được kỳ điện nước từ 09/2026");
+    if(bill.closed)return toast("Hãy mở khóa kỳ trước khi chỉnh ngày");
+    if(billHasPaymentRecords(bill))return toast("Hãy hủy ghi nhận thanh toán trước khi chỉnh kỳ",5000);
+    const bounds=resolvedCycleBounds(bill);
+    $("#billingPeriodEditorTitle").textContent=`Chỉnh ${billingPeriodTitle(bill.month)}`;
+    $("#billingPeriodEditorCurrent").textContent=`Đang áp dụng: ${Period.formatDateRange(bounds.start,bounds.end)}`;
+    $("#billingPeriodStart").value=bounds.start;$("#billingPeriodEnd").value=bounds.end;
+    updateBillingPeriodEditorNotice();openModal("billingPeriodModal");
+  }
+  function resetBillingPeriodEditor(){
+    const defaults=Period.cycleBounds(state.billing.selectedMonth);if(!defaults)return;
+    $("#billingPeriodStart").value=defaults.start;$("#billingPeriodEnd").value=defaults.end;updateBillingPeriodEditorNotice();
+  }
+  async function saveBillingPeriodEditor(){
+    if(billingPeriodSavePending||!requireAdmin())return;
+    const month=state.billing.selectedMonth,existing=currentBill(),start=$("#billingPeriodStart")?.value||"",end=$("#billingPeriodEnd")?.value||"";
+    if(!Period.isCycleMonth(month))return toast("Kỳ này không hỗ trợ chỉnh ngày");
+    const dates=Period.dateRangeKeys(start,end);
+    if(!dates.length)return toast(`Kỳ phải hợp lệ và không dài quá ${Period.MAX_CUSTOM_PERIOD_DAYS} ngày`,5000);
+    if(existing?.closed)return toast("Hãy mở khóa kỳ trước khi chỉnh ngày");
+    if(billHasPaymentRecords(existing))return toast("Hãy hủy ghi nhận thanh toán trước khi chỉnh kỳ",5000);
+    const overlap=overlappingCycleBill(month,start,end);
+    if(overlap){
+      const bounds=resolvedCycleBounds(overlap);
+      return toast(`Khoảng này trùng ${billingPeriodTitle(overlap.month)} (${Period.formatDateRange(bounds.start,bounds.end)})`,6000);
+    }
+    const previous=resolvedCycleBounds(existing||periodBillForDisplay()),nextSet=new Set(dates);
+    if(previous.start===start&&previous.end===end){closeModal("billingPeriodModal");return toast("Kỳ điện nước không thay đổi");}
+    const hiddenMarkedDays=(existing?.people||[]).reduce((count,person)=>count+Object.entries(person.days||{}).filter(([key,value])=>value===true&&Period.parseDateKey(key)&&!nextSet.has(key)).length,0);
+    const detail=hiddenMarkedDays?` ${hiddenMarkedDays} lượt ngày ở nằm ngoài kỳ mới sẽ được giữ lại an toàn nhưng không tham gia tính tiền.`:"";
+    if(!confirm(`Đổi kỳ từ ${Period.formatDateRange(previous.start,previous.end)} thành ${Period.formatDateRange(start,end)}? Tiền chia sẽ được tính lại.${detail}`))return;
+    const bill=ensureCycleMetadata(ensureBill()),defaults=Period.cycleBounds(month);
+    bill.cycleStart=start;bill.cycleEnd=end;bill.cycleCustomized=start!==defaults.start||end!==defaults.end;bill.updatedAt=nowIso();
+    for(const person of bill.people||[]){
+      person.days=person.days&&typeof person.days==="object"?person.days:{};
+      for(const date of dates)if(!(date in person.days))person.days[date]=false;
+      person.updatedAt=nowIso();
+    }
+    billingPeriodSavePending=true;const button=$("#saveBillingPeriodButton");if(button)button.disabled=true;
+    const ok=await persist("Đã cập nhật kỳ điện nước",{
+      action:"UPDATE_BILLING_PERIOD",summary:`${billingPeriodTitle(month)}: ${Period.formatDateRange(start,end)}`,
+      periodMonth:month,expectedPeriodExists:!!existing,expectedPeriodStart:previous.start,expectedPeriodEnd:previous.end
+    });
+    billingPeriodSavePending=false;if(button)button.disabled=false;if(ok)closeModal("billingPeriodModal");
+  }
+
+  globalThis.openBillingPeriodEditor=openBillingPeriodEditor;
+  globalThis.resetBillingPeriodEditor=resetBillingPeriodEditor;
+  globalThis.saveBillingPeriodEditor=saveBillingPeriodEditor;
+
   function ensureBillingCycleUi(){
     if(!document.querySelector('link[data-billing-cycle-style="1"]')){
       const link=document.createElement("link");link.rel="stylesheet";link.href=`./billing-cycle.css?v=${VERSION}`;link.dataset.billingCycleStyle="1";document.head.appendChild(link);
@@ -307,11 +399,12 @@
     const card=document.querySelector(".calendar-card"),head=card?.querySelector(":scope > .card-head");
     if(card&&head&&!$("#billingPeriodNav")){
       const nav=document.createElement("div");nav.id="billingPeriodNav";nav.className="billing-period-nav";
-      nav.innerHTML=`<button class="period-arrow" id="billingPeriodPrev" type="button" aria-label="Kỳ trước">‹</button><div class="period-copy"><b id="billingPeriodLabel">Kỳ điện nước</b><small id="billingPeriodDates"></small></div><button class="btn small soft" id="billingPeriodCurrent" type="button">Kỳ hiện tại</button><button class="period-arrow" id="billingPeriodNext" type="button" aria-label="Kỳ sau">›</button>`;
+      nav.innerHTML=`<button class="period-arrow" id="billingPeriodPrev" type="button" aria-label="Kỳ trước">‹</button><div class="period-copy"><b id="billingPeriodLabel">Kỳ điện nước</b><small id="billingPeriodDates"></small></div><button class="btn small soft admin-only" id="billingPeriodEdit" type="button">Chỉnh kỳ</button><button class="btn small soft" id="billingPeriodCurrent" type="button">Kỳ hiện tại</button><button class="period-arrow" id="billingPeriodNext" type="button" aria-label="Kỳ sau">›</button>`;
       head.insertAdjacentElement("afterend",nav);
       $("#billingPeriodPrev")?.addEventListener("click",()=>shiftBillingPeriod(-1));
       $("#billingPeriodNext")?.addEventListener("click",()=>shiftBillingPeriod(1));
       $("#billingPeriodCurrent")?.addEventListener("click",()=>goToBillingPeriod(Period.currentPeriodMonth(new Date())));
+      $("#billingPeriodEdit")?.addEventListener("click",openBillingPeriodEditor);
     }
     const field=$("#billMonth")?.closest(".field")?.querySelector("label");if(field)field.textContent="Kỳ điện nước";
     const allPreset=document.querySelector('[data-stay-preset="all"]');if(allPreset)allPreset.textContent="Ở cả kỳ";
@@ -331,7 +424,8 @@
     const cycle=isCycleBill(bill);
     const label=$("#billingPeriodLabel"),dates=$("#billingPeriodDates");
     if(label)label.textContent=cycle?billingPeriodTitle(bill.month):`${monthLabel(bill.month)} · dữ liệu cũ`;
-    if(dates)dates.textContent=cycle?`${Period.formatPeriodRange(bill.month)} · Vuốt ngang để xem kỳ khác`: `${legacyPeriodRange(bill)} · Vuốt ngang để xem tháng khác`;
+    if(dates)dates.textContent=cycle?`${periodRangeText(bill)}${bill.cycleCustomized?" · Đã tùy chỉnh":""} · Vuốt ngang để xem kỳ khác`: `${legacyPeriodRange(bill)} · Vuốt ngang để xem tháng khác`;
+    const edit=$("#billingPeriodEdit");if(edit){edit.classList.toggle("role-hidden",!isAdmin());edit.disabled=!cycle||!!bill.closed;edit.title=bill.closed?"Mở khóa kỳ để chỉnh ngày":"Chỉnh ngày bắt đầu và kết thúc kỳ";}
   }
 
   renderBilling=function(){
@@ -392,11 +486,11 @@
   billingText=function(){
     const bill=currentBill();if(!bill||!isCycleBill(bill))return baseBillingText();
     const calc=billCalc(bill);
-    return [`⚡💧 ĐIỆN NƯỚC ${billingPeriodTitle(bill.month).toUpperCase()}`,`📅 ${Period.formatPeriodRange(bill.month)}`,`Tổng: ${money(calc.b.electricity+calc.b.water)}`,"",...calc.people.map(person=>{
+    return [`⚡💧 ĐIỆN NƯỚC ${billingPeriodTitle(bill.month).toUpperCase()}`,`📅 ${periodRangeText(bill)}`,`Tổng: ${money(calc.b.electricity+calc.b.water)}`,"",...calc.people.map(person=>{
       const due=calc.due[person.id]||0,status=billPaymentState(person,due),label=status==="none"?"KHÔNG PHÁT SINH":status==="paid"?"ĐÃ ĐÓNG":"CHƯA ĐÓNG";
       return `• ${person.name}: ${stayCount(person,calc.b)} ngày · ${money(due)} · ${label}`;
     })].join("\n");
   };
 
-  globalThis.P708BillingCycleUi={goToBillingPeriod,shiftBillingPeriod,billingPeriodTitle,calendarDateKeys};
+  globalThis.P708BillingCycleUi={goToBillingPeriod,shiftBillingPeriod,billingPeriodTitle,calendarDateKeys,updateBillingPeriodEditorNotice};
 })();

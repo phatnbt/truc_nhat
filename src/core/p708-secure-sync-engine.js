@@ -9,6 +9,7 @@ import {
   doc, collection, query, where, orderBy, limit, onSnapshot, runTransaction, serverTimestamp,
   setDoc, deleteDoc, getDoc, getDocs, writeBatch, Timestamp, increment
 } from "https://www.gstatic.com/firebasejs/12.16.0/firebase-firestore.js";
+import { assertBillingPeriodUpdate } from "./billing-cycle-period.js?v=20260921-2";
 
 const clone=value=>value==null?value:JSON.parse(JSON.stringify(value));
 const isObject=value=>value!==null&&typeof value==="object"&&!Array.isArray(value);
@@ -306,6 +307,7 @@ export function createP708SecureEngine({firebaseConfig,roomCode,deviceId,initial
         const roomSnap=await tx.get(roomRef),memberSnaps=[];
         for(const change of memberChanges)memberSnaps.push(await tx.get(doc(memberDataCollection,change.mappedUid)));
         const serverPayload=roomSnap.exists()?clone(roomSnap.data()?.payload)||{}:{},mergedShape=applyJsonOperations(serverPayload,roomOperations),mergedMembers=[];
+        assertBillingPeriodUpdate(serverPayload,mergedShape,audit);
         memberChanges.forEach((change,index)=>{
           const snap=memberSnaps[index],current=snap.exists()?clone(snap.data())||{}:{memberId:change.memberId},merged=applyJsonOperations(current,change.operations);
           merged.memberId=change.memberId;

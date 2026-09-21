@@ -1,6 +1,7 @@
 export const BILLING_CYCLE_CUTOVER_MONTH = "2026-09";
 export const BILLING_CYCLE_START_DAY = 30;
 export const BILLING_CYCLE_END_DAY = 29;
+export const MAX_CUSTOM_PERIOD_DAYS = 62;
 
 const validMonth = value => /^\d{4}-(0[1-9]|1[0-2])$/.test(String(value || ""));
 const pad = value => String(value).padStart(2, "0");
@@ -66,20 +67,41 @@ export function addUtcDays(date, amount) {
   return next;
 }
 
-export function periodDateKeys(month) {
-  const bounds = cycleBounds(month);
-  if (!bounds) return [];
-  const start = parseDateKey(bounds.start), end = parseDateKey(bounds.end);
+export function dateRangeKeys(startValue, endValue, maxDays = MAX_CUSTOM_PERIOD_DAYS) {
+  const start = parseDateKey(startValue), end = parseDateKey(endValue);
+  const limit = Math.max(1, Math.floor(Number(maxDays) || MAX_CUSTOM_PERIOD_DAYS));
+  if (!start || !end || start > end) return [];
   const result = [];
-  for (let cursor = start; cursor && end && cursor <= end; cursor = addUtcDays(cursor, 1)) result.push(dateKey(cursor));
+  for (let cursor = start; cursor <= end && result.length <= limit; cursor = addUtcDays(cursor, 1)) result.push(dateKey(cursor));
+  if (result.length > limit) return [];
   return result;
 }
 
-export function containsDate(month, value) {
-  const bounds = cycleBounds(month), date = parseDateKey(value);
+export function resolveCycleBounds(month, customStart = "", customEnd = "") {
+  const fallback = cycleBounds(month);
+  if (!fallback) return null;
+  const dates = dateRangeKeys(customStart, customEnd);
+  if (!dates.length) return fallback;
+  const endDate = parseDateKey(customEnd);
+  return { month, start: customStart, end: customEnd, endExclusive: dateKey(addUtcDays(endDate, 1)) };
+}
+
+export function periodDateKeys(month, customBounds = null) {
+  const bounds = resolveCycleBounds(month, customBounds?.start, customBounds?.end);
+  return bounds ? dateRangeKeys(bounds.start, bounds.end) : [];
+}
+
+export function containsDate(month, value, customBounds = null) {
+  const bounds = resolveCycleBounds(month, customBounds?.start, customBounds?.end), date = parseDateKey(value);
   if (!bounds || !date) return false;
   const start = parseDateKey(bounds.start), end = parseDateKey(bounds.end);
   return date >= start && date <= end;
+}
+
+export function rangesOverlap(startA, endA, startB, endB) {
+  const aStart = parseDateKey(startA), aEnd = parseDateKey(endA), bStart = parseDateKey(startB), bEnd = parseDateKey(endB);
+  if (!aStart || !aEnd || !bStart || !bEnd || aStart > aEnd || bStart > bEnd) return false;
+  return aStart <= bEnd && bStart <= aEnd;
 }
 
 export function currentPeriodMonth(input = new Date()) {
@@ -90,12 +112,41 @@ export function currentPeriodMonth(input = new Date()) {
   return day >= BILLING_CYCLE_START_DAY ? shiftMonth(base, 1) : base;
 }
 
-export function formatPeriodRange(month, locale = "vi-VN") {
-  const bounds = cycleBounds(month);
-  if (!bounds) return "";
+export function formatDateRange(start, end, locale = "vi-VN") {
+  if (!dateRangeKeys(start, end).length) return "";
   const format = key => {
     const date = parseDateKey(key);
     return new Intl.DateTimeFormat(locale, { day: "2-digit", month: "2-digit", year: "numeric", timeZone: "UTC" }).format(date);
   };
-  return `${format(bounds.start)} – ${format(bounds.end)}`;
+  return `${format(start)} – ${format(end)}`;
+}
+
+export function formatPeriodRange(month, locale = "vi-VN", customBounds = null) {
+  const bounds = resolveCycleBounds(month, customBounds?.start, customBounds?.end);
+  return bounds ? formatDateRange(bounds.start, bounds.end, locale) : "";
+}
+
+// Enforced again inside the Firestore transaction so two managers cannot create
+// overlapping periods or silently overwrite each other's period edit.
+export function assertBillingPeriodUpdate(serverShape, nextShape, audit = {}) {
+  if (audit.action !== "UPDATE_BILLING_PERIOD") return true;
+  const month = String(audit.periodMonth || "");
+  const current = serverShape?.billingMonths?.[month] || null;
+  const next = nextShape?.billingMonths?.[month] || null;
+  if (!validMonth(month) || !next || next.cycleMode !== "28-27") throw new Error("Kỳ điện nước không hợp lệ.");
+  if (Boolean(current) !== Boolean(audit.expectedPeriodExists)) throw new Error("Kỳ điện nước vừa được thay đổi trên thiết bị khác. Hãy tải lại rồi thử lại.");
+  if (current) {
+    const currentBounds = resolveCycleBounds(month, current.cycleStart, current.cycleEnd);
+    if (currentBounds?.start !== audit.expectedPeriodStart || currentBounds?.end !== audit.expectedPeriodEnd) throw new Error("Kỳ điện nước vừa được chỉnh trên thiết bị khác. Hãy tải lại rồi thử lại.");
+    if (current.closed) throw new Error("Kỳ đã được chốt trên thiết bị khác. Hãy tải lại trước khi chỉnh.");
+    if (Object.values(current.people || {}).some(person => person?.paid === true || (Number(person?.paidAmount) || 0) > 0 || person?.paidAt)) throw new Error("Kỳ đã có thanh toán. Hãy hủy thanh toán trước khi chỉnh.");
+  }
+  const dates = dateRangeKeys(next.cycleStart, next.cycleEnd);
+  if (!dates.length) throw new Error(`Kỳ điện nước phải hợp lệ và không dài quá ${MAX_CUSTOM_PERIOD_DAYS} ngày.`);
+  for (const [otherMonth, other] of Object.entries(nextShape?.billingMonths || {})) {
+    if (otherMonth === month || other?.cycleMode !== "28-27") continue;
+    const otherBounds = resolveCycleBounds(otherMonth, other.cycleStart, other.cycleEnd);
+    if (otherBounds && rangesOverlap(next.cycleStart, next.cycleEnd, otherBounds.start, otherBounds.end)) throw new Error(`Kỳ điện nước bị trùng với kỳ ${otherMonth}.`);
+  }
+  return true;
 }
