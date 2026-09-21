@@ -2,6 +2,8 @@
 
 Bản này không dùng Cloud Functions và không yêu cầu nâng project lên Blaze.
 
+> Đây là phương án giới hạn. Streak Pet có kiểm tra server và các thao tác Admin SDK không hoạt động trong phương án này. Cấu hình production hiện tại có Functions; nếu muốn dùng Spark-only phải bỏ riêng mục `functions` khi deploy/cấu hình một biến thể Firebase khác.
+
 ## Deploy
 
 ```powershell
@@ -24,4 +26,4 @@ Trình duyệt không được cấp Firebase Admin SDK, vì vậy nút **Xóa k
 
 Nếu cần xóa luôn tài khoản Auth: Firebase Console → Authentication → Users → chọn người dùng → Delete user.
 
-Thư mục `functions/` được giữ lại làm mã tham khảo nhưng `firebase.json` Free Edition không cấu hình Functions, vì vậy `firebase deploy` sẽ không cố triển khai Functions.
+Lệnh deploy phía trên chỉ chọn Hosting và Rules nên không triển khai thư mục `functions/`.

@@ -242,6 +242,20 @@ service cloud.firestore {
         allow delete: if isAdmin(roomId);
       }
 
+      match /petProfiles/{uid} {
+        allow read: if isAdmin(roomId)
+          || (signedIn() && uid == request.auth.uid && hasActiveAccess(roomId));
+        // XP, streak and evolution are written only by trusted Cloud Functions.
+        allow create, update, delete: if false;
+      }
+
+      match /petCheckins/{checkinId} {
+        allow read: if isAdmin(roomId)
+          || (signedIn() && hasActiveAccess(roomId) && resource.data.uid == request.auth.uid);
+        // The deterministic uid_date document is created inside a server transaction.
+        allow create, update, delete: if false;
+      }
+
       match /auditLogs/{logId} {
         allow read: if isAdmin(roomId);
         allow create: if signedIn() && validAuditCreate(roomId);

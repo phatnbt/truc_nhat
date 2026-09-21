@@ -172,8 +172,8 @@ async function submitTask(index){
   if(existing?.status==="submitted")return toast("Công việc này đã báo hoàn thành và đang chờ xác nhận");
   if(existing?.status==="approved")return toast("Công việc đã được xác nhận");
   try{
-    await realtimeEngine?.submitTask({scheduleId:s.id,weekStart:s.weekStart,taskId:a.taskId,taskName:a.task,memberId:a.personId});
-    toast("Đã báo hoàn thành, chờ trưởng phòng xác nhận");
+    const result=await realtimeEngine?.submitTask({scheduleId:s.id,weekStart:s.weekStart,taskId:a.taskId,taskName:a.task,memberId:a.personId});
+    toast(result?.pet?.awarded?`Đã điểm danh +${result.pet.xpAwarded||20} XP · chờ trưởng phòng xác nhận`:"Đã báo hoàn thành, chờ trưởng phòng xác nhận");
   }catch(e){toast(e?.message||"Không thể báo hoàn thành");}
 }
 async function reviewTask(index,approved){

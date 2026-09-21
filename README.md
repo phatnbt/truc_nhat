@@ -12,7 +12,7 @@
 │   ├── core/                   # State/core + Firebase sync engine
 │   └── features/               # Cleaning, billing, dashboard, UI enhancements
 ├── icons/                      # PWA icons
-├── functions/                  # Cloud Functions tham khảo/tùy chọn
+├── functions/                  # Cloud Functions bảo mật và Streak Pet
 ├── docs/                       # Tài liệu và validation metadata
 ├── .github/                    # QA tests + workflows
 ├── index.html
@@ -31,7 +31,7 @@
 - Logic tính năng và enhancement đặt trong `src/features`.
 - Tài liệu không dùng khi chạy production đặt trong `docs`.
 - Mọi thay đổi vào `main` phải qua workflow `P708 Production QA`.
-- Firebase Hosting và Firestore Rules được deploy tự động khi workflow production chạy thành công.
+- Firebase Hosting, Firestore Rules và Cloud Functions được deploy tự động khi workflow production chạy thành công.
 
 ## Bảo mật cấu hình Firebase
 
@@ -47,4 +47,5 @@ Các credential thật như Firebase service account chỉ được dùng qua Gi
 
 - [Firebase Free Edition](docs/README_FREE_EDITION.md)
 - [P708 Security / Architecture](docs/README_P708_SECURE.md)
+- [Streak Pet](docs/STREAK_PET.md)
 - [Validation metadata](docs/VALIDATION.json)
