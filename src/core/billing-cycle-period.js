@@ -1,6 +1,6 @@
 export const BILLING_CYCLE_CUTOVER_MONTH = "2026-09";
-export const BILLING_CYCLE_START_DAY = 30;
-export const BILLING_CYCLE_END_DAY = 29;
+export const BILLING_CYCLE_START_DAY = 29;
+export const BILLING_CYCLE_END_DAY = 28;
 export const MAX_CUSTOM_PERIOD_DAYS = 62;
 
 const validMonth = value => /^\d{4}-(0[1-9]|1[0-2])$/.test(String(value || ""));
@@ -31,8 +31,8 @@ export function cycleBounds(month) {
   const currentLastDay = daysInMonthKey(month);
   const next = shiftMonth(month, 1);
 
-  // Quy ước chuẩn: ngày 29 chốt sổ, ngày 30 bắt đầu kỳ mới.
-  // Riêng tháng 2 không có ngày 30 (và có thể không có ngày 29), nên kỳ kế
+  // Quy ước chuẩn: ngày 28 chốt sổ, ngày 29 bắt đầu kỳ mới.
+  // Riêng tháng 2 không có ngày 29 trong năm thường, nên kỳ kế
   // tiếp bắt đầu ngày 01 của tháng sau. Cách này bảo đảm không trùng/thiếu ngày.
   const start = previousLastDay >= BILLING_CYCLE_START_DAY
     ? `${previous}-${pad(BILLING_CYCLE_START_DAY)}`
@@ -133,7 +133,7 @@ export function assertBillingPeriodUpdate(serverShape, nextShape, audit = {}) {
   const month = String(audit.periodMonth || "");
   const current = serverShape?.billingMonths?.[month] || null;
   const next = nextShape?.billingMonths?.[month] || null;
-  if (!validMonth(month) || !next || next.cycleMode !== "28-27") throw new Error("Kỳ điện nước không hợp lệ.");
+  if (!validMonth(month) || !next || !["28-27", "29-28"].includes(next.cycleMode)) throw new Error("Kỳ điện nước không hợp lệ.");
   if (Boolean(current) !== Boolean(audit.expectedPeriodExists)) throw new Error("Kỳ điện nước vừa được thay đổi trên thiết bị khác. Hãy tải lại rồi thử lại.");
   if (current) {
     const currentBounds = resolveCycleBounds(month, current.cycleStart, current.cycleEnd);
@@ -144,7 +144,7 @@ export function assertBillingPeriodUpdate(serverShape, nextShape, audit = {}) {
   const dates = dateRangeKeys(next.cycleStart, next.cycleEnd);
   if (!dates.length) throw new Error(`Kỳ điện nước phải hợp lệ và không dài quá ${MAX_CUSTOM_PERIOD_DAYS} ngày.`);
   for (const [otherMonth, other] of Object.entries(nextShape?.billingMonths || {})) {
-    if (otherMonth === month || other?.cycleMode !== "28-27") continue;
+    if (otherMonth === month || !["28-27", "29-28"].includes(other?.cycleMode)) continue;
     const otherBounds = resolveCycleBounds(otherMonth, other.cycleStart, other.cycleEnd);
     if (otherBounds && rangesOverlap(next.cycleStart, next.cycleEnd, otherBounds.start, otherBounds.end)) throw new Error(`Kỳ điện nước bị trùng với kỳ ${otherMonth}.`);
   }

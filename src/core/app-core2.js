@@ -60,6 +60,7 @@ async function persist(message,audit={}){
   saveLocal();renderAll();
   try{
     await realtimeEngine.recordShape(toSyncShape(state),{
+      ...audit,
       action:audit.action||"UPDATE_DATA",
       summary:audit.summary||message||"Cập nhật dữ liệu",
       targetMemberId:audit.targetMemberId||null

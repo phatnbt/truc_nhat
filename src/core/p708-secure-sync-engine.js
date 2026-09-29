@@ -9,7 +9,7 @@ import {
   doc, collection, query, where, orderBy, limit, onSnapshot, runTransaction, serverTimestamp,
   setDoc, deleteDoc, getDoc, getDocs, writeBatch, Timestamp, increment
 } from "https://www.gstatic.com/firebasejs/12.16.0/firebase-firestore.js";
-import { assertBillingPeriodUpdate } from "./billing-cycle-period.js?v=20260921-2";
+import { assertBillingPeriodUpdate } from "./billing-cycle-period.js?v=20260929-1";
 
 const clone=value=>value==null?value:JSON.parse(JSON.stringify(value));
 const isObject=value=>value!==null&&typeof value==="object"&&!Array.isArray(value);

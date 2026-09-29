@@ -64,6 +64,9 @@ jobs:
       - name: Billing cycle and swipe history regression tests
         run: node .github/billing-cycle.test.mjs
 
+      - name: Production billing period migration tests
+        run: node .github/production-billing-period-29-28.test.mjs
+
       - name: Cleaning week deletion resurrection regression tests
         run: node .github/cleaning-delete-tombstone.test.mjs
 

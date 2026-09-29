@@ -2,9 +2,11 @@
   const Period=globalThis.P708BillingCycle;
   if(!Period)throw new Error("Billing cycle utilities are not available");
 
-  const VERSION="20260921-2";
+  const VERSION="20260929-1";
   const nameKey=value=>String(value||"").normalize("NFKC").trim().replace(/\s+/g," ").toLocaleLowerCase("vi-VN");
-  const isCycleBill=bill=>bill?.cycleMode==="28-27";
+  // "28-27" is the legacy persisted tag. Keep accepting it for older installed
+  // clients; cycleRule carries the actual 29→28 rule on new/updated records.
+  const isCycleBill=bill=>["28-27","29-28"].includes(bill?.cycleMode);
   const baseNormalizeState=normalizeState;
   const baseEnsureBill=ensureBill;
   const baseStayCount=stayCount;
@@ -97,7 +99,7 @@
     const bounds=Period.cycleBounds(state.billing.selectedMonth);
     bill={
       id:uid(),month:state.billing.selectedMonth,electricity:0,water:0,closed:false,people:[],
-      cycleMode:"28-27",dayMode:"date",cycleStart:bounds.start,cycleEnd:bounds.end,updatedAt:nowIso()
+      cycleMode:"28-27",dayMode:"date",cycleRule:"29-28",cycleStart:bounds.start,cycleEnd:bounds.end,updatedAt:nowIso()
     };
     state.billing.months.push(bill);
     return bill;
@@ -114,6 +116,7 @@
     if(!isCycleBill(bill))return bill;
     const bounds=resolvedCycleBounds(bill);
     bill.cycleStart=bounds.start;bill.cycleEnd=bounds.end;bill.dayMode="date";
+    bill.cycleRule="29-28";
     const defaults=Period.cycleBounds(bill.month);
     bill.cycleCustomized=bill.cycleStart!==defaults.start||bill.cycleEnd!==defaults.end;
     return bill;
@@ -229,7 +232,7 @@
     const month=state.billing.selectedMonth;
     if(Period.isCycleMonth(month)){
       const bounds=Period.cycleBounds(month);
-      return {month,electricity:0,water:0,closed:false,people:[],cycleMode:"28-27",dayMode:"date",cycleStart:bounds.start,cycleEnd:bounds.end};
+      return {month,electricity:0,water:0,closed:false,people:[],cycleMode:"28-27",dayMode:"date",cycleRule:"29-28",cycleStart:bounds.start,cycleEnd:bounds.end};
     }
     return {month,electricity:0,water:0,closed:false,people:[]};
   }
@@ -374,7 +377,7 @@
     const detail=hiddenMarkedDays?` ${hiddenMarkedDays} lượt ngày ở nằm ngoài kỳ mới sẽ được giữ lại an toàn nhưng không tham gia tính tiền.`:"";
     if(!confirm(`Đổi kỳ từ ${Period.formatDateRange(previous.start,previous.end)} thành ${Period.formatDateRange(start,end)}? Tiền chia sẽ được tính lại.${detail}`))return;
     const bill=ensureCycleMetadata(ensureBill()),defaults=Period.cycleBounds(month);
-    bill.cycleStart=start;bill.cycleEnd=end;bill.cycleCustomized=start!==defaults.start||end!==defaults.end;bill.updatedAt=nowIso();
+    bill.cycleStart=start;bill.cycleEnd=end;bill.cycleRule="29-28";bill.cycleCustomized=start!==defaults.start||end!==defaults.end;bill.updatedAt=nowIso();
     for(const person of bill.people||[]){
       person.days=person.days&&typeof person.days==="object"?person.days:{};
       for(const date of dates)if(!(date in person.days))person.days[date]=false;
@@ -425,7 +428,7 @@
     const label=$("#billingPeriodLabel"),dates=$("#billingPeriodDates");
     if(label)label.textContent=cycle?billingPeriodTitle(bill.month):`${monthLabel(bill.month)} · dữ liệu cũ`;
     if(dates)dates.textContent=cycle?`${periodRangeText(bill)}${bill.cycleCustomized?" · Đã tùy chỉnh":""} · Vuốt ngang để xem kỳ khác`: `${legacyPeriodRange(bill)} · Vuốt ngang để xem tháng khác`;
-    const edit=$("#billingPeriodEdit");if(edit){edit.classList.toggle("role-hidden",!isAdmin());edit.disabled=!cycle||!!bill.closed;edit.title=bill.closed?"Mở khóa kỳ để chỉnh ngày":"Chỉnh ngày bắt đầu và kết thúc kỳ";}
+    const edit=$("#billingPeriodEdit");if(edit){edit.classList.toggle("role-hidden",!isAdmin());edit.disabled=!cycle;edit.title=bill.closed?"Kỳ đang khóa — bấm để xem hướng dẫn":"Chỉnh ngày bắt đầu và kết thúc kỳ";}
   }
 
   renderBilling=function(){
