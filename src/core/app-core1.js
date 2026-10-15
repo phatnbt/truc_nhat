@@ -2,9 +2,9 @@ const TASKS = [
   {id:"lavabo",name:"Lavabo - Toilet",emoji:"🚽",w:4},
   {id:"san",name:"Sàn NVS - cống",emoji:"🧼",w:5},
   {id:"quet",name:"Quét nhà",emoji:"🧹",w:3},
-  {id:"lau",name:"Lau nhà",emoji:"🪣",w:4},
+  {id:"lau",name:"Lau Nhà & Ban công",emoji:"🪣",w:4},
   {id:"tham",name:"Giặt thảm",emoji:"🧺",w:2},
-  {id:"rac",name:"Vứt rác và chà tường",emoji:"🗑️",w:4}
+  {id:"rac",name:"Vứt rác và chà tường",emoji:"🗑️",w:3}
 ];
 const FIREBASE_CONFIG = Object.freeze({...globalThis.P708_FIREBASE_CONFIG});
 try{delete globalThis.P708_FIREBASE_CONFIG;}catch{globalThis.P708_FIREBASE_CONFIG=undefined;}
@@ -55,7 +55,7 @@ function normalizeState(input){
   // The cleaning task catalog is authoritative; migrate legacy task weights
   // on every client that still has cached or persisted state.
   s.settings.weights.lavabo=4;
-  s.settings.weights.rac=4;
+  s.settings.weights.rac=3;
   s.settings.cleaningPointsResetThrough=validDateKey(s.settings.cleaningPointsResetThrough)?s.settings.cleaningPointsResetThrough:"";
   s.settings.cleaningPointsResetAt=String(s.settings.cleaningPointsResetAt||"");
   for(const task of TASKS){const value=Number(s.settings.weights[task.id]);s.settings.weights[task.id]=Number.isFinite(value)&&value>=0?value:task.w;}

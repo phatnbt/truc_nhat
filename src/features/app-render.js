@@ -38,6 +38,16 @@ function renderCleaning(){
   $$('[data-schedule-id]').forEach(btn=>btn.addEventListener("click",()=>selectSchedule(btn.dataset.scheduleId)));
 }
 
+function renderCleaningRules(){
+  const list=$("#cleaningRulesTaskList");
+  if(!list)return;
+  list.innerHTML=TASKS.map(task=>{
+    const configured=Number(state.settings?.weights?.[task.id]);
+    const points=Number.isFinite(configured)&&configured>=0?configured:task.w;
+    return `<div class="cleaning-rule-row"><span class="cleaning-rule-icon" aria-hidden="true">${task.emoji}</span><b>${esc(task.name)}</b><span class="cleaning-rule-points">${formatCleaningPoints(points)} điểm</span></div>`;
+  }).join("");
+}
+
 function paymentLabel(person,due){
   const status=billPaymentState(person,due);
   return status==="none"?"Không phát sinh":status==="paid"?"Đã đóng":"Chưa đóng";
@@ -120,5 +130,5 @@ function renderSync(){
 }
 function renderAll(){
   state=normalizeState(state);ui.selectedMonth=state.billing.selectedMonth;
-  renderPermission();renderAccountButton();renderHome();renderCleaning();renderBilling();renderAudit();renderAccessModal();renderSync();saveLocal();scheduleReminderNotifications();
+  renderPermission();renderAccountButton();renderHome();renderCleaning();renderCleaningRules();renderBilling();renderAudit();renderAccessModal();renderSync();saveLocal();scheduleReminderNotifications();
 }

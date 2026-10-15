@@ -77,6 +77,7 @@ function bindStaticEvents(){
   $("#signOutButton")?.addEventListener("click",secureSignOut);
   $("#notificationButton")?.addEventListener("click",requestNotifications);
   $("#refreshReminderButton")?.addEventListener("click",()=>{renderHome();scheduleReminderNotifications(true);toast("Đã làm mới nhắc việc");});
+  $("#cleaningRulesButton")?.addEventListener("click",()=>{renderCleaningRules();openModal("cleaningRulesModal");});
 
   $("#addMemberButton")?.addEventListener("click",addMember);
   $("#cleanMemberName")?.addEventListener("keydown",e=>{if(e.key==="Enter")addMember();});
