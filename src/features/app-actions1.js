@@ -108,7 +108,7 @@ async function createSchedule(){
     loads[chosen.id].week+=task.w;loads[chosen.id].count++;
     return {taskId:task.id,task:task.name,personId:chosen.id,personName:chosen.name,completed:false,cut:false};
   });
-  if(absent===1)assignments.push({taskId:"rac",task:"Vứt rác và chà tường",personId:null,personName:"Tạm cắt",completed:false,cut:true});
+  if(absent===1)assignments.push({taskId:"rac",task:"Vứt rác & chà tường",personId:null,personName:"Tạm cắt",completed:false,cut:true});
 
   const old=state.schedules.find(s=>s.weekStart===week);
   if(old&&!confirm("Tuần này đã có lịch. Ghi đè? Mọi trạng thái hoàn thành của tuần này sẽ được tạo lại."))return;

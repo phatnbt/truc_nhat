@@ -4,7 +4,7 @@ const TASKS = [
   {id:"quet",name:"Quét nhà",emoji:"🧹",w:3},
   {id:"lau",name:"Lau Nhà & Ban công",emoji:"🪣",w:4},
   {id:"tham",name:"Giặt thảm",emoji:"🧺",w:2},
-  {id:"rac",name:"Vứt rác và chà tường",emoji:"🗑️",w:3}
+  {id:"rac",name:"Vứt rác & chà tường",emoji:"🗑️",w:3}
 ];
 const FIREBASE_CONFIG = Object.freeze({...globalThis.P708_FIREBASE_CONFIG});
 try{delete globalThis.P708_FIREBASE_CONFIG;}catch{globalThis.P708_FIREBASE_CONFIG=undefined;}
