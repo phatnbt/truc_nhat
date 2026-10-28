@@ -6,7 +6,7 @@
     ["⚡","lightning-charge-fill"],["👥","people-fill"],["💳","credit-card-2-front-fill"],
     ["👑","shield-lock-fill"],["🧾","receipt-cutoff"],["☁️","cloud-arrow-up-fill"],
     ["📋","clipboard2-fill"],["✨","stars"],["🚽","badge-wc-fill"],["🧼","droplet-fill"],
-    ["🪣","bucket-fill"],["🧺","basket2-fill"],["🗑️","trash3-fill"],["👤","person-fill"],
+    ["🪣","bucket-fill"],["🧺","basket2-fill"],["🧱","bricks"],["🗑️","trash3-fill"],["👤","person-fill"],
     ["💰","cash-stack"],["🔓","unlock-fill"],["🔒","lock-fill"],["⚠️","exclamation-triangle-fill"],
     ["⏳","hourglass-split"],["✅","check-circle-fill"],["🟢","circle-fill"],["⚪","circle"],
     ["🔴","circle-fill"],["📅","calendar-week"],["🗓️","calendar-week"],["🚫","slash-circle"],
@@ -14,7 +14,7 @@
     ["📈","graph-up-arrow"],["📉","graph-down-arrow"],["🔄","arrow-repeat"],["↻","arrow-clockwise"],
     ["✓","check-lg"],["←","arrow-left"],["→","arrow-right"]
   ]);
-  const emojiPattern=/🔐|🏠|🔔|🧹|⚡|👥|💳|👑|🧾|☁️|📋|✨|🚽|🧼|🪣|🧺|🗑️|👤|💰|🔓|🔒|⚠️|⏳|✅|🟢|⚪|🔴|📅|🗓️|🚫|🏡|💧|💡|📊|📈|📉|🔄|↻|✓|←|→/g;
+  const emojiPattern=/🔐|🏠|🔔|🧹|⚡|👥|💳|👑|🧾|☁️|📋|✨|🚽|🧼|🪣|🧺|🧱|🗑️|👤|💰|🔓|🔒|⚠️|⏳|✅|🟢|⚪|🔴|📅|🗓️|🚫|🏡|💧|💡|📊|📈|📉|🔄|↻|✓|←|→/g;
 
   function ensureIconStyles(){
     if(!document.querySelector('link[data-bootstrap-icons="1"]')){
