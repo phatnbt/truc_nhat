@@ -18,10 +18,10 @@
   // Override the base notification helpers with local-date semantics. The old helper
   // used UTC and marked a notification as delivered before the browser actually
   // accepted it, which could suppress retries after an OS/browser failure.
-  notificationKey=function(title){return `P708_NOTIFY_${localDateKey()}_${title}`;};
-  showNotification=async function(title,body){
+  notificationKey=function(title,scope=""){return `P708_NOTIFY_${localDateKey()}_${title}_${scope}`;};
+  showNotification=async function(title,body,scope=""){
     if(permissionState()!=="granted")return false;
-    const key=notificationKey(title);
+    const key=notificationKey(title,scope);
     if(storageGet(key)||notificationInFlight.has(key))return false;
     notificationInFlight.add(key);
     try{
@@ -122,6 +122,20 @@
     await showNotification(`P708 · Nhắc trực tối ${dayLabel}`,`Bạn còn ${pending.length} việc trực tuần này: ${summary}. Hãy hoàn thành và báo đã làm.`);
   }
 
+  async function notifyAdminCleaningReminder(myId){
+    const reminder=state?.settings?.cleaningReminder;
+    if(!reminder?.id||!reminder?.memberIds?.includes(myId))return;
+    const seenKey=`P708_CLEANING_REMINDER_${actorKey(myId)}_${reminder.id}`;
+    if(storageGet(seenKey)==="1")return;
+    const schedule=(state?.schedules||[]).find(item=>item.weekStart===reminder.weekStart);
+    const pending=pendingAssignments(schedule,myId);if(!pending.length)return;
+    const tasks=pending.map(item=>item.task).filter(Boolean);
+    const summary=tasks.length<=2?tasks.join(" · "):`${tasks.slice(0,2).join(" · ")} +${tasks.length-2} việc`;
+    const title="P708 · Trưởng phòng nhắc việc trực";
+    const sent=await showNotification(title,`Bạn còn ${pending.length} việc: ${summary}. Hãy hoàn thành và báo đã làm.`,reminder.id);
+    if(sent||storageGet(notificationKey(title,reminder.id)))storageSet(seenKey,"1");
+  }
+
   function latestClosedBill(){
     return [...(state?.billing?.months||[])]
       .filter(item=>item?.closed&&item?.month)
@@ -138,6 +152,7 @@
     if(permissionState()!=="granted"||authSession?.status!=="active")return;
     if(!force&&storageGet(AUTO_NOTIFY_KEY)!=="1")return;
     const myId=myMemberId?.();if(!myId)return;
+    await notifyAdminCleaningReminder(myId);
     await notifyNewSchedule(myId);
     await notifyWednesdayThursdayEvening(myId,new Date());
     await notifyClosedBill(myId);

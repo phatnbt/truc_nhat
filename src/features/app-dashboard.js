@@ -73,6 +73,20 @@ function renderHome(){
   const reminders=[];
   if(authSession.status==="active"){
     const myId=myMemberId();
+    const sharedReminder=state.settings?.cleaningReminder;
+    if(myId&&sharedReminder?.memberIds?.includes(myId)){
+      const reminderSchedule=state.schedules.find(item=>item.weekStart===sharedReminder.weekStart);
+      const pending=(reminderSchedule?.assignments||[]).filter(assignment=>{
+        if(assignment.personId!==myId||assignment.cut||assignment.completed)return false;
+        const submission=submissionFor(reminderSchedule,assignment);
+        return submission?.status!=="submitted"&&submission?.status!=="approved";
+      });
+      if(pending.length)reminders.push({
+        icon:"🔔",title:`${sharedReminder.senderName||"Trưởng phòng"} nhắc bạn hoàn thành việc trực`,
+        detail:`${pending.map(item=>item.task).join(" · ")} · ${weekRange(sharedReminder.weekStart)}`,
+        action:"cleaning",label:"Xem việc"
+      });
+    }
     if(myId&&schedule){
       schedule.assignments.forEach((a,index)=>{
         if(a.personId!==myId||a.cut||a.completed)return;

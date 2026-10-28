@@ -123,7 +123,7 @@
       <div class="shell">
         <header class="topbar">
           <div class="brand"><button class="icon-btn" data-go="home" type="button">←</button><div><h1>Lịch trực nhật</h1><p>Phân công công bằng · báo hoàn thành · xác nhận</p></div></div>
-          <div class="top-actions"><button class="btn" id="cleaningRulesButton" type="button" aria-haspopup="dialog">ⓘ Luật tính điểm</button><button class="btn soft" id="copyScheduleButton" type="button">📋 Copy lịch</button></div>
+          <div class="top-actions"><button class="btn soft admin-only" id="sendCleaningReminderButton" type="button">🔔 Nhắc thành viên</button><button class="btn" id="cleaningRulesButton" type="button" aria-haspopup="dialog">ⓘ Luật tính điểm</button><button class="btn soft" id="copyScheduleButton" type="button">📋 Copy lịch</button></div>
         </header>
         <div class="two-col">
           <aside class="card sidebar-card">
@@ -233,6 +233,6 @@
       window.addEventListener("p708:boot-ready",()=>{clearTimeout(timer);try{sessionStorage.removeItem(repairKey);}catch{}},{once:true});
     })();
   </script>
-  <script type="module" src="./app.js?v=20261015-2"></script>
+  <script type="module" src="./app.js?v=20261029-1"></script>
 </body>
 </html>

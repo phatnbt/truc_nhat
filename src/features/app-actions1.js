@@ -85,6 +85,29 @@ function setAllPresent(){
   state.members.forEach(m=>state.presence[m.id]=true);
   persist("Đã đánh dấu tất cả có mặt",{action:"SET_ALL_PRESENCE",summary:"Đánh dấu tất cả có mặt"});
 }
+async function sendCleaningReminder(){
+  if(!requireAdmin())return;
+  const schedule=currentSchedule();
+  if(!schedule)return toast("Chưa có lịch để nhắc");
+  const pending=(schedule.assignments||[]).filter(assignment=>{
+    if(!assignment?.personId||assignment.cut||assignment.completed)return false;
+    const submission=submissionFor(schedule,assignment);
+    return submission?.status!=="submitted"&&submission?.status!=="approved";
+  });
+  const memberIds=[...new Set(pending.map(assignment=>assignment.personId))];
+  if(!memberIds.length)return toast("Không có thành viên nào còn việc cần nhắc");
+  const names=memberIds.map(id=>state.members.find(member=>member.id===id)?.name).filter(Boolean);
+  const preview=names.length<=4?names.join(", "):`${names.slice(0,4).join(", ")} và ${names.length-4} người khác`;
+  if(!confirm(`Gửi nhắc việc trực tuần này tới ${preview||memberIds.length+" thành viên"}?`))return;
+  state.settings.cleaningReminder={
+    id:uid(),createdAt:nowIso(),weekStart:schedule.weekStart,memberIds,
+    senderName:String(authSession.access?.displayName||authSession.user?.displayName||"Trưởng phòng").trim().slice(0,80)||"Trưởng phòng"
+  };
+  await persist(`Đã nhắc ${memberIds.length} thành viên`,{
+    action:"SEND_CLEANING_REMINDER",
+    summary:`Nhắc ${memberIds.length} thành viên hoàn thành việc trực tuần ${schedule.weekStart}`
+  });
+}
 async function createSchedule(){
   if(!requireAdmin())return;
   const week=$("#cleanWeek").value;
@@ -108,7 +131,7 @@ async function createSchedule(){
     loads[chosen.id].week+=task.w;loads[chosen.id].count++;
     return {taskId:task.id,task:task.name,personId:chosen.id,personName:chosen.name,completed:false,cut:false};
   });
-  if(absent===1)assignments.push({taskId:"rac",task:"Vứt rác & chà tường",personId:null,personName:"Tạm cắt",completed:false,cut:true});
+  if(absent===1)assignments.push({taskId:"rac",task:"Chà tường",personId:null,personName:"Tạm cắt",completed:false,cut:true});
 
   const old=state.schedules.find(s=>s.weekStart===week);
   if(old&&!confirm("Tuần này đã có lịch. Ghi đè? Mọi trạng thái hoàn thành của tuần này sẽ được tạo lại."))return;

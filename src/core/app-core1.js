@@ -4,7 +4,7 @@ const TASKS = [
   {id:"quet",name:"Quét nhà",emoji:"🧹",w:3},
   {id:"lau",name:"Lau Nhà & Ban công",emoji:"🪣",w:4},
   {id:"tham",name:"Giặt thảm",emoji:"🧺",w:2},
-  {id:"rac",name:"Vứt rác & chà tường",emoji:"🗑️",w:3}
+  {id:"rac",name:"Chà tường",emoji:"🧱",w:2}
 ];
 const FIREBASE_CONFIG = Object.freeze({...globalThis.P708_FIREBASE_CONFIG});
 try{delete globalThis.P708_FIREBASE_CONFIG;}catch{globalThis.P708_FIREBASE_CONFIG=undefined;}
@@ -41,7 +41,7 @@ function nextMonday(){ const d=new Date(); d.setHours(0,0,0,0); const day=d.getD
 function weekRange(v){ const s=parseDate(v); if(Number.isNaN(s.getTime()))return String(v||""); const e=addDays(s,6); const f=d=>new Intl.DateTimeFormat("vi-VN",{day:"2-digit",month:"2-digit",year:"numeric"}).format(d); return `${f(s)} – ${f(e)}`; }
 function timeMs(v){ const n=Date.parse(v||""); return Number.isFinite(n)?n:0; }
 function toast(message,duration=3000){ const el=$("#toast"); if(!el)return; el.textContent=message; el.classList.add("show"); clearTimeout(toast.timer); toast.timer=setTimeout(()=>el.classList.remove("show"),duration); }
-function defaultState(){ return {members:[],presence:{},schedules:[],billing:{selectedMonth:todayMonth(),months:[]},settings:{weights:Object.fromEntries(TASKS.map(t=>[t.id,t.w])),cleaningPointAdjustments:{},cleaningPointsResetThrough:"",cleaningPointsResetAt:""},updatedAt:""}; }
+function defaultState(){ return {members:[],presence:{},schedules:[],billing:{selectedMonth:todayMonth(),months:[]},settings:{weights:Object.fromEntries(TASKS.map(t=>[t.id,t.w])),cleaningPointAdjustments:{},cleaningPointsResetThrough:"",cleaningPointsResetAt:"",cleaningReminder:null},updatedAt:""}; }
 function defaultUi(){ return {selectedMonth:todayMonth(),selectedScheduleId:null,activeBillPersonId:null}; }
 
 function normalizeState(input){
@@ -55,7 +55,7 @@ function normalizeState(input){
   // The cleaning task catalog is authoritative; migrate legacy task weights
   // on every client that still has cached or persisted state.
   s.settings.weights.lavabo=4;
-  s.settings.weights.rac=3;
+  s.settings.weights.rac=2;
   s.settings.cleaningPointsResetThrough=validDateKey(s.settings.cleaningPointsResetThrough)?s.settings.cleaningPointsResetThrough:"";
   s.settings.cleaningPointsResetAt=String(s.settings.cleaningPointsResetAt||"");
   for(const task of TASKS){const value=Number(s.settings.weights[task.id]);s.settings.weights[task.id]=Number.isFinite(value)&&value>=0?value:task.w;}
@@ -79,6 +79,17 @@ function normalizeState(input){
     const value=Number(s.settings.cleaningPointAdjustments[member.id]);
     return [member.id,Number.isFinite(value)&&value>=0?value:0];
   }).filter(([,value])=>value>0));
+  const reminder=s.settings.cleaningReminder;
+  if(reminder&&typeof reminder==="object"&&!Array.isArray(reminder)&&reminder.id&&validDateKey(reminder.weekStart)){
+    const memberIds=new Set(s.members.map(member=>member.id));
+    s.settings.cleaningReminder={
+      id:String(reminder.id).slice(0,160),
+      createdAt:String(reminder.createdAt||"").slice(0,40),
+      weekStart:reminder.weekStart,
+      memberIds:[...new Set((Array.isArray(reminder.memberIds)?reminder.memberIds:[]).map(String).filter(id=>memberIds.has(id)))],
+      senderName:String(reminder.senderName||"Trưởng phòng").trim().slice(0,80)||"Trưởng phòng"
+    };
+  }else s.settings.cleaningReminder=null;
 
   s.schedules=s.schedules.filter(schedule=>schedule&&validDateKey(schedule.weekStart)).map(schedule=>{
     schedule.id=String(schedule.id||uid());
