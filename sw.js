@@ -1,18 +1,37 @@
-const CACHE_NAME="p708-manager-v5-runtime-fallback-20261029-1";
+const CACHE_NAME="p708-manager-v5-runtime-fallback-20261029-2";
 const APP_SHELL=[
   "./","./index.html","./styles.css","./landing-ui.css","./utility-chart.css","./mobile-notification-ui.css","./kpi-polish.css","./billing-cycle.css","./cleaning-pet.css","./icon-polish.css","./app.js","./src/boot/app-loader.js","./src/boot/app-start.js","./src/core/app-core1.js","./src/core/app-core2.js","./src/core/p708-secure-sync-engine.js","./src/core/p708-authoritative-repair.js","./src/core/p708-identity-plan.js","./src/core/p708-canonical-mapping-repair.js","./src/core/billing-cycle-period.js","./src/core/cleaning-fairness.js","./src/core/cleaning-streak.js","./src/core/cleaning-schedule-store.js","./src/features/app-actions1.js","./src/features/cleaning-fairness-upgrade.js","./src/features/app-actions2.js","./src/features/cleaning-delete-fix.js","./src/features/app-dashboard.js","./src/features/app-render.js","./src/features/cleaning-pet-streak.js","./src/features/app-integrity-fixes.js","./src/features/inactive-mapping-dedup-fix.js","./src/features/canonical-identity-repair.js","./src/features/billing-canonical-repair.js","./src/features/billing-stable-repair.js","./src/features/billing-membership-exclusion.js","./src/features/billing-cycle-history.js","./src/features/home-enhancements.js","./src/features/home-pet-garden.js","./src/features/ui-icon-polish.js","./src/features/notification-enhancements.js","./src/features/today-calendar.js","./src/features/mobile-install-bridge.js","./src/features/mobile-install-guide.js","./manifest.webmanifest","./offline.html","./icons/icon-32.png","./icons/icon-192.png","./icons/icon-512.png","./icons/icon-maskable-512.png","./icons/pets/cloud-egg.svg","./icons/pets/cloud-sprout.svg","./icons/pets/cloud-cat.svg","./icons/pets/cloud-guardian.svg","./icons/pets/cloud-celestial.svg"
 ];
-self.addEventListener("install",event=>event.waitUntil((async()=>{const cache=await caches.open(CACHE_NAME);await cache.addAll(APP_SHELL);await self.skipWaiting();})()));
+function isValidRuntimeResponse(request,response){
+  if(!response?.ok)return false;
+  const url=new URL(typeof request==="string"?request:request.url,self.location.href);
+  const type=String(response.headers.get("content-type")||"").toLowerCase();
+  if(url.pathname.endsWith(".js"))return type.includes("javascript");
+  if(url.pathname.endsWith(".css"))return type.includes("text/css");
+  if(url.pathname.endsWith(".html"))return type.includes("text/html");
+  if(url.pathname.endsWith(".webmanifest"))return type.includes("json")||type.includes("manifest");
+  return true;
+}
+async function precacheAppShell(){
+  const cache=await caches.open(CACHE_NAME);
+  await Promise.all(APP_SHELL.map(async path=>{
+    const request=new Request(path,{cache:"reload"});
+    const response=await fetch(request);
+    if(!isValidRuntimeResponse(request,response))throw new Error(`Invalid app-shell response: ${path}`);
+    await cache.put(request,response);
+  }));
+}
+self.addEventListener("install",event=>event.waitUntil((async()=>{await precacheAppShell();await self.skipWaiting();})()));
 self.addEventListener("activate",event=>event.waitUntil((async()=>{const keys=await caches.keys();await Promise.all(keys.filter(key=>key!==CACHE_NAME).map(key=>caches.delete(key)));await self.clients.claim();})()));
 self.addEventListener("message",event=>{if(event.data?.type==="SKIP_WAITING")self.skipWaiting();});
 self.addEventListener("notificationclick",event=>{event.notification.close();event.waitUntil((async()=>{const clientsList=await clients.matchAll({type:"window",includeUncontrolled:true});const target=event.notification?.data?.url||"./";const existing=clientsList.find(client=>client.url.startsWith(self.location.origin));if(existing){await existing.focus();if("navigate" in existing)await existing.navigate(target).catch(()=>{});return;}await clients.openWindow(target);})());});
 async function cachedResponse(request,fallback){
-  const exact=await caches.match(request);if(exact)return exact;
+  const exact=await caches.match(request);if(exact&&isValidRuntimeResponse(request,exact))return exact;
   const url=new URL(typeof request==="string"?request:request.url);
-  if(url.origin===self.location.origin&&url.search){const withoutQuery=await caches.match(`${url.origin}${url.pathname}`);if(withoutQuery)return withoutQuery;}
+  if(url.origin===self.location.origin&&url.search){const withoutQuery=await caches.match(`${url.origin}${url.pathname}`);if(withoutQuery&&isValidRuntimeResponse(request,withoutQuery))return withoutQuery;}
   return fallback?await caches.match(fallback):null;
 }
-async function networkFirst(request,fallback){try{const response=await fetch(request,{cache:"no-store"});if(response?.ok){const cache=await caches.open(CACHE_NAME);await cache.put(request,response.clone());return response;}return (await cachedResponse(request,fallback))||response;}catch{return (await cachedResponse(request,fallback))||Response.error();}}
+async function networkFirst(request,fallback){try{const response=await fetch(request,{cache:"no-store"});if(isValidRuntimeResponse(request,response)){const cache=await caches.open(CACHE_NAME);await cache.put(request,response.clone());return response;}return (await cachedResponse(request,fallback))||Response.error();}catch{return (await cachedResponse(request,fallback))||Response.error();}}
 self.addEventListener("fetch",event=>{
   if(event.request.method!=="GET")return;
   const url=new URL(event.request.url);

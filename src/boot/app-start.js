@@ -129,7 +129,7 @@ function bindStaticEvents(){
 async function registerPwa(){
   if(!("serviceWorker" in navigator)||location.protocol==="file:")return;
   try{
-    const reg=await navigator.serviceWorker.register("./sw.js?v=20261029-1",{scope:"./"});
+    const reg=await navigator.serviceWorker.register("./sw.js?v=20261029-2",{scope:"./"});
     setTimeout(()=>reg.update().catch(()=>{}),1500);
   }catch(e){console.warn("PWA",e);}
 }

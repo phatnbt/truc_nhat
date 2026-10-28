@@ -214,7 +214,7 @@
   <div class="toast" id="toast"></div>
   <script>
     (()=>{
-      const repairKey="P708_BOOT_REPAIR_20260929_1",baseUrl=new URL("./",location.href).href;
+      const release="20261029-2",repairKey="P708_BOOT_REPAIR_20261029_2",releaseKey="P708_BOOT_RELEASE_20261029-2",baseUrl=new URL("./",location.href).href;
       let timer=null;
       const clearAppShell=async()=>{
         try{if("caches" in window){const keys=await caches.keys();await Promise.all(keys.filter(key=>key.startsWith("p708-manager-")).map(key=>caches.delete(key)));}}catch{}
@@ -222,6 +222,13 @@
       };
       const wasRepaired=()=>{try{return sessionStorage.getItem(repairKey)==="1";}catch{return false;}};
       const markRepaired=()=>{try{sessionStorage.setItem(repairKey,"1");}catch{}};
+      const prepareRelease=async()=>{
+        let prepared=false;try{prepared=localStorage.getItem(releaseKey)==="1";}catch{}
+        if(prepared)return;
+        await clearAppShell();
+        try{localStorage.setItem(releaseKey,"1");}catch{}
+      };
+      globalThis.P708_BOOT_PREPARE=prepareRelease();
       const reload=async()=>{await clearAppShell();location.replace(`${location.pathname}?boot-repair=${Date.now()}${location.hash||""}`);};
       const showRecovery=()=>{
         const box=document.querySelector("#authGateContent");if(!box||(!box.textContent.includes("Đang khởi động")&&!box.dataset.bootProgress))return;
@@ -233,6 +240,10 @@
       window.addEventListener("p708:boot-ready",()=>{clearTimeout(timer);try{sessionStorage.removeItem(repairKey);}catch{}},{once:true});
     })();
   </script>
-  <script type="module" src="./app.js?v=20261029-1"></script>
+  <script>
+    Promise.resolve(globalThis.P708_BOOT_PREPARE).catch(()=>{}).finally(()=>{
+      const script=document.createElement("script");script.type="module";script.src="./app.js?v=20261029-2";document.body.appendChild(script);
+    });
+  </script>
 </body>
 </html>
