@@ -2,7 +2,6 @@
   const Period=globalThis.P708BillingCycle;
   if(!Period)throw new Error("Billing cycle utilities are not available");
 
-  const VERSION="20260929-1";
   const nameKey=value=>String(value||"").normalize("NFKC").trim().replace(/\s+/g," ").toLocaleLowerCase("vi-VN");
   // "28-27" is the legacy persisted tag. Keep accepting it for older installed
   // clients; cycleRule carries the actual 29→28 rule on new/updated records.
@@ -11,9 +10,6 @@
   const baseEnsureBill=ensureBill;
   const baseStayCount=stayCount;
 
-  function localDateKey(date){
-    return `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,"0")}-${String(date.getDate()).padStart(2,"0")}`;
-  }
   function displayDate(value){
     const match=/^(\d{4})-(\d{2})-(\d{2})$/.exec(String(value||""));
     if(!match)return String(value||"");
@@ -396,9 +392,6 @@
   globalThis.saveBillingPeriodEditor=saveBillingPeriodEditor;
 
   function ensureBillingCycleUi(){
-    if(!document.querySelector('link[data-billing-cycle-style="1"]')){
-      const link=document.createElement("link");link.rel="stylesheet";link.href=`./billing-cycle.css?v=${VERSION}`;link.dataset.billingCycleStyle="1";document.head.appendChild(link);
-    }
     const card=document.querySelector(".calendar-card"),head=card?.querySelector(":scope > .card-head");
     if(card&&head&&!$("#billingPeriodNav")){
       const nav=document.createElement("div");nav.id="billingPeriodNav";nav.className="billing-period-nav";
@@ -409,8 +402,6 @@
       $("#billingPeriodCurrent")?.addEventListener("click",()=>goToBillingPeriod(Period.currentPeriodMonth(new Date())));
       $("#billingPeriodEdit")?.addEventListener("click",openBillingPeriodEditor);
     }
-    const field=$("#billMonth")?.closest(".field")?.querySelector("label");if(field)field.textContent="Kỳ điện nước";
-    const allPreset=document.querySelector('[data-stay-preset="all"]');if(allPreset)allPreset.textContent="Ở cả kỳ";
     const wrap=document.querySelector(".calendar-wrap");
     if(wrap&&!wrap.dataset.billingSwipeBound){
       wrap.dataset.billingSwipeBound="1";let startX=0,startY=0;
@@ -427,7 +418,7 @@
     const cycle=isCycleBill(bill);
     const label=$("#billingPeriodLabel"),dates=$("#billingPeriodDates");
     if(label)label.textContent=cycle?billingPeriodTitle(bill.month):`${monthLabel(bill.month)} · dữ liệu cũ`;
-    if(dates)dates.textContent=cycle?`${periodRangeText(bill)}${bill.cycleCustomized?" · Đã tùy chỉnh":""} · Vuốt ngang để xem kỳ khác`: `${legacyPeriodRange(bill)} · Vuốt ngang để xem tháng khác`;
+    if(dates)dates.textContent=cycle?`${periodRangeText(bill)}${bill.cycleCustomized?" · Đã tùy chỉnh":""}`:legacyPeriodRange(bill);
     const edit=$("#billingPeriodEdit");if(edit){edit.classList.toggle("role-hidden",!isAdmin());edit.disabled=!cycle;edit.title=bill.closed?"Kỳ đang khóa — bấm để xem hướng dẫn":"Chỉnh ngày bắt đầu và kết thúc kỳ";}
   }
 
@@ -458,16 +449,17 @@
 
     const editable=!!realBill&&canEditBillingPerson(person)&&!bill.closed;
     $("#calendarPersonTitle").textContent=person?`Lịch ở của ${person.name}`:"Chọn một người";
-    $("#calendarPersonHint").textContent=person?(editable?(isCycleBill(bill)?`Kỳ ${displayDate(bill.cycleStart)} – ${displayDate(bill.cycleEnd)} · bấm ngày để đổi trạng thái.`:"Bấm từng ngày hoặc chọn khoảng ngày."):"Chỉ xem — vuốt ngang để xem lịch sử các kỳ."):"Chọn người ở danh sách bên trái.";
-    $("#billRangePanel").style.display=editable?"block":"none";
+    $("#calendarPersonHint").textContent=person?(editable?"Bấm ngày để đổi trạng thái. Vuốt ngang để đổi kỳ.":"Lịch chỉ xem. Vuốt ngang để đổi kỳ."):"Chọn người trong danh sách để xem lịch.";
+    $("#billRangePanel").hidden=!editable;
 
-    const dates=calendarDateKeys(bill),firstDate=dates[0]||"",firstParts=firstDate.split("-").map(Number),first=firstDate?(new Date(firstParts[0],firstParts[1]-1,firstParts[2]).getDay()+6)%7:0,today=localDateKey(new Date());
+    const dates=calendarDateKeys(bill),firstDate=dates[0]||"",firstParts=firstDate.split("-").map(Number),first=firstDate?(new Date(firstParts[0],firstParts[1]-1,firstParts[2]).getDay()+6)%7:0,today=Period.roomDateKey();
     let cells="";for(let index=0;index<first;index++)cells+='<span class="day-cell blank"></span>';
     let previousMonth="";
     for(const dateKey of dates){
       const parts=dateKey.split("-").map(Number),monthToken=`${parts[0]}-${String(parts[1]).padStart(2,"0")}`,day=parts[2],storageKey=storageKeyForDate(bill,dateKey),stay=person?.days?.[storageKey]===true;
       const showMonth=monthToken!==previousMonth;previousMonth=monthToken;
-      cells+=`<button class="day-cell ${stay?"stay":""} ${dateKey===today?"today":""}" data-billing-date="${dateKey}" type="button" ${person&&editable?"":"disabled"} aria-pressed="${stay}">${showMonth?`<span class="day-month-tag">T${parts[1]}</span>`:""}<b>${day}</b><small>${stay?"✓ Có ở":"Vắng"}</small></button>`;
+      const currentDay=dateKey===today;
+      cells+=`<button class="day-cell ${stay?"stay":""} ${currentDay?"today":""}" data-billing-date="${dateKey}" type="button" ${person&&editable?"":"disabled"} ${currentDay?'aria-current="date"':""} aria-label="${displayDate(dateKey)}, ${stay?"có ở":"vắng"}" aria-pressed="${stay}">${showMonth?`<span class="day-month-tag">T${parts[1]}</span>`:""}<b>${day}</b><small>${stay?"✓ Có ở":"Vắng"}</small></button>`;
     }
     $("#billCalendar").innerHTML=cells;
     $$('[data-billing-date]').forEach(button=>button.addEventListener("click",()=>setBillDay(button.dataset.billingDate)));

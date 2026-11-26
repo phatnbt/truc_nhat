@@ -112,7 +112,7 @@ function renderBilling(){
   const editable=canEditBillingPerson(p)&&!b.closed;
   $("#calendarPersonTitle").textContent=p?`Lịch ở của ${p.name}`:"Chọn một người";
   $("#calendarPersonHint").textContent=p?(editable?"Bấm từng ngày hoặc chọn khoảng ngày.":"Chỉ xem — bạn không thể sửa người này."):"Chọn người ở danh sách bên trái.";
-  $("#billRangePanel").style.display=editable?"block":"none";
+  $("#billRangePanel").hidden=!editable;
   const [y,m]=String(b.month).split("-").map(Number),n=monthDays(b.month),first=n?(new Date(y,m-1,1).getDay()+6)%7:0;
   let cells="";for(let i=0;i<first;i++)cells+='<span class="day-cell blank"></span>';
   for(let d=1;d<=n;d++){

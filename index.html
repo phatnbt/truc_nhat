@@ -11,8 +11,9 @@
   <link rel="manifest" href="./manifest.webmanifest">
   <link rel="icon" type="image/png" sizes="32x32" href="./icons/icon-32.png">
   <link rel="apple-touch-icon" sizes="192x192" href="./icons/icon-192.png">
-  <link rel="stylesheet" href="./styles.css?v=20261127-1">
-  <link rel="stylesheet" href="./landing-ui.css?v=20261127-1">
+  <link rel="stylesheet" href="./styles.css?v=20261127-2">
+  <link rel="stylesheet" href="./landing-ui.css?v=20261127-2">
+  <link rel="stylesheet" href="./billing-cycle.css?v=20261127-2">
   <title>Quản lý phòng P708</title>
 </head>
 <body>
@@ -166,9 +167,11 @@
           <aside class="billing-sidebar">
             <section class="card compact-card">
               <div class="section-title"><h3>Kỳ điện nước</h3></div>
-              <div class="field"><label>Tháng</label><input id="billMonth" type="month"></div>
-              <div class="field"><label>Tiền điện</label><input id="billElectricity" type="number" min="0" step="1000"></div>
-              <div class="field"><label>Tiền nước</label><input id="billWater" type="number" min="0" step="1000"></div>
+              <div class="billing-fields">
+                <div class="field"><label for="billMonth">Kỳ điện nước</label><input id="billMonth" type="month"></div>
+                <div class="field"><label for="billElectricity">Tiền điện</label><input id="billElectricity" type="number" min="0" step="1000"></div>
+                <div class="field"><label for="billWater">Tiền nước</label><input id="billWater" type="number" min="0" step="1000"></div>
+              </div>
             </section>
             <section class="card compact-card">
               <div class="section-title"><h3>Ngày ở theo người</h3></div>
@@ -179,11 +182,12 @@
           <section class="billing-main">
             <article class="card calendar-card">
               <div class="card-head"><div><h2 id="calendarPersonTitle">Chọn một người</h2><p id="calendarPersonHint">Chọn ngày có ở trong phòng.</p></div><span class="badge" id="billClosedBadge">Đang mở</span></div>
-              <div class="range-panel" id="billRangePanel">
-                <div class="range-grid"><div class="field"><label>Từ ngày</label><input id="stayFrom" type="date"></div><div class="field"><label>Đến ngày</label><input id="stayTo" type="date"></div><button class="btn primary" id="markStayButton" type="button">✓ Có ở</button><button class="btn" id="markAwayButton" type="button">Vắng</button></div>
-                <div class="button-row"><button class="btn small soft" data-stay-preset="all" type="button">Ở cả tháng</button><button class="btn small soft" data-stay-preset="weekdays" type="button">T2–T6</button><button class="btn small" data-stay-preset="none" type="button">Bỏ hết</button><button class="btn small danger admin-only" id="removeBillingPersonButton" type="button">Xóa người</button></div>
-              </div>
               <div class="calendar-wrap"><div class="weekday-grid"><span>T2</span><span>T3</span><span>T4</span><span>T5</span><span>T6</span><span>T7</span><span>CN</span></div><div class="day-grid" id="billCalendar"></div><div class="person-summary" id="billPersonSummary"></div></div>
+              <details class="range-panel" id="billRangePanel" hidden>
+                <summary>Chỉnh nhiều ngày</summary>
+                <div class="range-grid"><div class="field"><label for="stayFrom">Từ ngày</label><input id="stayFrom" type="date"></div><div class="field"><label for="stayTo">Đến ngày</label><input id="stayTo" type="date"></div><button class="btn primary" id="markStayButton" type="button">✓ Có ở</button><button class="btn" id="markAwayButton" type="button">Vắng</button></div>
+                <div class="button-row"><button class="btn small soft" data-stay-preset="all" type="button">Ở cả kỳ</button><button class="btn small soft" data-stay-preset="weekdays" type="button">T2–T6</button><button class="btn small" data-stay-preset="none" type="button">Bỏ hết</button><button class="btn small danger admin-only" id="removeBillingPersonButton" type="button">Xóa người</button></div>
+              </details>
             </article>
             <article class="card billing-result">
               <div class="card-head"><div><h2>Thanh toán</h2></div><div class="button-row"><button class="btn small" id="downloadBillingCsvButton" type="button">Tải CSV</button><button class="btn small admin-only" id="billCloseButton" type="button">🔒 Chốt sổ</button></div></div>
@@ -352,6 +356,6 @@
       window.addEventListener("p708:boot-ready",()=>clearTimeout(timer),{once:true});
     })();
   </script>
-  <script type="module" src="./app.js?v=20261127-1"></script>
+  <script type="module" src="./app.js?v=20261127-2"></script>
 </body>
 </html>

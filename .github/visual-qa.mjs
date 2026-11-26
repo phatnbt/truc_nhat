@@ -1,7 +1,7 @@
 import {execFileSync} from "node:child_process";
 import {mkdir} from "node:fs/promises";
 import {chromium,webkit,firefox} from "playwright";
-import {roomDateKey,addUtcDays,parseDateKey,dateKey} from "../src/core/billing-cycle-period.js";
+import {roomDateKey,addUtcDays,parseDateKey,dateKey,currentPeriodMonth,cycleBounds} from "../src/core/billing-cycle-period.js";
 
 const refs=process.argv.includes("--before")?["f99b4f0","6ef5469"]:["working"];
 const engines=process.argv.includes("--all")?{chromium,webkit,firefox}:{chromium};
@@ -9,6 +9,8 @@ const widths=refs[0]==="working"?[320,375,390,430,768,1024,1440]:[390,1440];
 const now=parseDateKey(roomDateKey());
 const weekStart=dateKey(addUtcDays(now,-((now.getUTCDay()+6)%7)));
 const month="2026-08";
+const activeMonth=currentPeriodMonth();
+const activeCycle=cycleBounds(activeMonth);
 const ids=["a","b","c","d"];
 const names=["Tiến Phát","Minh Anh","Gia Bảo","Khánh Linh"];
 const members=Object.fromEntries(ids.map((id,i)=>[id,{id,name:names[i]}]));
@@ -17,7 +19,11 @@ const assignments=tasks.map((taskId,i)=>({taskId,personId:ids[i%ids.length],pers
 const payload={members,presence:{a:true,b:true,c:true,d:false},schedules:{[weekStart]:{id:"visual-week",weekStart,assignments}},settings:{},billingMonths:{
   [month]:{id:"visual-bill",month,electricity:348000,water:96000,closed:true,people:Object.fromEntries(ids.map((id,i)=>[
     `person:${id}`,{id,memberId:id,name:names[i],days:{"1":true,"2":true},paid:i===1,paidAmount:i===1?111000:0}
-  ]))}
+  ]))},
+  [activeMonth]:{id:"visual-active-bill",month:activeMonth,electricity:348000,water:96000,
+    cycleMode:"29-28",cycleStart:activeCycle.start,cycleEnd:activeCycle.end,
+    people:Object.fromEntries(ids.map((id,index)=>[`person:${id}`,{id,memberId:id,name:names[index],
+      days:{[activeCycle.start]:true,[roomDateKey()]:true}}]))}
 }};
 const session={status:"active",user:{uid:"visual-admin",displayName:names[0]},access:{active:true,role:"admin",memberId:"a",displayName:"Phát"},adminExists:true};
 const engineFixture=`export function createP708SecureEngine(handlers){return {
@@ -29,6 +35,33 @@ const out="test-results/visual";
 const fileTypes={js:"text/javascript",html:"text/html",css:"text/css"};
 const historical=new Map();
 await mkdir(out,{recursive:true});
+
+async function checkBillingContrast(page){
+  return page.evaluate(()=>{
+    const selectors=[
+      "#calendarPersonTitle","#calendarPersonHint","#billClosedBadge",".period-copy b",".period-copy small",
+      "#billingPeriodPrev","#billingPeriodCurrent","#billMonth",".person-pick.active b",".person-amount",
+      ".day-cell.stay b",".day-cell.stay small",".day-cell:not(.stay) small",".day-month-tag","#billPersonSummary"
+    ];
+    const rgb=value=>value.match(/[\d.]+/g).map(Number);
+    const luminance=color=>color.slice(0,3).map(value=>{
+      const channel=value/255;
+      return channel<=0.04045?channel/12.92:((channel+0.055)/1.055)**2.4;
+    }).reduce((sum,channel,index)=>sum+channel*[0.2126,0.7152,0.0722][index],0);
+    return selectors.flatMap(selector=>{
+      const node=document.querySelector(selector);
+      if(!node)return [`missing ${selector}`];
+      let surface=node;
+      while(surface&&getComputedStyle(surface).backgroundColor==="rgba(0, 0, 0, 0)")surface=surface.parentElement;
+      if(!surface)return [`missing background for ${selector}`];
+      if(getComputedStyle(surface).backgroundImage!=="none")return [`unexpected background image for ${selector}`];
+      const ink=luminance(rgb(getComputedStyle(node).color));
+      const background=luminance(rgb(getComputedStyle(surface).backgroundColor));
+      const ratio=(Math.max(ink,background)+0.05)/(Math.min(ink,background)+0.05);
+      return ratio<4.5?[`${selector} contrast ${ratio.toFixed(2)}`]:[];
+    });
+  });
+}
 
 async function capture(browser,browserName,ref,width){
   const page=await browser.newPage({viewport:{width,height:width<700?844:960},serviceWorkers:"block",reducedMotion:"reduce"});
@@ -54,7 +87,18 @@ async function capture(browser,browserName,ref,width){
     const errors=[];
     for(const view of views){
       await page.evaluate(view=>showPage(view,{instant:true,replace:true}),view);
-      if(view==="billing")await page.evaluate(month=>setBillMonth(month),month);
+      if(view==="billing"){
+        await page.evaluate(month=>setBillMonth(month),ref==="working"?activeMonth:month);
+        if(ref==="working"){
+          await page.locator("#billCalendar button.day-cell.stay").first().waitFor();
+          const range=page.locator("#billRangePanel summary"),startDate=page.locator("#stayFrom");
+          if(await startDate.isVisible())errors.push("billing bulk controls should start collapsed");
+          await range.click();
+          if(!await startDate.isVisible())errors.push("billing bulk controls did not expand");
+          await range.click();
+          await page.evaluate(()=>window.scrollTo(0,0));
+        }
+      }
       for(const theme of ref==="working"?["light","dark"]:["light"]){
         await page.evaluate(theme=>document.documentElement.dataset.theme=theme,theme);
         const widthUsed=await page.evaluate(()=>document.documentElement.scrollWidth);
@@ -70,6 +114,7 @@ async function capture(browser,browserName,ref,width){
             errors.push(`${view} dark heading: ${color}`);
           }
         }
+        if(ref==="working"&&view==="billing")errors.push(...(await checkBillingContrast(page)).map(error=>`billing ${theme}: ${error}`));
         if([390,1440].includes(width))await page.screenshot({path:`${out}/${ref}-${browserName}-${width}-${theme}-${view}.png`});
       }
     }

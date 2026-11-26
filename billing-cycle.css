@@ -1,5 +1,164 @@
-.billing-period-nav{display:grid;grid-template-columns:auto minmax(0,1fr) auto auto auto;gap:10px;align-items:center;margin:0 22px 16px;padding:12px 14px;border:1px solid #dbe7f7;border-radius:18px;background:linear-gradient(180deg,#f8fbff,#f4f8ff)}
-.period-arrow{width:42px;height:42px;border:1px solid #d6e2f2;border-radius:14px;background:#fff;color:#23408e;font-size:28px;line-height:1;cursor:pointer;box-shadow:0 4px 14px rgba(41,72,152,.08)}
-.period-arrow:hover{background:#eef5ff}.period-copy{min-width:0}.period-copy b{display:block;color:#16213a;font-size:16px}.period-copy small{display:block;margin-top:3px;color:#6b7892;white-space:normal}.calendar-wrap{touch-action:pan-y;overscroll-behavior-x:contain}.day-cell{position:relative}.day-month-tag{position:absolute;top:5px;left:7px;padding:2px 5px;border-radius:999px;background:#e8f0ff;color:#3158c7;font-size:10px;font-weight:800;line-height:1.2}.day-cell.today{outline:2px solid #4967f3;outline-offset:-2px}.day-cell.today::after{content:"";position:absolute;top:7px;right:7px;width:7px;height:7px;border-radius:50%;background:#4967f3}.day-cell:disabled{cursor:default}.calendar-card .calendar-wrap{position:relative}.calendar-card .calendar-wrap::before{content:"Vuốt ngang để xem kỳ trước / kỳ sau";display:block;margin:0 0 10px;color:#8792a8;font-size:12px;text-align:right}
-.billing-period-modal-card{width:min(620px,100%)}.period-editor-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}.period-editor-note{margin-top:12px;padding:11px 13px;border-radius:12px;background:#eef5ff;color:#3158c7;font-size:12px;font-weight:750;line-height:1.5}.period-editor-note.period-editor-error{background:#fff1f2;color:#be123c}.period-editor-safety{display:grid;gap:4px;margin-top:12px;padding:13px;border:1px solid #dbe7f7;border-radius:14px;background:#f8fbff;color:#56647d;font-size:12px;line-height:1.5}.period-editor-safety b{color:#16213a}.period-editor-actions{flex-wrap:wrap}.period-editor-actions #resetBillingPeriodButton{margin-right:auto}
-@media(max-width:760px){.billing-period-nav{grid-template-columns:auto minmax(0,1fr) auto;margin:0 14px 14px;padding:10px}.billing-period-nav #billingPeriodEdit{grid-column:2;grid-row:2;justify-self:start}.billing-period-nav #billingPeriodCurrent{grid-column:2;grid-row:2;justify-self:end}.billing-period-nav #billingPeriodNext{grid-column:3;grid-row:1}.period-copy small{font-size:12px}.calendar-card .calendar-wrap::before{text-align:center}.period-arrow{width:40px;height:40px}.period-editor-grid{grid-template-columns:1fr}.period-editor-actions{grid-template-columns:1fr 1fr}.period-editor-actions #resetBillingPeriodButton{grid-column:1/-1;margin:0}}
+#page-billing .topbar{
+  flex-direction:row;
+  align-items:center;
+  margin-bottom:14px;
+}
+#page-billing .top-actions{width:auto}
+#page-billing .billing-layout{grid-template-columns:minmax(230px,270px) minmax(0,1fr)}
+#page-billing .billing-sidebar{position:static}
+#page-billing :is(.card,.billing-overview){border-radius:16px;box-shadow:var(--shadow)}
+#page-billing .card-head{align-items:center;gap:8px}
+#page-billing .card-head h2{font-size:1.2rem;overflow-wrap:anywhere}
+#page-billing .card-head .badge{flex-shrink:0}
+#page-billing :is(.btn,input,.icon-btn,.person-pick){border-radius:11px}
+#page-billing input{background:var(--field);min-width:0}
+#page-billing input:disabled{opacity:1;color:var(--muted)}
+#page-billing .btn.primary{background:#3653d6;border-color:#3653d6;color:#fff}
+.billing-fields{display:grid;gap:10px}
+#page-billing .billing-fields .field{min-width:0;margin:0}
+#page-billing .field label{font-weight:700;letter-spacing:0}
+#page-billing .person-pick{
+  grid-template-columns:32px minmax(0,1fr) auto;
+  gap:8px;
+  background:var(--card);
+  color:var(--text);
+  border-color:var(--line);
+}
+#page-billing .person-pick.active{background:var(--blue-soft);border-color:var(--blue)}
+#page-billing .person-pick .avatar{width:32px;height:32px;background:var(--purple-soft);color:var(--purple)}
+#page-billing .person-pick b{font-size:.875rem;overflow-wrap:anywhere}
+#page-billing .person-pick small{font-size:.75rem;line-height:1.35}
+#page-billing .person-amount{font-size:.75rem;font-variant-numeric:tabular-nums}
+#page-billing :is(.badge.success,.paid-text){background:var(--green-soft);color:var(--green);border-color:var(--line)}
+#page-billing .badge.warning{background:var(--amber-soft);color:var(--amber);border-color:var(--line)}
+#page-billing .person-summary{
+  flex-wrap:wrap;
+  row-gap:4px;
+  background:var(--field);
+  color:var(--text);
+  border-color:var(--line);
+  border-radius:11px;
+}
+.person-summary span{color:var(--muted)}
+
+.billing-period-nav{
+  display:grid;
+  grid-template-columns:auto minmax(0,1fr) auto auto auto;
+  gap:8px;
+  align-items:center;
+  margin:12px 16px 0;
+  padding:8px;
+  border:1px solid var(--line);
+  border-radius:12px;
+  background:var(--field);
+}
+.period-arrow{
+  display:grid;
+  place-items:center;
+  width:44px;
+  height:44px;
+  border:1px solid var(--line);
+  border-radius:10px;
+  background:var(--card);
+  color:var(--blue-dark);
+  font-size:1.6rem;
+  line-height:1;
+}
+.period-arrow:hover{background:var(--blue-soft)}
+.period-copy{min-width:0}
+.period-copy b{display:block;color:var(--text);font-size:.9375rem}
+.period-copy small{display:block;margin-top:2px;color:var(--muted);font-size:.8125rem}
+
+#page-billing .calendar-wrap{padding:14px 16px 16px;touch-action:pan-y;overscroll-behavior-x:contain}
+#page-billing :is(.weekday-grid,.day-grid){grid-template-columns:repeat(7,minmax(0,1fr));gap:6px}
+#page-billing .weekday-grid span{padding-block:3px;font-size:.75rem;font-weight:700}
+#page-billing .day-cell{
+  position:relative;
+  min-width:0;
+  min-height:58px;
+  padding:4px 1px;
+  border-radius:10px;
+  background:var(--field);
+  color:var(--muted);
+  border-color:var(--line);
+  font-variant-numeric:tabular-nums;
+}
+#page-billing .day-cell b{font-size:.9375rem}
+#page-billing .day-cell small{font-size:.6875rem;line-height:1.15}
+#page-billing .day-cell.stay{background:var(--green-soft);color:var(--green)}
+#page-billing .day-cell:disabled{cursor:default;opacity:1}
+#page-billing .day-cell:hover:not(:disabled){border-color:var(--blue)}
+#page-billing .day-cell.today{outline:2px solid var(--blue);outline-offset:-2px}
+#page-billing .day-cell:focus-visible{outline:2px solid var(--blue);outline-offset:2px;z-index:1}
+.day-month-tag{
+  position:absolute;
+  top:3px;
+  left:4px;
+  padding:1px 4px;
+  border-radius:6px;
+  background:var(--blue-soft);
+  color:var(--blue-dark);
+  font-size:.625rem;
+  font-weight:700;
+  line-height:1.2;
+}
+
+#page-billing .range-panel{
+  padding:0 14px;
+  margin:0 16px 16px;
+  border:1px solid var(--line);
+  border-radius:12px;
+}
+#page-billing .range-panel summary{padding:13px 0;cursor:pointer;font-size:.875rem;font-weight:700}
+#page-billing .range-panel .range-grid{grid-template-columns:repeat(2,minmax(0,1fr)) auto auto}
+#page-billing .range-panel .button-row{margin-bottom:12px}
+#page-billing .table-wrap th{background:var(--field);color:var(--muted)}
+#page-billing .table-wrap tr{background:var(--card);color:var(--text);border-color:var(--line)}
+
+.billing-period-modal-card{width:min(620px,100%)}
+.period-editor-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.period-editor-note,.period-editor-safety{
+  margin-top:12px;
+  padding:11px 13px;
+  border-radius:12px;
+  font-size:.8125rem;
+  line-height:1.5;
+}
+.period-editor-note{background:var(--blue-soft);color:var(--blue-dark)}
+.period-editor-note.period-editor-error{background:var(--red-soft);color:var(--red)}
+.period-editor-safety{display:grid;gap:4px;border:1px solid var(--line);background:var(--field);color:var(--muted)}
+.period-editor-safety b{color:var(--text)}
+.period-editor-actions{flex-wrap:wrap}
+.period-editor-actions #resetBillingPeriodButton{margin-right:auto}
+
+@media(max-width:920px){
+  #page-billing .billing-layout{grid-template-columns:minmax(0,1fr)}
+  .billing-fields{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .billing-fields .field:first-child{grid-column:1/-1}
+}
+@media(max-width:640px){
+  #page-billing .topbar{margin-bottom:8px}
+  #page-billing .brand h1{font-size:1.25rem}
+  #page-billing .compact-card{padding:12px}
+  #page-billing .people-list{max-height:132px;overflow:auto;scrollbar-width:thin;padding:2px}
+  body[data-page="billing"] .floating-pet-host{visibility:hidden;pointer-events:none}
+  .billing-period-nav{grid-template-columns:auto minmax(0,1fr) auto;margin-inline:12px;gap:6px}
+  #billingPeriodNext{grid-column:3;grid-row:1}
+  #billingPeriodEdit,#billingPeriodCurrent{grid-row:2;grid-column:1/-1;justify-self:start}
+  #billingPeriodCurrent{justify-self:end}
+  #page-billing .calendar-wrap{padding-inline:12px}
+  #page-billing :is(.weekday-grid,.day-grid){gap:3px}
+  #page-billing .day-cell{border-radius:8px}
+  #page-billing .day-cell:has(.day-month-tag){padding-top:14px}
+  .day-month-tag{left:50%;transform:translateX(-50%)}
+  #page-billing .range-panel{margin-inline:12px;padding-inline:10px}
+  #page-billing .range-panel .range-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+  #page-billing .range-grid input{padding-inline:6px;font-size:.875rem}
+  .period-editor-grid{grid-template-columns:1fr}
+  .period-editor-actions{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .period-editor-actions #resetBillingPeriodButton{grid-column:1/-1;margin:0}
+}
+@media(max-width:360px){
+  #page-billing .calendar-wrap{padding-inline:8px}
+  #page-billing .day-cell small{font-size:.625rem}
+}

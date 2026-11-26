@@ -4,7 +4,7 @@
   --green:#087a58;--green-soft:#e7f7ef;--amber:#985713;--amber-soft:#fff4de;
   --red:#b6393e;--red-soft:#fff0ef;--purple:#6549be;--purple-soft:#f0ebff;
   --week-surface:#e7edff;--week-ink:#203776;--field:#f7f9ff;--shadow:0 8px 28px rgba(31,52,104,.075);
-  --space:16px;--radius:8px;--duration:160ms;--toolbar:66px;--dock:74px;
+  --space:16px;--radius:12px;--duration:160ms;--toolbar:66px;--dock:74px;
 }
 :root[data-theme="dark"]{
   color-scheme:dark;
@@ -119,16 +119,15 @@ body.modal-open .mobile-nav,body.modal-open .floating-pet-host,body[data-page="h
 .task-assignee{overflow-wrap:anywhere}
 .task-initial{display:inline-grid;place-items:center;width:26px;height:26px;border-radius:50%;margin-right:6px;background:var(--blue-soft);color:var(--blue-dark);font-size:.8125rem;font-weight:700}
 .own-task td:first-child{box-shadow:inset 3px 0 var(--blue)}
-.day-cell.stay{color:var(--green);background:var(--green-soft)}
 #page-billing :is(.billing-sidebar,.billing-main,.calendar-card, .billing-result){min-width:0}
 .billing-overview{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:1px;border:1px solid var(--line);border-radius:var(--radius);overflow:hidden;background:var(--line);margin-bottom:16px}
 .billing-overview>div{display:grid;gap:4px;padding:16px;background:var(--card);min-width:0}
 .billing-overview>div:nth-child(2){background:var(--week-surface)}
 .billing-overview span,.billing-overview small{color:var(--muted);font-size:.875rem;overflow-wrap:anywhere}
 .billing-overview strong{font-size:1.375rem;font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
-[data-theme="dark"] :is(.history-btn,.member-row,.billing-result tr,.schedule-card tr,.person-pick,.pet-garden-card,.utility-preview){background:var(--card);color:var(--text);border-color:var(--line)}
-[data-theme="dark"] :is(.utility-preview-head strong,.period-copy b,.pet-garden-heading-simple h2,.garden-owner-name){color:var(--text)}
-[data-theme="dark"] :is(.utility-preview-head small,.utility-legend,.utility-label,.period-copy small,.garden-streak-line,.pet-garden-heading-simple p){color:var(--muted)}
+[data-theme="dark"] :is(.history-btn,.member-row,.schedule-card tr,.pet-garden-card,.utility-preview){background:var(--card);color:var(--text);border-color:var(--line)}
+[data-theme="dark"] :is(.utility-preview-head strong,.pet-garden-heading-simple h2,.garden-owner-name){color:var(--text)}
+[data-theme="dark"] :is(.utility-preview-head small,.utility-legend,.utility-label,.garden-streak-line,.pet-garden-heading-simple p){color:var(--muted)}
 @media(max-width:800px){
   .desktop-nav{display:none}
   .shell,.app-toolbar-inner{width:calc(100% - 28px)}
@@ -163,10 +162,6 @@ body.modal-open .mobile-nav,body.modal-open .floating-pet-host,body[data-page="h
   .billing-overview>div{padding:12px}
   .billing-overview>.billing-overview-days{grid-column:1/-1;grid-template-columns:1fr auto;align-items:center;padding:8px 12px}
   .billing-overview-days small{display:none}
-  #page-billing .calendar-wrap{padding-inline:8px}
-  #page-billing :is(.day-grid,.weekday-grid){grid-template-columns:repeat(7,minmax(0,1fr));gap:3px}
-  #page-billing .day-cell{padding-inline:1px;min-width:0}
-  #page-billing .day-cell small{font-size:.625rem}
   .home-priority .action-icon{width:32px;height:32px}
 }
 @media(prefers-reduced-motion:reduce){
