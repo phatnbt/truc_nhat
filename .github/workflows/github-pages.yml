@@ -29,6 +29,7 @@ jobs:
           cp index.html app.js sw.js offline.html manifest.webmanifest _site/
           find . -maxdepth 1 -type f -name '*.css' -exec cp {} _site/ \;
           cp -R src icons _site/
+          node .github/write-pwa-build.mjs _site/p708-build.json
           touch _site/.nojekyll
 
       - name: Configure Pages

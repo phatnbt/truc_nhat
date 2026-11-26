@@ -5,6 +5,7 @@ import {chromium,firefox,webkit,expect} from "@playwright/test";
 import {initializeTestEnvironment} from "@firebase/rules-unit-testing";
 import {doc,setDoc,updateDoc,getDocFromServer,Timestamp,FieldPath,increment} from "firebase/firestore";
 import {roomDateKey,parseDateKey,dateKey,addUtcDays,currentPeriodMonth,cycleBounds} from "../src/core/billing-cycle-period.js";
+import {runCriticalCleaningStress} from "./critical-cleaning-stress.mjs";
 
 const base="http://127.0.0.1:5178",projectId="demo-p708-production-audit",room="rooms/P708";
 assert.ok(process.env.FIRESTORE_EMULATOR_HOST && process.env.FIREBASE_AUTH_EMULATOR_HOST,"Run against local Auth and Firestore emulators.");
@@ -40,7 +41,7 @@ async function testAccount(kind, browser){
   assert.ok(user.localId,JSON.stringify(user.error));
   return {uid:user.localId,email};
 }
-async function login(page,account){
+async function login(page,account,memberCount=2){
   const errors=[];
   page.on("pageerror",e=>errors.push(e.message));
   await page.goto(base);
@@ -58,7 +59,7 @@ async function login(page,account){
     await signInWithEmailAndPassword(getAuth(getApp("p708-secure-manager-v5")),email,password);
   },{email:account.email,password});
   await expect(page.locator("#authGate")).toBeHidden({timeout:15000});
-  await expect(page.locator("#kpiMembers")).toHaveText("2");
+  await expect(page.locator("#kpiMembers")).toHaveText(String(memberCount));
   assert.equal(await page.evaluate(()=>window.p708SawUnexpectedAccessRequest),false,"a pending permission lookup must not show the access-request form");
   return errors;
 }
@@ -101,15 +102,29 @@ async function exercise(engine,name,width){
       }
     }});
   });
-  const browser=await engine.launch();
+  const channel=name==="chromium"?process.env.P708_QA_CHROMIUM_CHANNEL:undefined;
+  const browser=await engine.launch({channel});
   const activate=target=>name==="webkit"?target.press("Enter"):target.click();
   try{
     const viewport={width,height:820};
     const hasTouch=name==="webkit";
-    const manager=await browser.newPage({viewport,hasTouch,timezoneId:"America/Los_Angeles"});
+    const managerContext=await browser.newContext({viewport,hasTouch,timezoneId:"America/Los_Angeles"});
+    const manager=await managerContext.newPage();
     const resident=await browser.newPage({viewport,hasTouch,timezoneId:"Asia/Ho_Chi_Minh"});
+    const firestore="https://www.gstatic.com/firebasejs/12.16.0/firebase-firestore.js";
+    if(name==="chromium"){
+      await manager.route(firestore,route=>route.fulfill({
+        contentType:"text/javascript",
+        body:`export * from "${firestore}?p708-original";
+          import {runTransaction as transact} from "${firestore}?p708-original";
+          export async function runTransaction(...args){
+            if(window.p708HoldTransaction)await new Promise(resolve=>{window.p708ReleaseTransaction=resolve;});
+            return transact(...args);
+          }`
+      }));
+    }
     if(hasTouch){
-      const firestore="https://www.gstatic.com/firebasejs/12.16.0/firebase-firestore.js";
+      for(const page of [manager,resident])await page.addInitScript(()=>Object.defineProperty(navigator,"standalone",{value:true}));
       await resident.route(firestore,route=>route.fulfill({
         contentType:"text/javascript",
         body:`export * from "${firestore}?p708-original";
@@ -160,6 +175,13 @@ async function exercise(engine,name,width){
     await expect(taskRow).toContainText("Chờ xác nhận");
     const managerTask=manager.locator("#cleanScheduleBox tr").filter({hasText:"Lavabo"});
     if(name==="chromium"){
+      await expect(managerTask.getByRole("button",{name:"Xác nhận",exact:true})).toBeVisible();
+      const report=await dataFromServer("taskSubmissions",`${monday}__lavabo__b`);
+      assert.equal(report.status,"submitted");
+      const staleCleanup=await manager.evaluate(weekStart=>realtimeEngine.reconcileTaskSubmissions({weekStart,assignments:[]}),monday);
+      assert.equal(staleCleanup,0,"a stale repair roster must not delete a valid report");
+      assert.equal((await dataFromServer("taskSubmissions",`${monday}__lavabo__b`)).status,"submitted");
+      console.log("CRIT-stale-cleanup: server report remains submitted; cleanup deleted 0 documents.");
       await clickDuringSync(managerTask.getByRole("button",{name:"Làm lại"}),false);
       await expect(taskRow).toContainText("Cần làm lại");
       await expect(resident.locator('#homePetGarden [data-garden-member="b"]')).toContainText("0 EXP");
@@ -168,16 +190,22 @@ async function exercise(engine,name,width){
       await resident.locator('#taskChecklistForm [value="finish"]').check();
       await activate(resident.getByRole("button",{name:"Gửi xác nhận"}));
       await expect(taskRow).toContainText("Chờ xác nhận");
+      const staleReview=manager.evaluate(({submissionId,submittedAt})=>realtimeEngine.reviewTask({submissionId,status:"approved",expectedSubmittedAt:submittedAt}),{
+        submissionId:`${monday}__lavabo__b`,submittedAt:{seconds:report.submittedAt.seconds,nanoseconds:report.submittedAt.nanoseconds}
+      });
+      await assert.rejects(staleReview,/báo cáo mới/i);
+      assert.equal((await dataFromServer("taskSubmissions",`${monday}__lavabo__b`)).status,"submitted");
+      console.log("CRIT-stale-review: the older timestamp was rejected; replacement report remains submitted.");
     }
     const approval=managerTask.getByRole("button",{name:"Xác nhận",exact:true});
     await expect(approval).toBeEnabled();
     await clickDuringSync(approval,hasTouch);
     await expect(taskRow).toContainText("Đã xong");
     if(name==="chromium"){
-      await manager.evaluate(async({monday})=>{
-        const submissionId=`${monday}__lavabo__b`;
-        await Promise.all([realtimeEngine.reviewTask({submissionId,status:"approved"}),realtimeEngine.reviewTask({submissionId,status:"approved"})]);
-      },{monday});
+      const submissionId=`${monday}__lavabo__b`,{submittedAt}=await dataFromServer("taskSubmissions",submissionId);
+      await manager.evaluate(async args=>{
+        await Promise.all([realtimeEngine.reviewTask(args),realtimeEngine.reviewTask(args)]);
+      },{submissionId,status:"approved",expectedSubmittedAt:{seconds:submittedAt.seconds,nanoseconds:submittedAt.nanoseconds}});
     }
     await resident.reload();
     await expect(resident.locator("#authGate")).toBeHidden();
@@ -288,7 +316,7 @@ async function exercise(engine,name,width){
       const bill=(await roomPayloadFromServer()).billingMonths[billMonth];
       return bill.people["person:a"].days["2"];
     }).toBe(true);
-    await activate(secondDay);
+    await clickDuringSync(secondDay,hasTouch,false);
     await expect(secondDay).toHaveAttribute("aria-pressed","false");
     await expect.poll(async()=>{
       const bill=(await roomPayloadFromServer()).billingMonths[billMonth];
@@ -302,6 +330,7 @@ async function exercise(engine,name,width){
       const payload=await roomPayloadFromServer();
       return payload.billingMonths[billMonth].closedDaysVersion;
     }).toBe(1);
+    await expect(manager.locator("#billingDecisionModal")).toBeHidden();
     await manager.locator('[data-payment="b"]').evaluate(button=>button.scrollIntoView({block:"center",behavior:"instant"}));
     await manager.locator('[data-payment="b"]').press("Enter");
     await manager.locator("#billingDecisionAmount").fill("2500");
@@ -345,6 +374,27 @@ async function exercise(engine,name,width){
       await manager.locator("#pwaUpdateButton").click();
       await expect(manager.locator("#stockForm [name=name]")).toHaveValue("Bản nháp");
       await manager.locator("#stockForm [name=name]").clear();
+      await manager.evaluate(()=>{
+        window.p708HoldTransaction=true;
+        const schedule=currentSchedule(),task=schedule.assignments.find(item=>item.completed&&!item.cut);
+        window.p708PendingQA=realtimeEngine.completeTask({
+          weekStart:schedule.weekStart,scheduleId:schedule.id,taskId:task.taskId,memberId:task.personId
+        });
+      });
+      await manager.waitForFunction(()=>typeof window.p708ReleaseTransaction==="function");
+      await manager.locator("#pwaUpdateButton").click();
+      await expect(manager.locator("#toast")).toContainText("Đợi các thay đổi");
+      await manager.evaluate(()=>{
+        window.p708HoldTransaction=false;
+        window.p708ReleaseTransaction();
+        return window.p708PendingQA;
+      });
+      const parallelTab=await manager.context().newPage();
+      await parallelTab.goto(base);
+      try{
+        await manager.locator("#pwaUpdateButton").click();
+        await expect(manager.locator("#toast")).toContainText("Đóng các cửa sổ P708 khác");
+      }finally{await parallelTab.close();}
       await Promise.all([manager.waitForEvent("framenavigated"),manager.locator("#pwaUpdateButton").click()]);
       await expect(manager.locator("#authGate")).toBeHidden();
       await manager.context().setOffline(true);
@@ -353,6 +403,9 @@ async function exercise(engine,name,width){
       await manager.context().setOffline(false);
       await manager.reload();
       await expect(manager.locator("#stockList")).toContainText("2 chai");
+      if(process.argv.includes("--critical-stress")){
+        await runCriticalCleaningStress({env,browser,manager,resident,member,monday,testAccount,login,room,viewport});
+      }
     }
     await resident.locator("#accountButton").click();
     await resident.locator("#signOutButton").click();
@@ -360,7 +413,7 @@ async function exercise(engine,name,width){
     await expect(resident.locator("#homeGreeting")).toHaveText("Phòng P708");
     assertBrowserErrors(name,managerErrors);
     assertBrowserErrors(name,residentErrors);
-    console.log(`P708 browser QA passed: ${name} (${width}px)`);
+    console.log(`P708 browser QA passed: ${channel||name} (${width}px)`);
   } catch(error) {
     for(const context of browser.contexts())for(const page of context.pages()){
       console.error(name,"toast:",await page.locator("#toast").textContent().catch(()=>null),
@@ -375,7 +428,8 @@ try {
   await fs.mkdir("test-results",{recursive:true});
   const browsers={chromium:[chromium,1280],firefox:[firefox,820],webkit:[webkit,390]};
   const failures=[];
-  for(const name of process.argv.slice(2).length?process.argv.slice(2):Object.keys(browsers)){
+  const selected=process.argv.slice(2).filter(argument=>!argument.startsWith("--"));
+  for(const name of selected.length?selected:Object.keys(browsers)){
     try{await exercise(browsers[name][0],name,browsers[name][1]);}
     catch(error){failures.push(error);console.error(`P708 browser QA failed: ${name}`,error.message);}
   }

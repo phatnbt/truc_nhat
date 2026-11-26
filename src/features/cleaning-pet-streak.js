@@ -11,7 +11,7 @@
     if(document.querySelector('link[data-cleaning-pet="1"]'))return;
     const link=document.createElement("link");
     link.rel="stylesheet";
-    link.href="./cleaning-pet.css?v=20261127-4";
+    link.href="./cleaning-pet.css?v=20261127-11";
     link.dataset.cleaningPet="1";
     document.head.appendChild(link);
   }

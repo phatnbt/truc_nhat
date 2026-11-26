@@ -27,6 +27,7 @@ build/
 coverage/
 test-results/
 graphify-out/
+/p708-build.json
 
 # OS / editors
 .DS_Store

@@ -10,8 +10,8 @@ import {
   doc, collection, query, where, orderBy, limit, onSnapshot, runTransaction, serverTimestamp, FieldPath,
   setDoc, deleteDoc, getDoc, getDocFromServer, getDocs, writeBatch, Timestamp, increment
 } from "https://www.gstatic.com/firebasejs/12.16.0/firebase-firestore.js";
-import { assertBillingPeriodUpdate, periodDateKeys, daysInMonthKey } from "./billing-cycle-period.js?v=20261126-1";
-import {authEnvironment,authDestination} from "./mobile-auth-policy.js?v=20261127-7";
+import { assertBillingPeriodUpdate, periodDateKeys, daysInMonthKey } from "./billing-cycle-period.js?v=20261127-11";
+import {authEnvironment,signInMethod,sessionStorageAvailable} from "./mobile-auth-policy.js?v=20261127-11";
 
 const clone=value=>value==null?value:JSON.parse(JSON.stringify(value));
 const isObject=value=>value!==null&&typeof value==="object"&&!Array.isArray(value);
@@ -99,6 +99,8 @@ function escapeRegExp(value){return String(value||"").replace(/[.*+?^${}()|[\]\\
 export function createP708SecureEngine({firebaseConfig,roomCode,deviceId,onShape,onStatus,onSession,onAdminData,onTaskData,onSwapData}){
   if(!firebaseConfig?.apiKey)throw new Error("Chưa cấu hình Firebase.");
   const useEmulators=["localhost","127.0.0.1","[::1]"].includes(location.hostname)&&firebaseConfig.projectId==="demo-p708-production-audit";
+  const supportsRedirect=useEmulators||location.host===firebaseConfig.authDomain;
+  const diagnostic=(key,value)=>globalThis.P708Debug?.(key,value);
   const appName="p708-secure-manager-v5";
   const appExists=getApps().some(x=>x.name===appName);
   const app=appExists?getApp(appName):initializeApp(firebaseConfig,appName);
@@ -107,13 +109,16 @@ export function createP708SecureEngine({firebaseConfig,roomCode,deviceId,onShape
   catch{db=getFirestore(app);}
   const auth=appExists?getAuth(app):initializeAuth(app,{
     persistence:[browserLocalPersistence,indexedDBLocalPersistence,browserSessionPersistence,inMemoryPersistence],
-    popupRedirectResolver:browserPopupRedirectResolver
+    ...(supportsRedirect?{popupRedirectResolver:browserPopupRedirectResolver}:{})
   }),provider=new GoogleAuthProvider();
   if(useEmulators&&!appExists){
     connectAuthEmulator(auth,"http://127.0.0.1:9099",{disableWarnings:true});
     connectFirestoreEmulator(db,"127.0.0.1",8080);
   }
   provider.setCustomParameters({prompt:"select_account"});
+  diagnostic("firebase","initialized");
+  diagnostic("sdk","12.16.0");
+  diagnostic("persistence","firebase-managed-fallback");
   const roomRef=doc(db,"rooms",roomCode),configRef=doc(db,"rooms",roomCode,"security","config");
   const accessCollection=collection(db,"rooms",roomCode,"access"),
     requestCollection=collection(db,"rooms",roomCode,"accessRequests"),
@@ -144,6 +149,8 @@ export function createP708SecureEngine({firebaseConfig,roomCode,deviceId,onShape
   };
   const emitSession=()=>{
     const status=sessionStatus();
+    diagnostic("auth",status);
+    if(authError)diagnostic("authError",authError);
     const waiting=status==="checking"||status==="loadingRoom"?status:"";
     if(waitingFor!==waiting){
       clearTimeout(waitingTimer);
@@ -206,7 +213,8 @@ export function createP708SecureEngine({firebaseConfig,roomCode,deviceId,onShape
     roomUnsub?.();memberDataUnsub?.();adminAccessUnsub?.();adminRequestsUnsub?.();auditUnsub?.();taskUnsub?.();swapUnsub?.();
     roomUnsub=memberDataUnsub=adminAccessUnsub=adminRequestsUnsub=auditUnsub=taskUnsub=swapUnsub=null;
     memberDataByUid=new Map();accessByUid=new Map();memberDataReady=false;
-    remoteShape={};optimisticShape={};roomReady=false;remoteRevision=0;
+    remoteShape={};optimisticShape={};roomReady=false;remoteRevision=0;pendingRoomWrite=false;
+    diagnostic("listener","stopped");
   };
   const dataListener=callback=>{
     const epoch=dataGeneration;
@@ -223,8 +231,11 @@ export function createP708SecureEngine({firebaseConfig,roomCode,deviceId,onShape
   };
   const startTaskListener=()=>{
     taskUnsub?.();
-    const source=isAdmin()?query(taskCollection,orderBy("updatedAt","desc"),limit(200)):query(taskCollection,where("actorUid","==",user.uid),limit(200));
-    taskUnsub=onSnapshot(source,dataListener(snap=>onTaskData?.(snap.docs.map(d=>({id:d.id,...d.data()})))),dataListener(()=>emitStatus("offline","Không tải được trạng thái công việc")));
+    const source=isAdmin()?query(taskCollection,orderBy("updatedAt","desc"),limit(200)):query(taskCollection,where("actorUid","==",user.uid));
+    taskUnsub=onSnapshot(source,{includeMetadataChanges:true},dataListener(snap=>{
+      if(snap.metadata.fromCache||snap.metadata.hasPendingWrites)return;
+      onTaskData?.(snap.docs.map(d=>({id:d.id,...d.data()})));
+    }),dataListener(()=>emitStatus("offline","Không tải được trạng thái công việc")));
     const swaps=isAdmin()?query(swapCollection,orderBy("updatedAt","desc"),limit(100)):query(swapCollection,where("actorUid","==",user.uid),limit(100));
     swapUnsub=onSnapshot(swaps,dataListener(snap=>onSwapData?.(snap.docs.map(d=>({id:d.id,...d.data()})))),dataListener(()=>emitStatus("offline","Không tải được yêu cầu đổi việc")));
   };
@@ -235,10 +246,17 @@ export function createP708SecureEngine({firebaseConfig,roomCode,deviceId,onShape
     const onRoomError=error=>{
       if(!stillCurrent())return;
       roomError=error?.code||"room";
+      diagnostic("firestoreError",roomError);
+      diagnostic("listener","error");
       emitSession();emitStatus("offline","Không thể đọc dữ liệu phòng");
     };
+    diagnostic("listener","connecting");
     roomUnsub=onSnapshot(roomRef,{includeMetadataChanges:true},snap=>{
-      if(!stillCurrent()||snap.metadata.hasPendingWrites)return;
+      if(!stillCurrent())return;
+      pendingRoomWrite=snap.metadata.hasPendingWrites;
+      diagnostic("pendingWrites",pendingRoomWrite||activeWrites>0);
+      diagnostic("snapshot",pendingRoomWrite?"pending":snap.metadata.fromCache?"cache":"server");
+      if(pendingRoomWrite)return;
       if(snap.metadata.fromCache){
         emitStatus(navigator.onLine?"syncing":"offline","Chưa xác nhận dữ liệu với máy chủ");
         return;
@@ -249,6 +267,8 @@ export function createP708SecureEngine({firebaseConfig,roomCode,deviceId,onShape
       }
       roomError="";
       acceptRoomShape(snap.data()?.payload,Number(snap.data()?.revision)||0);
+      diagnostic("listener","active");
+      diagnostic("lastSync",Date.now());
       emitSession();
       emitStatus(navigator.onLine?"online":"offline",navigator.onLine?"Đã đồng bộ":"Đang dùng dữ liệu ngoại tuyến");
     },onRoomError);
@@ -285,7 +305,7 @@ export function createP708SecureEngine({firebaseConfig,roomCode,deviceId,onShape
       accessError="";
       accessReady=true;
       handleAccessChange(s.exists()?{uid:s.id,...s.data()}:null);
-    },e=>{if(epoch!==generation)return;stopDataListeners();access=null;accessError=e?.code||"access";emitSession();});
+    },e=>{if(epoch!==generation)return;stopDataListeners();access=null;accessError=e?.code||"access";diagnostic("firestoreError",accessError);emitSession();});
     requestUnsub=onSnapshot(doc(requestCollection,user.uid),{includeMetadataChanges:true},s=>{
       if(epoch!==generation||s.metadata.fromCache)return;
       if(accessReady&&accessError==="slow")accessError="";
@@ -303,10 +323,34 @@ export function createP708SecureEngine({firebaseConfig,roomCode,deviceId,onShape
     if(!user)return;
     clearUserListeners();emitSession();attachUserListeners();
   };
-  const onlineHandler=()=>{emitStatus("syncing","Đang kết nối lại…");if(user&&(accessError||roomError))retryAccess();else emitSession();};
+  let wasHidden=false,lastRecoveryAt=0,activeWrites=0,pendingRoomWrite=false;
+  const trackWrite=operation=>async(...args)=>{
+    activeWrites++;
+    diagnostic("pendingWrites",true);
+    try{return await operation(...args);}
+    catch(error){diagnostic("firestoreError",error?.code||"write-rejected");throw error;}
+    finally{activeWrites--;diagnostic("pendingWrites",activeWrites>0||pendingRoomWrite);}
+  };
+  const resume=()=>{
+    if(!navigator.onLine||!user)return;
+    const now=Date.now();
+    if(now-lastRecoveryAt<750)return;
+    lastRecoveryAt=now;
+    if(accessError||roomError){retryAccess();return;}
+    if(!hasAccess()||!roomReady)return;
+    emitStatus("syncing","Đang xác nhận dữ liệu với máy chủ…");
+    void forceSync();
+  };
+  const onlineHandler=()=>{emitStatus("syncing","Đang kết nối lại…");lastRecoveryAt=0;resume();emitSession();};
   const offlineHandler=()=>{emitStatus("offline","Đang ngoại tuyến");emitSession();};
+  const pageHideHandler=()=>{wasHidden=true;};
+  const visibilityHandler=()=>{
+    if(document.visibilityState==="hidden"){wasHidden=true;return;}
+    if(wasHidden){wasHidden=false;resume();}
+  };
   const pageShowHandler=event=>{
     if(event.persisted&&signingIn&&!user){signingIn=false;authError="auth/cancelled-popup-request";emitSession();}
+    if(event.persisted||wasHidden){wasHidden=false;resume();}
   };
 
   const start=async()=>{
@@ -314,7 +358,13 @@ export function createP708SecureEngine({firebaseConfig,roomCode,deviceId,onShape
     authRestoring=true;emitSession();
     window.addEventListener("online",onlineHandler);window.addEventListener("offline",offlineHandler);
     window.addEventListener("pageshow",pageShowHandler);
-    await Promise.all([auth.authStateReady(),getRedirectResult(auth).catch(error=>{authError=error?.code||"redirect";})]);
+    window.addEventListener("pagehide",pageHideHandler);
+    document.addEventListener("visibilitychange",visibilityHandler);
+    const redirect=supportsRedirect&&sessionStorageAvailable()
+      ?getRedirectResult(auth,browserPopupRedirectResolver).catch(error=>{authError=error?.code||"redirect";})
+      :Promise.resolve(null);
+    diagnostic("authFlow",supportsRedirect?"restore-same-origin":"restore-popup-context");
+    await Promise.all([auth.authStateReady(),redirect]);
     if(!started)return;
     authRestoring=false;
     authUnsub=onAuthStateChanged(auth,next=>{
@@ -332,17 +382,18 @@ export function createP708SecureEngine({firebaseConfig,roomCode,deviceId,onShape
   const signInGoogle=async()=>{
     if(signingIn||authRestoring||user)return;
     if(!navigator.onLine){authError="auth/network-request-failed";emitSession();return;}
-    const {embedded,mobile,standalone}=environment();
-    if(embedded){authError="auth/operation-not-supported-in-this-environment";emitSession();return;}
-    const firstParty=location.hostname===firebaseConfig.authDomain;
-    const redirect=()=>firstParty||useEmulators
-      ?signInWithRedirect(auth,provider):location.assign(authDestination(location.hash));
+    const environmentInfo=environment();
+    const canRedirect=supportsRedirect&&sessionStorageAvailable();
+    const method=signInMethod({...environmentInfo,sameOrigin:supportsRedirect,sessionStorage:canRedirect});
+    if(method==="unavailable"){authError="auth/operation-not-supported-in-this-environment";emitSession();return;}
+    const redirect=()=>signInWithRedirect(auth,provider,browserPopupRedirectResolver);
     signingIn=true;authError="";emitSession();
+    diagnostic("authFlow",method);
     try{
-      if(!useEmulators&&(mobile||standalone))await redirect();
+      if(method==="redirect")await redirect();
       else{
-        try{await signInWithPopup(auth,provider);}
-        catch(error){if(error?.code!=="auth/popup-blocked")throw error;await redirect();}
+        try{await signInWithPopup(auth,provider,browserPopupRedirectResolver);}
+        catch(error){if(error?.code!=="auth/popup-blocked"||!canRedirect)throw error;await redirect();}
       }
     }catch(error){authError=error?.code||"unknown";}
     finally{
@@ -572,13 +623,17 @@ export function createP708SecureEngine({firebaseConfig,roomCode,deviceId,onShape
 
   const submitTask=async({scheduleId,weekStart,taskId,taskName,memberId,status="submitted",checks=[]})=>{
     if(!user||!hasAccess())throw new Error("Chưa có quyền truy cập.");if(isAdmin())throw new Error("Trưởng phòng dùng nút xác nhận trực tiếp.");if(!navigator.onLine)throw new Error("Đang ngoại tuyến.");if(memberId!==access.memberId)throw new Error("Bạn chỉ được báo công việc của mình.");
-    const schedule=optimisticShape?.schedules?.[weekStart],assignment=(schedule?.assignments||[]).find(a=>a?.taskId===taskId&&a?.personId===memberId&&!a?.cut);
-    if(!schedule||schedule.id!==scheduleId||!assignment)throw new Error("Công việc này không còn được phân cho bạn.");if(assignment.completed)throw new Error("Công việc đã được xác nhận hoàn thành.");
-    const id=taskDocId(weekStart,taskId,memberId),ref=doc(taskCollection,id);
+    const actor=user.uid,epoch=dataGeneration,id=taskDocId(weekStart,taskId,memberId),ref=doc(taskCollection,id);
     if(!["in_progress","submitted"].includes(status))throw new Error("Trạng thái không hợp lệ.");
     const completion=status==="submitted"?{checks}:{};
     await runTransaction(db,async tx=>{
-      const old=await tx.get(ref);
+      const room=await tx.get(roomRef),old=await tx.get(ref);
+      if(user?.uid!==actor||epoch!==dataGeneration||access?.memberId!==memberId)throw new Error("Tài khoản hoặc phân công đã thay đổi.");
+      const payload=room.data()?.payload,schedule=payload?.schedules?.[weekStart];
+      const assignment=schedule?.assignments?.find(a=>a.taskId===taskId&&a.personId===memberId&&!a.cut);
+      if(schedule?.id!==scheduleId||!assignment||payload?._sync?.deletedSchedules?.[weekStart])
+        throw new Error("Công việc này không còn được phân cho bạn.");
+      if(assignment.completed)throw new Error("Công việc đã được xác nhận hoàn thành.");
       if(old.exists()){
         const previous=old.data(),oldStatus=previous.status;
         if(previous.scheduleId!==scheduleId||previous.actorUid!==user.uid)throw new Error("Báo trực cũ đang giữ chỗ. Hãy nhờ trưởng phòng kiểm tra.");
@@ -592,14 +647,20 @@ export function createP708SecureEngine({firebaseConfig,roomCode,deviceId,onShape
     });
     return {id};
   };
-  const reviewTask=async({submissionId,status,note=""})=>{
+  const reviewTask=async({submissionId,status,note="",expectedSubmittedAt})=>{
     if(!isAdmin())throw new Error("Chỉ trưởng phòng được xác nhận.");if(!navigator.onLine)throw new Error("Đang ngoại tuyến.");if(!["approved","rejected"].includes(status))throw new Error("Trạng thái không hợp lệ.");
-    const actor=user.uid,ref=doc(taskCollection,submissionId),result=await runTransaction(db,async tx=>{
+    if(!expectedSubmittedAt||!Number.isInteger(expectedSubmittedAt.seconds)||!Number.isInteger(expectedSubmittedAt.nanoseconds))
+      throw new Error("Chưa có phiên bản báo cáo đã đồng bộ. Hãy thử lại.");
+    const actor=user.uid,epoch=dataGeneration,ref=doc(taskCollection,submissionId),result=await runTransaction(db,async tx=>{
       const taskSnap=await tx.get(ref),roomSnap=await tx.get(roomRef);
       if(!taskSnap.exists())throw new Error("Không tìm thấy báo hoàn thành.");
-      const task=taskSnap.data()||{};if(task.status===status)return null;if(task.status!=="submitted")throw new Error("Báo hoàn thành này đã được xử lý.");if(!roomSnap.exists())throw new Error("Không tìm thấy dữ liệu phòng.");
+      if(user?.uid!==actor||epoch!==dataGeneration||!isAdmin())throw new Error("Phiên hoặc quyền truy cập đã thay đổi.");
+      const task=taskSnap.data()||{};
+      if(task.submittedAt?.seconds!==expectedSubmittedAt.seconds||task.submittedAt?.nanoseconds!==expectedSubmittedAt.nanoseconds)
+        throw new Error("Thành viên đã gửi báo cáo mới. Hãy kiểm tra lại trước khi duyệt.");
+      if(task.status===status)return null;if(task.status!=="submitted")throw new Error("Báo hoàn thành này đã được xử lý.");if(!roomSnap.exists())throw new Error("Không tìm thấy dữ liệu phòng.");
       const payload=clone(roomSnap.data()?.payload)||{},schedule=payload?.schedules?.[task.weekStart];
-      if(!schedule||schedule.id!==task.scheduleId)throw new Error("Lịch trực tương ứng không còn tồn tại.");
+      if(!schedule||schedule.id!==task.scheduleId||payload._sync?.deletedSchedules?.[task.weekStart])throw new Error("Lịch trực tương ứng không còn tồn tại.");
       const assignment=(schedule.assignments||[]).find(a=>a?.taskId===task.taskId&&a?.personId===task.memberId&&!a?.cut);
       if(!assignment||assignment.completed)throw new Error("Phân công hoặc trạng thái đã thay đổi; hãy kiểm tra lại lịch.");
       if(status==="approved"){assignment.completed=true;schedule.updatedAt=new Date().toISOString();}
@@ -609,19 +670,20 @@ export function createP708SecureEngine({firebaseConfig,roomCode,deviceId,onShape
       await writeAudit({action:status==="approved"?"VERIFY_TASK":"REJECT_TASK",summary:`${status==="approved"?"Xác nhận":"Yêu cầu làm lại"}: ${task.taskName||"công việc"}`,targetMemberId:task.memberId||null},tx);
       return status==="approved"?{payload,revision:(Number(roomSnap.data()?.revision)||0)+1}:null;
     });
-    if(!result||user?.uid!==actor||!isAdmin())return true;
+    if(!result||user?.uid!==actor||epoch!==dataGeneration||!isAdmin())return true;
     acceptRoomShape(result.payload,result.revision);
     return true;
   };
   const completeTask=async({weekStart,scheduleId,taskId,memberId})=>{
     if(!isAdmin()||!navigator.onLine)throw new Error("Chỉ trưởng phòng đang kết nối mới được đánh dấu hoàn thành.");
-    const actor=user.uid;
+    const actor=user.uid,epoch=dataGeneration;
     const result=await runTransaction(db,async tx=>{
       const room=await tx.get(roomRef),payload=clone(room.data()?.payload),schedule=payload?.schedules?.[weekStart];
       const assignment=schedule?.assignments?.find(item=>item.taskId===taskId&&item.personId===memberId&&!item.cut);
-      if(schedule?.id!==scheduleId||!assignment)throw new Error("Phân công vừa thay đổi. Hãy kiểm tra lại.");
+      if(schedule?.id!==scheduleId||!assignment||payload?._sync?.deletedSchedules?.[weekStart])throw new Error("Phân công vừa thay đổi. Hãy kiểm tra lại.");
       if(assignment.completed)return null;
       const report=await tx.get(doc(taskCollection,taskDocId(weekStart,taskId,memberId)));
+      if(user?.uid!==actor||epoch!==dataGeneration||!isAdmin())throw new Error("Phiên hoặc quyền truy cập đã thay đổi.");
       if(report.data()?.scheduleId===scheduleId&&report.data()?.status==="submitted")
         throw new Error("Thành viên đang chờ xác nhận. Hãy dùng Xác nhận hoặc Làm lại.");
       assignment.completed=true;schedule.updatedAt=new Date().toISOString();
@@ -630,7 +692,7 @@ export function createP708SecureEngine({firebaseConfig,roomCode,deviceId,onShape
       await writeAudit({action:"UPDATE_TASK",summary:`${assignment.task||taskId}: Đã xong`,targetMemberId:memberId},tx);
       return {payload,revision:(Number(room.data()?.revision)||0)+1};
     });
-    if(result&&user?.uid===actor&&isAdmin())acceptRoomShape(result.payload,result.revision);
+    if(result&&user?.uid===actor&&epoch===dataGeneration&&isAdmin())acceptRoomShape(result.payload,result.revision);
     return true;
   };
   const requestTaskSwap=async({weekStart,scheduleId,taskId,otherTaskId,otherMemberId})=>{
@@ -684,16 +746,29 @@ export function createP708SecureEngine({firebaseConfig,roomCode,deviceId,onShape
     for(let i=0;i<items.length;i+=350){const batch=writeBatch(db),part=items.slice(i,i+350);part.forEach(item=>batch.set(item.ref,item.patch,{merge:true}));await batch.commit();updated+=part.length;}
     return updated;
   };
-  const deleteTaskSubmissionsForWeek=async(weekStart,scheduleId)=>{
-    if(!isAdmin())throw new Error("Chỉ trưởng phòng được dọn báo công việc.");if(!weekStart)return 0;
-    const snap=await getDocs(query(taskCollection,where("weekStart","==",weekStart)));
-    return commitDeletes(snap.docs.filter(item=>item.data().scheduleId===scheduleId));
-  };
-  const reconcileTaskSubmissions=async({weekStart,assignments=[]})=>{
+  const reconcileTaskSubmissions=async({weekStart,scheduleId})=>{
     if(!isAdmin())throw new Error("Chỉ trưởng phòng được đồng bộ báo công việc.");if(!weekStart)return 0;
-    const valid=new Set((assignments||[]).filter(a=>a&&!a.cut&&a.personId&&a.taskId).map(a=>`${a.taskId}::${a.personId}`)),snap=await getDocs(query(taskCollection,where("weekStart","==",weekStart)));
-    const stale=snap.docs.filter(d=>{const data=d.data()||{};return !valid.has(`${data.taskId}::${data.memberId}`);});return commitDeletes(stale);
+    const actor=user.uid,epoch=dataGeneration;
+    const snap=await getDocs(query(taskCollection,where("weekStart","==",weekStart)));
+    let deleted=0;
+    for(const candidate of snap.docs){
+      const removed=await runTransaction(db,async tx=>{
+        const room=await tx.get(roomRef),report=await tx.get(candidate.ref);
+        if(user?.uid!==actor||epoch!==dataGeneration||!isAdmin())throw new Error("Phiên hoặc quyền truy cập đã thay đổi.");
+        const task=report.data();
+        if(!room.exists()||!task||task.weekStart!==weekStart||(scheduleId&&task.scheduleId!==scheduleId))return false;
+        const current=room.data()?.payload?.schedules?.[weekStart];
+        const matches=current&&(task.scheduleId===current.id||!task.scheduleId)&&current.assignments?.some(
+          assignment=>!assignment.cut&&assignment.taskId===task.taskId&&assignment.personId===task.memberId);
+        if(matches)return false;
+        tx.delete(report.ref);
+        return true;
+      });
+      if(removed)deleted++;
+    }
+    return deleted;
   };
+  const deleteTaskSubmissionsForWeek=(weekStart,scheduleId)=>scheduleId?reconcileTaskSubmissions({weekStart,scheduleId}):Promise.resolve(0);
   const deleteAccountFromRoom=async targetUid=>{
     if(!isAdmin())throw new Error("Chỉ trưởng phòng được xóa tài khoản khỏi phòng.");if(targetUid===user.uid)throw new Error("Không thể tự xóa tài khoản đang đăng nhập.");
     const targetAccessRef=doc(accessCollection,targetUid),targetMemberRef=doc(memberDataCollection,targetUid),targetRequestRef=doc(requestCollection,targetUid),[configSnap,targetSnap]=await Promise.all([getDoc(configRef),getDoc(targetAccessRef)]);
@@ -727,12 +802,18 @@ export function createP708SecureEngine({firebaseConfig,roomCode,deviceId,onShape
     const actor=user.uid,epoch=dataGeneration;
     const pending=getDocFromServer(roomRef).then(snap=>{
       if(user?.uid!==actor||epoch!==dataGeneration||!hasAccess())return false;
+      if(snap.metadata.hasPendingWrites||snap.metadata.fromCache)return false;
       if(!snap.exists()||(!isAdmin()&&!snap.data()?.payload?.members?.[access.memberId]))return false;
       acceptRoomShape(snap.data()?.payload,Number(snap.data()?.revision)||0);
-      emitStatus("online","Đã đồng bộ");
+      diagnostic("lastSync",Date.now());
+      diagnostic("snapshot","server");
+      if(navigator.onLine)emitStatus("online","Đã đồng bộ");
       return true;
     }).catch(e=>{
-      if(user?.uid===actor&&epoch===dataGeneration)emitStatus("offline","Không thể đồng bộ");
+      if(user?.uid===actor&&epoch===dataGeneration){
+        diagnostic("firestoreError",e?.code||"server-read");
+        emitStatus("offline","Không thể đồng bộ");
+      }
       return false;
     }).finally(()=>{if(restoreInFlight===pending)restoreInFlight=null;});
     restoreInFlight=pending;
@@ -742,7 +823,15 @@ export function createP708SecureEngine({firebaseConfig,roomCode,deviceId,onShape
   const stop=()=>{
     authUnsub?.();clearUserListeners();clearTimeout(waitingTimer);waitingFor="";
     window.removeEventListener("online",onlineHandler);window.removeEventListener("offline",offlineHandler);
-    window.removeEventListener("pageshow",pageShowHandler);started=false;
+    window.removeEventListener("pageshow",pageShowHandler);
+    window.removeEventListener("pagehide",pageHideHandler);
+    document.removeEventListener("visibilitychange",visibilityHandler);
+    started=false;
   };
-  return {start,stop,signInGoogle,signOut,retryAccess,environment,requestAccess,cancelAccessRequest,approveRequest,updateAccess,revokeAccess,recordShape,saveBillingDays,submitTask,reviewTask,completeTask,requestTaskSwap,reviewTaskSwap,reconcileTaskSubmissions,deleteTaskSubmissionsForWeek,deleteAccountFromRoom,cleanupAuditLogs,forceSync,flush};
+  const writes={requestAccess,cancelAccessRequest,approveRequest,updateAccess,revokeAccess,recordShape,
+    saveBillingDays,submitTask,reviewTask,completeTask,requestTaskSwap,reviewTaskSwap,reconcileTaskSubmissions,
+    deleteTaskSubmissionsForWeek,deleteAccountFromRoom,cleanupAuditLogs};
+  for(const key of Object.keys(writes))writes[key]=trackWrite(writes[key]);
+  return {start,stop,signInGoogle,signOut,retryAccess,environment,forceSync,flush,...writes,
+    hasPendingWork:()=>authRestoring||signingIn||activeWrites>0||pendingRoomWrite};
 }

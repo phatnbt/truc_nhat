@@ -199,7 +199,7 @@ async function saveManual(){
   s.updatedAt=nowIso();
   closeModal("manualModal");
   const ok=await persist("Đã lưu phân công",{action:"UPDATE_SCHEDULE",summary:`Chỉnh phân công tuần ${s.weekStart}`});
-  if(ok)await realtimeEngine?.reconcileTaskSubmissions({weekStart:s.weekStart,assignments:s.assignments}).catch(()=>{});
+  if(ok)await realtimeEngine?.reconcileTaskSubmissions({weekStart:s.weekStart,scheduleId:s.id}).catch(()=>{});
 }
 const CHECK_ITEMS={
   lavabo:"Rửa lavabo và bồn cầu",san:"Chà sàn và làm sạch miệng cống",quet:"Quét sạch góc phòng và lối đi",
@@ -209,7 +209,7 @@ let checklistDraft=null;
 function openChecklist(index){
   const schedule=currentSchedule(),assignment=schedule?.assignments[index];
   if(!assignment||assignment.personId!==myMemberId()||assignment.cut||assignment.completed)return;
-  checklistDraft={scheduleId:schedule.id,taskId:assignment.taskId,actor:authSession.user?.uid};
+  checklistDraft={scheduleId:schedule.id,taskId:assignment.taskId,memberId:assignment.personId,actor:authSession.user?.uid};
   $("#checklistTitle").textContent=assignment.task;
   $("#checklistTaskLabel").textContent=CHECK_ITEMS[assignment.taskId]||assignment.task;
   $("#taskChecklistForm").reset();
@@ -218,10 +218,12 @@ function openChecklist(index){
 async function confirmChecklist(event){
   event.preventDefault();
   const draft=checklistDraft,schedule=currentSchedule();
-  if(!draft||draft.actor!==authSession.user?.uid||schedule?.id!==draft.scheduleId)return;
-  const index=schedule.assignments.findIndex(item=>item.taskId===draft.taskId);
+  if(!draft||draft.actor!==authSession.user?.uid||draft.memberId!==myMemberId()||schedule?.id!==draft.scheduleId)
+    return toast("Lịch hoặc tài khoản đã thay đổi. Hãy mở lại công việc.");
+  const index=schedule.assignments.findIndex(item=>item.taskId===draft.taskId&&item.personId===draft.memberId);
   const checks=new FormData(event.currentTarget).getAll("check");
-  if(index<0||checks.length!==2)return;
+  if(index<0)return toast("Phân công đã thay đổi. Hãy kiểm tra lại lịch.");
+  if(checks.length!==2)return;
   const button=event.currentTarget.querySelector('[type="submit"]');
   if(button.disabled)return;
   button.disabled=true;
@@ -271,20 +273,29 @@ async function sendTaskSwap(){
   }catch(e){toast(e.code==="permission-denied"?"Yêu cầu đã tồn tại hoặc phân công đã thay đổi.":e.message);}
   finally{$("#sendSwapButton").disabled=false;}
 }
-async function reviewTask(index,approved){
+const pendingTaskReviews=new Set();
+async function reviewTask(index,approved,button){
   if(!requireAdmin())return;
   const s=currentSchedule(),a=s?.assignments?.[index];
   if(!s||!a)return;
   const sub=submissionFor(s,a);
   if(!sub||sub.status!=="submitted")return toast("Không có báo hoàn thành đang chờ");
+  const [seconds,nanoseconds]=String(button.dataset.reviewVersion||"").split(":").map(Number);
+  const reviewKey=button.dataset.reviewId;
+  if(pendingTaskReviews.has(reviewKey))return;
+  pendingTaskReviews.add(reviewKey);
+  const controls=button.closest(".task-actions").querySelectorAll("button");
+  controls.forEach(control=>control.disabled=true);
   try{
     if(!realtimeEngine)throw new Error("Chưa kết nối Firebase. Hãy thử lại.");
     toast("Đang lưu xác nhận…");
     await realtimeEngine.reviewTask({
-      submissionId:sub.id,status:approved?"approved":"rejected",note:approved?"Đã xác nhận":"Yêu cầu làm lại"
+      submissionId:button.dataset.reviewId,expectedSubmittedAt:{seconds,nanoseconds},
+      status:approved?"approved":"rejected",note:approved?"Đã xác nhận":"Yêu cầu làm lại"
     });
     toast(approved?"Đã xác nhận công việc":"Đã yêu cầu làm lại");
   }catch(e){toast(e?.message||"Không thể cập nhật xác nhận");}
+  finally{pendingTaskReviews.delete(reviewKey);controls.forEach(control=>control.disabled=false);}
 }
 async function adminCompleteTask(index){
   if(!requireAdmin())return;

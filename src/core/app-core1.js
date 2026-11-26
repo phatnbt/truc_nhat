@@ -159,6 +159,12 @@ function activeBillPerson(b=currentBill()){ if(!b)return null; if(ui.activeBillP
 function stayCount(person,bill=currentBill()){ if(!person||!bill)return 0; let count=0; for(let d=1;d<=monthDays(bill.month);d++) if(person.days?.[String(d)])count++; return count; }
 function allocate(total,people,bill){ total=Math.max(0,Math.round(Number(total)||0)); const rows=people.map((p,i)=>({id:p.id,i,days:stayCount(p,bill),base:0,frac:0})); const totalDays=rows.reduce((s,r)=>s+r.days,0); if(!total||!totalDays)return Object.fromEntries(rows.map(r=>[r.id,0])); let used=0; rows.forEach(r=>{const exact=total*r.days/totalDays;r.base=Math.floor(exact);r.frac=exact-r.base;used+=r.base;}); rows.sort((a,b)=>b.frac-a.frac||b.days-a.days||a.i-b.i); for(let i=0;i<total-used;i++)rows[i%rows.length].base++; return Object.fromEntries(rows.map(r=>[r.id,r.base])); }
 function billCalc(b=currentBill()){ const bill=b||{month:state.billing.selectedMonth,electricity:0,water:0,people:[],closed:false}; const people=bill.people||[]; const electric=allocate(bill.electricity,people,bill),water=allocate(bill.water,people,bill); const totalDays=people.reduce((sum,p)=>sum+stayCount(p,bill),0); return {b:bill,people,electric,water,totalDays,due:Object.fromEntries(people.map(p=>[p.id,(electric[p.id]||0)+(water[p.id]||0)]))}; }
-function submissionFor(schedule,assignment){ return taskSubmissions.find(s=>s.weekStart===schedule?.weekStart&&(!s.scheduleId||s.scheduleId===schedule?.id)&&s.taskId===assignment?.taskId&&s.memberId===assignment?.personId)||null; }
+function submissionMatchesAssignment(report,schedule,assignment){
+  return !!schedule&&!!assignment&&!assignment.cut&&report.weekStart===schedule.weekStart
+    &&report.scheduleId===schedule.id&&report.taskId===assignment.taskId&&report.memberId===assignment.personId;
+}
+function submissionFor(schedule,assignment){
+  return taskSubmissions.find(report=>submissionMatchesAssignment(report,schedule,assignment))||null;
+}
 function isBillPaid(person,due){ return Number(due)>0 && person?.paid===true && Number(person?.paidAmount||0)>=Number(due); }
 function billPaymentState(person,due){ const amount=Number(due)||0; return amount<=0?"none":isBillPaid(person,amount)?"paid":"unpaid"; }

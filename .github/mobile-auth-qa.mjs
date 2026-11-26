@@ -4,7 +4,7 @@ import {readFile} from "node:fs/promises";
 import {chromium,firefox,webkit,devices,expect} from "@playwright/test";
 import {initializeTestEnvironment} from "@firebase/rules-unit-testing";
 import {doc,setDoc,updateDoc,deleteDoc} from "firebase/firestore";
-import {authEnvironment} from "../src/core/mobile-auth-policy.js";
+import {authEnvironment,signInMethod} from "../src/core/mobile-auth-policy.js";
 
 const base="http://127.0.0.1:5178/";
 const projectId="demo-p708-production-audit",room="rooms/P708",password="test-emulator-password";
@@ -15,6 +15,9 @@ for(const userAgent of ["Zalo","FBAN/FBIOS","FB_IAB/Messenger","Android; wv"]){
 }
 assert.deepEqual(authEnvironment({userAgent:"Android SamsungBrowser/28.0"}),{embedded:false,mobile:true,standalone:false});
 assert.deepEqual(authEnvironment({userAgent:"iPhone CriOS/133.0",standalone:true}),{embedded:false,mobile:true,standalone:true});
+assert.equal(signInMethod({standalone:true,sameOrigin:true,sessionStorage:true}),"redirect");
+assert.equal(signInMethod({standalone:true,sameOrigin:false,sessionStorage:true}),"popup");
+assert.equal(signInMethod({standalone:true,sameOrigin:true,sessionStorage:false}),"popup");
 assert.match(process.env.FIREBASE_AUTH_EMULATOR_HOST||"",/^127\.0\.0\.1:9099$/);
 assert.ok(process.env.FIRESTORE_EMULATOR_HOST);
 const env=await initializeTestEnvironment({projectId,firestore:{rules:await readFile("firestore-secure.rules","utf8")}});
@@ -89,9 +92,10 @@ async function exercise(name){
 
     if(name==="chromium"){
       const redirect=await browser.newPage({serviceWorkers:"block"});
+      await redirect.addInitScript(()=>Object.defineProperty(navigator,"standalone",{value:true}));
       await redirect.route(authUrl,route=>route.fulfill({contentType:"text/javascript",body:`
         export * from "${authUrl}?auth-original";
-        export async function signInWithPopup(){throw {code:"auth/popup-blocked"};}
+        export async function signInWithPopup(){throw new Error("Standalone same-origin sign-in must use redirect");}
       `}));
       await redirect.goto(base);
       await redirect.locator("#googleLoginButton").click();
@@ -117,7 +121,11 @@ async function exercise(name){
     const firestore="https://www.gstatic.com/firebasejs/12.16.0/firebase-firestore.js";
     await user.route(firestore,route=>route.fulfill({contentType:"text/javascript",body:`
       export * from "${firestore}?auth-original";
-      import {onSnapshot as subscribe} from "${firestore}?auth-original";
+      import {onSnapshot as subscribe,getDocFromServer as read} from "${firestore}?auth-original";
+      export function getDocFromServer(ref){
+        if(ref.path==="rooms/P708")window.p708ServerReads=(window.p708ServerReads||0)+1;
+        return read(ref);
+      }
       export function onSnapshot(ref,...args){
         if(ref.path==="rooms/P708"&&window.testRoomFailure){
           queueMicrotask(()=>args[2]({code:"permission-denied"}));
@@ -139,6 +147,12 @@ async function exercise(name){
     await user.reload();
     await expect(user.locator("#authGate")).toBeHidden({timeout:15000});
     await expect(user.locator("#homeGreeting")).toHaveText("P708 · An");
+    await user.evaluate(()=>{
+      window.p708ServerReads=0;
+      window.dispatchEvent(new PageTransitionEvent("pagehide",{persisted:true}));
+      window.dispatchEvent(new PageTransitionEvent("pageshow",{persisted:true}));
+    });
+    await expect.poll(()=>user.evaluate(()=>window.p708ServerReads),{timeout:5000}).toBe(1);
     await user.context().setOffline(true);
     await expect(user.locator("#googleLoginButton")).toHaveCount(0);
     await user.context().setOffline(false);

@@ -10,9 +10,10 @@ async function cleanupAudit(){
 
 function relevantTaskSubmissions(){
   return (taskSubmissions||[]).filter(sub=>{
-    const schedule=state.schedules.find(s=>s.weekStart===sub.weekStart&&(!sub.scheduleId||s.id===sub.scheduleId));
+    const schedule=state.schedules.find(s=>s.weekStart===sub.weekStart&&s.id===sub.scheduleId);
     if(!schedule)return false;
-    return (schedule.assignments||[]).some(a=>!a.cut&&a.taskId===sub.taskId&&a.personId===sub.memberId);
+    return (schedule.assignments||[]).some(assignment=>submissionMatchesAssignment(sub,schedule,assignment)
+      &&(sub.status==="approved"?assignment.completed:!assignment.completed));
   });
 }
 

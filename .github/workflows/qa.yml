@@ -102,7 +102,7 @@ jobs:
         run: npx playwright install --with-deps chromium firefox webkit
 
       - name: Browser QA with local Auth, Firestore and Hosting
-        run: npx firebase-tools emulators:exec --only auth,firestore,hosting --project demo-p708-production-audit "node .github/mobile-boot-qa.mjs && node .github/mobile-auth-qa.mjs && node .github/browser-qa.mjs"
+        run: npx firebase-tools emulators:exec --only auth,firestore,hosting --project demo-p708-production-audit "node .github/mobile-boot-qa.mjs && node .github/mobile-auth-qa.mjs && node .github/browser-qa.mjs --critical-stress"
 
       - name: Responsive layout and theme QA
         if: ${{ !cancelled() && steps.browsers.outcome == 'success' }}

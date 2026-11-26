@@ -74,7 +74,9 @@ jobs:
 
       - name: Deploy Hosting and Firestore Rules
         if: steps.credentials.outputs.available == 'true'
-        run: firebase deploy --only hosting,firestore:rules --project p708-room-manager --non-interactive
+        run: |
+          node .github/write-pwa-build.mjs
+          firebase deploy --only hosting,firestore:rules --project p708-room-manager --non-interactive
 
       - name: Verify public runtime config endpoint
         if: steps.credentials.outputs.available == 'true'
@@ -96,6 +98,10 @@ jobs:
             -H "Origin: https://phatnbt.github.io" \
             "https://p708-room-manager.web.app/firebase-config.runtime.json" \
             | grep -qi '^access-control-allow-origin: https://phatnbt.github.io'
+          for asset in p708-build.json app.js sw.js manifest.webmanifest; do
+            curl --fail --silent --show-error "https://p708-room-manager.web.app/$asset" -o "/tmp/p708-$asset"
+            cmp "$asset" "/tmp/p708-$asset"
+          done
 
       - name: Deployment summary
         if: always()

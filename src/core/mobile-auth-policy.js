@@ -10,6 +10,21 @@ export function authDestination(hash=""){
   return new URL(hash.startsWith("#")?hash:"/",P708_AUTH_HOME).href;
 }
 
+export function signInMethod({embedded,mobile,standalone,sameOrigin,sessionStorage}){
+  if(embedded)return "unavailable";
+  return (mobile||standalone)&&sameOrigin&&sessionStorage?"redirect":"popup";
+}
+
+export function sessionStorageAvailable(){
+  try{
+    const key="p708-auth-probe";
+    sessionStorage.setItem(key,"1");
+    const available=sessionStorage.getItem(key)==="1";
+    sessionStorage.removeItem(key);
+    return available;
+  }catch{return false;}
+}
+
 const messages={
   "auth/popup-blocked":"Trình duyệt đã chặn cửa sổ đăng nhập. Hãy mở P708 trong Safari hoặc Chrome rồi thử lại.",
   "auth/popup-closed-by-user":"Bạn đã đóng cửa sổ Google. Có thể thử lại.",

@@ -16,6 +16,7 @@
       "README*.md",
       "CHANGELOG.md",
       "docs/**",
+      "_site/**",
       "graphify-out/**",
       "test-results/**",
       "*.log",
@@ -63,14 +64,17 @@
         ]
       },
       {
+        "source": "/p708-build.json",
+        "headers": [
+          {"key": "Cache-Control", "value": "no-store, max-age=0"}
+        ]
+      },
+      {
         "source": "**/*.@(html|js|css|webmanifest)",
         "headers": [
           {"key": "Cache-Control", "value": "no-cache, no-store, must-revalidate"}
         ]
       }
-    ],
-    "rewrites": [
-      {"source": "**", "destination": "/index.html"}
     ]
   }
 }

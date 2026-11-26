@@ -257,7 +257,7 @@ syncBillingMembers=async function(){
   if(ok&&repair.affectedWeeks.length){
     for(const weekStart of repair.affectedWeeks){
       const schedule=state.schedules.find(item=>item.weekStart===weekStart);
-      if(schedule)await realtimeEngine?.reconcileTaskSubmissions({weekStart,assignments:schedule.assignments}).catch(()=>{});
+      if(schedule)await realtimeEngine?.reconcileTaskSubmissions({weekStart,scheduleId:schedule.id}).catch(()=>{});
     }
   }
   if(repair.conflicts.length)toast(`${message}. Kiểm tra Tài khoản vì có mapping cùng tên tới nhiều ID.`,7000);

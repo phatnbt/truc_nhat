@@ -2,9 +2,6 @@ async function startCloud(){
   let bootReady=false;
   let sessionMarkup="";
   const signalBootReady=()=>{if(bootReady)return;bootReady=true;window.dispatchEvent(new Event("p708:boot-ready"));};
-  try{
-    for(const key of [CACHE_KEY,"cleaning_shared_apps_script_v2","cleaning_shared_apps_script_v1"])localStorage.removeItem(key);
-  }catch{}
   realtimeEngine=createP708SecureEngine({
     firebaseConfig:FIREBASE_CONFIG,roomCode:ROOM_CODE,deviceId:DEVICE_ID,
     onShape:(shape)=>{
@@ -103,8 +100,8 @@ function bindStaticEvents(){
     submitTask:openChecklist,
     startTask:index=>submitTask(index,"in_progress"),
     swapTask:openTaskSwap,
-    reviewApprove:index=>reviewTask(index,true),
-    reviewReject:index=>reviewTask(index,false),
+    reviewApprove:(index,button)=>reviewTask(index,true,button),
+    reviewReject:(index,button)=>reviewTask(index,false,button),
     adminTask:adminCompleteTask
   };
   const cleaningScheduleBox=$("#cleanScheduleBox");
@@ -141,7 +138,7 @@ function bindStaticEvents(){
         toast("Phân công vừa thay đổi. Hãy kiểm tra lại lịch trực.");
         return;
       }
-      action(index);
+      action(index,button);
       return;
     }
   });
@@ -192,48 +189,75 @@ function bindStaticEvents(){
   const routeFromLocation=()=>showPage(location.hash.replace("#","")||"home",{replace:true,instant:true,scroll:false});
   window.addEventListener("hashchange",routeFromLocation);
   window.addEventListener("popstate",routeFromLocation);
-  window.addEventListener("online",()=>forceSync());
-  window.addEventListener("offline",()=>{syncStatus={mode:"offline",text:"Mất kết nối · chế độ chỉ đọc"};renderSync();});
-  let hiddenAt=document.hidden?Date.now():0;
-  document.addEventListener("visibilitychange",()=>{
-    if(document.hidden){hiddenAt=Date.now();return;}
-    const away=hiddenAt?Date.now()-hiddenAt:0;
-    hiddenAt=0;
-    if(away>=30000&&navigator.onLine)realtimeEngine?.forceSync().catch(()=>{});
-  });
 }
 
 async function registerPwa(){
   if(!("serviceWorker" in navigator)||location.protocol==="file:")return;
   try{
-    const reg=await navigator.serviceWorker.register("./sw.js?v=20261127-7",{scope:"./",updateViaCache:"none"});
+    const reg=await navigator.serviceWorker.register("./sw.js",{scope:"./",updateViaCache:"none"});
     const banner=$("#pwaUpdateBanner");
-    const showUpdate=()=>{banner.hidden=!(reg.waiting&&reg.active&&reg.waiting!==reg.active&&navigator.serviceWorker.controller);};
+    let requested=false,reloadNeeded=false,updateCheckedAt=0;
+    const showUpdate=()=>{banner.hidden=!(reloadNeeded||(reg.waiting&&reg.active&&reg.waiting!==reg.active&&navigator.serviceWorker.controller));};
+    const reloadBlocker=()=>{
+      if(!navigator.onLine)return "Kết nối mạng rồi thử cập nhật.";
+      if(["loading","restoring","signingIn","checking","loadingRoom"].includes(authSession.status))
+        return "Đợi đăng nhập và dữ liệu phòng tải xong rồi cập nhật.";
+      if(realtimeEngine?.hasPendingWork()||globalThis.P708HasExternalWrites?.())
+        return "Đợi các thay đổi được máy chủ xác nhận rồi cập nhật.";
+      const drafts=$$('#stockForm input,#expenseForm input,#roomEventForm input')
+        .some(input=>input.name!=="threshold"&&input.name!==""&&input.value!==input.defaultValue);
+      if($(".modal.show")||drafts)return "Lưu hoặc hủy phần đang nhập rồi cập nhật.";
+      return "";
+    };
     showUpdate();
     reg.addEventListener("updatefound",()=>{
       reg.installing?.addEventListener("statechange",showUpdate);
     });
-    navigator.serviceWorker.addEventListener("controllerchange",showUpdate);
-    $("#pwaUpdateButton").addEventListener("click",()=>{
-      const drafts=$$('#stockForm input,#expenseForm input,#roomEventForm input')
-        .some(input=>input.name!=="threshold"&&input.name!==""&&input.value!==input.defaultValue);
-      if(["restoring","signingIn","checking","loadingRoom"].includes(authSession.status))return toast("Đợi đăng nhập hoàn tất rồi cập nhật.");
-      if($(".modal.show")||drafts){
-        return toast("Lưu hoặc hủy phần đang nhập rồi cập nhật.");
+    navigator.serviceWorker.addEventListener("controllerchange",()=>{
+      if(requested){
+        requested=false;
+        if(!reloadBlocker()){location.reload();return;}
+        reloadNeeded=true;
       }
-      if(!reg.waiting){location.reload();return;}
-      navigator.serviceWorker.addEventListener("controllerchange",()=>location.reload(),{once:true});
-      reg.waiting.postMessage({type:"SKIP_WAITING"});
+      showUpdate();
     });
-  }catch(e){console.warn("PWA",e);}
+    navigator.serviceWorker.addEventListener("message",event=>{
+      if(event.source!==navigator.serviceWorker.controller||event.data?.type!=="P708_OPEN_PAGE")return;
+      const page=typeof event.data.hash==="string"?event.data.hash.slice(1):"";
+      if(page)showPage(page);
+    });
+    $("#pwaUpdateButton").addEventListener("click",()=>{
+      const blocker=reloadBlocker();
+      if(blocker)return toast(blocker);
+      if(reloadNeeded){location.reload();return;}
+      if(requested||!reg.waiting)return;
+      const channel=new MessageChannel();
+      requested=true;
+      const timeout=setTimeout(()=>{requested=false;channel.port1.close();},5000);
+      channel.port1.onmessage=event=>{
+        clearTimeout(timeout);channel.port1.close();
+        if(!event.data?.accepted){requested=false;toast("Đóng các cửa sổ P708 khác rồi thử cập nhật.");}
+      };
+      reg.waiting.postMessage({type:"SKIP_WAITING"},[channel.port2]);
+    });
+    const checkUpdate=()=>{
+      if(document.hidden||!navigator.onLine||Date.now()-updateCheckedAt<60000)return;
+      updateCheckedAt=Date.now();
+      void reg.update().then(showUpdate).catch(()=>globalThis.P708Debug?.("registration","update-error"));
+    };
+    for(const event of ["pageshow","online"])window.addEventListener(event,checkUpdate);
+    document.addEventListener("visibilitychange",checkUpdate);
+  }catch(e){globalThis.P708Debug?.("registration","failed");}
 }
 
-bindStaticEvents();
-bindRoomResources();
-bindNotificationCenter();
-if($("#cleanWeek"))$("#cleanWeek").value=dateValue(nextMonday());
-state.billing.selectedMonth=validMonthKey(ui.selectedMonth)?ui.selectedMonth:state.billing.selectedMonth||todayMonth();
-renderAll();
-showPage(location.hash.replace("#","")||"home",{replace:true,instant:true,updateLocation:location.hash!=="#audit"});
-void registerPwa();
-startCloud();
+globalThis.P708StartApplication=()=>{
+  bindStaticEvents();
+  bindRoomResources();
+  bindNotificationCenter();
+  if($("#cleanWeek"))$("#cleanWeek").value=dateValue(nextMonday());
+  state.billing.selectedMonth=validMonthKey(ui.selectedMonth)?ui.selectedMonth:state.billing.selectedMonth||todayMonth();
+  renderAll();
+  showPage(location.hash.replace("#","")||"home",{replace:true,instant:true,updateLocation:location.hash!=="#audit"});
+  void registerPwa();
+  void startCloud().catch(()=>globalThis.P708ShowBootRecovery?.("cloud-start"));
+};
