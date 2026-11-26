@@ -6,7 +6,7 @@ import {
 } from "@firebase/rules-unit-testing";
 import {
   doc, collection, query, where, getDoc, getDocs, setDoc, updateDoc, deleteDoc,
-  runTransaction, serverTimestamp, Timestamp
+  runTransaction, serverTimestamp, Timestamp, writeBatch
 } from "firebase/firestore";
 
 const projectId="demo-p708-production-audit";
@@ -33,7 +33,9 @@ const roomPayload={
       ]
     }
   },
-  billingMonths:{"2026-08":{closed:true},"2026-09":{closed:false}},
+  billingMonths:{"2026-08":{closed:true,people:{"person:m1":{id:"m1",memberId:"m1",days:{}}}},"2026-09":{closed:false,people:{
+    "person:m1":{id:"m1",memberId:"m1",days:{}},"person:m2":{id:"m2",memberId:"m2",days:{}}
+  }}},
   settings:{weights:{lavabo:4,san:5,quet:3,lau:4,tham:2,rac:4}}
 };
 
@@ -93,6 +95,32 @@ try{
   await assertSucceeds(updateDoc(doc(member1,`rooms/${roomId}/memberData/member1`),{
     billingMonths:{"2026-09":{days:{"2026-08-29":true}}},billingPatchMonth:"2026-09",updatedAt:serverTimestamp()
   }));
+
+  async function publishBillDays({month="2026-09",person="person:m1",personal=true,extra={}}={}){
+    const room=doc(member1,`rooms/${roomId}`);
+    const data=doc(member1,`rooms/${roomId}/memberData/member1`);
+    const days={"2026-08-29":true,"2026-08-30":true};
+    const batch=writeBatch(member1);
+    if(personal)batch.set(data,{memberId:"m1",presence:false,billingMonths:{[month]:{days}},
+      billingPatchMonth:month,billingPatchPerson:person,updatedBy:"member1",updatedAt:serverTimestamp()});
+    batch.update(room,{
+      [`payload.billingMonths.${month}.people.${person}.days`]:days,
+      [`payload.billingMonths.${month}.people.${person}.daysShared`]:true,
+      revision:3,updatedAt:serverTimestamp(),...extra
+    });
+    return batch.commit();
+  }
+  await assertFails(publishBillDays({person:"person:m2"}));
+  await assertFails(publishBillDays({month:"2026-08"}));
+  await assertFails(publishBillDays({personal:false}));
+  await assertFails(publishBillDays({extra:{"payload.billingMonths.2026-09.electricity":1}}));
+  await assertFails(publishBillDays({extra:{"payload.presence.m2":false}}));
+  await assertSucceeds(publishBillDays());
+  const member2=env.authenticatedContext("member2",{email:"m2@example.com",name:"Member Two"}).firestore();
+  const published=await assertSucceeds(getDoc(doc(member2,`rooms/${roomId}`)));
+  if(published.data().payload.billingMonths["2026-09"].people["person:m1"].days["2026-08-30"]!==true)
+    throw new Error("Other active members must see the shared day in the room");
+  await assertFails(getDoc(doc(member2,`rooms/${roomId}/memberData/member1`)));
 
   // Exact app flow: submitTask() performs a transaction and reads the deterministic
   // task document before creating it. Missing-doc reads must be permitted, while

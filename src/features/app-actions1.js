@@ -171,7 +171,7 @@ async function deleteSchedule(){
   state.schedules=state.schedules.filter(x=>x.id!==s.id);
   ui.selectedScheduleId=null;
   const ok=await persist("Đã xóa lịch",{action:"DELETE_SCHEDULE",summary:`Xóa lịch tuần ${weekStart}`});
-  if(ok)await realtimeEngine?.deleteTaskSubmissionsForWeek(weekStart).catch(()=>{});
+  if(ok)await realtimeEngine?.deleteTaskSubmissionsForWeek(weekStart,s.id).catch(()=>{});
 }
 function openManual(){
   if(!requireAdmin())return;
@@ -222,9 +222,14 @@ async function confirmChecklist(event){
   const index=schedule.assignments.findIndex(item=>item.taskId===draft.taskId);
   const checks=new FormData(event.currentTarget).getAll("check");
   if(index<0||checks.length!==2)return;
-  if(await submitTask(index,"submitted",checks)){
-    checklistDraft=null;closeModal("taskChecklistModal");
-  }
+  const button=event.currentTarget.querySelector('[type="submit"]');
+  if(button.disabled)return;
+  button.disabled=true;
+  try{
+    if(await submitTask(index,"submitted",checks)&&checklistDraft===draft){
+      checklistDraft=null;closeModal("taskChecklistModal");
+    }
+  }finally{button.disabled=false;}
 }
 async function submitTask(index,status="submitted",checks=[]){
   if(!navigator.onLine)return toast("Đang ngoại tuyến · hãy kết nối mạng trước khi báo hoàn thành",5000);
@@ -235,7 +240,9 @@ async function submitTask(index,status="submitted",checks=[]){
   if(existing?.status==="submitted")return toast("Công việc này đã báo hoàn thành và đang chờ xác nhận");
   if(existing?.status==="approved")return toast("Công việc đã được xác nhận");
   try{
-    await realtimeEngine?.submitTask({scheduleId:s.id,weekStart:s.weekStart,taskId:a.taskId,taskName:a.task,memberId:a.personId,status,checks});
+    if(!realtimeEngine)throw new Error("Chưa kết nối Firebase. Hãy thử lại.");
+    toast("Đang lưu công việc…");
+    await realtimeEngine.submitTask({scheduleId:s.id,weekStart:s.weekStart,taskId:a.taskId,taskName:a.task,memberId:a.personId,status,checks});
     toast(status==="in_progress"?"Đã bắt đầu công việc":"Đã báo hoàn thành, chờ trưởng phòng xác nhận");
     return true;
   }catch(e){toast(e?.message||"Không thể báo hoàn thành");}
@@ -271,22 +278,26 @@ async function reviewTask(index,approved){
   const sub=submissionFor(s,a);
   if(!sub||sub.status!=="submitted")return toast("Không có báo hoàn thành đang chờ");
   try{
-    await realtimeEngine?.reviewTask({
+    if(!realtimeEngine)throw new Error("Chưa kết nối Firebase. Hãy thử lại.");
+    toast("Đang lưu xác nhận…");
+    await realtimeEngine.reviewTask({
       submissionId:sub.id,status:approved?"approved":"rejected",note:approved?"Đã xác nhận":"Yêu cầu làm lại"
     });
     toast(approved?"Đã xác nhận công việc":"Đã yêu cầu làm lại");
   }catch(e){toast(e?.message||"Không thể cập nhật xác nhận");}
 }
-function adminCompleteTask(index){
+async function adminCompleteTask(index){
   if(!requireAdmin())return;
   const s=currentSchedule(),a=s?.assignments?.[index];
   if(!s||!a||a.cut||a.completed)return;
   const sub=submissionFor(s,a);
   if(sub?.status==="submitted")return toast("Thành viên đang chờ xác nhận. Hãy dùng Xác nhận hoặc Làm lại.");
-  a.completed=true;s.updatedAt=nowIso();
-  persist("Đã đánh dấu hoàn thành",{
-    action:"UPDATE_TASK",summary:`${a.task}: Đã xong`,targetMemberId:a.personId
-  });
+  try{
+    if(!realtimeEngine)throw new Error("Chưa kết nối Firebase. Hãy thử lại.");
+    toast("Đang lưu công việc…");
+    await realtimeEngine.completeTask({weekStart:s.weekStart,scheduleId:s.id,taskId:a.taskId,memberId:a.personId});
+    toast("Đã đánh dấu hoàn thành");
+  }catch(error){toast(error?.message||"Không thể đánh dấu. Hãy thử lại.",5000);}
 }
 function scheduleText(){
   const s=currentSchedule();

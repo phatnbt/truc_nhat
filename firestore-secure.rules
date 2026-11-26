@@ -6,6 +6,7 @@ service cloud.firestore {
     function configPath(roomId) { return /databases/$(database)/documents/rooms/$(roomId)/security/config; }
     function roomPath(roomId) { return /databases/$(database)/documents/rooms/$(roomId); }
     function accessPath(roomId, uid) { return /databases/$(database)/documents/rooms/$(roomId)/access/$(uid); }
+    function memberDataPath(roomId, uid) { return /databases/$(database)/documents/rooms/$(roomId)/memberData/$(uid); }
     function taskSubmissionPath(roomId, submissionId) { return /databases/$(database)/documents/rooms/$(roomId)/taskSubmissions/$(submissionId); }
 
     function isPrimaryAdmin(roomId) {
@@ -84,7 +85,7 @@ service cloud.firestore {
         && request.resource.data.updatedBy == request.auth.uid
         && request.resource.data.updatedAt == request.time
         && request.resource.data.keys().hasOnly([
-          'memberId', 'presence', 'billingMonths', 'updatedBy', 'updatedAt','billingPatchMonth'
+          'memberId', 'presence', 'billingMonths', 'updatedBy', 'updatedAt','billingPatchMonth','billingPatchPerson'
         ]);
     }
     function editableMemberBill(roomId, months) {
@@ -98,8 +99,30 @@ service cloud.firestore {
       return value is map
         && value.taskId == taskId
         && value.personId == memberId
-        && value.cut != true
+        && value.get('cut', false) != true
         && value.get('completed', false) != true;
+    }
+    function publishOwnBillingDays(roomId) {
+      let own = getAfter(memberDataPath(roomId, request.auth.uid)).data;
+      let month = own.get('billingPatchMonth', '');
+      let key = own.get('billingPatchPerson', '');
+      let before = resource.data.payload.billingMonths[month];
+      let after = request.resource.data.payload.billingMonths[month];
+      let beforePerson = before.people[key];
+      let afterPerson = after.people[key];
+      return own.memberId == ownMemberId(roomId) && own.memberId is string
+        && own.updatedBy == request.auth.uid && own.updatedAt == request.time
+        && before.closed == false && beforePerson.memberId == own.memberId
+        && request.resource.data.revision == resource.data.revision + 1
+        && request.resource.data.updatedAt == request.time
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['payload','revision','updatedAt'])
+        && request.resource.data.payload.diff(resource.data.payload).affectedKeys().hasOnly(['billingMonths'])
+        && request.resource.data.payload.billingMonths.diff(resource.data.payload.billingMonths).affectedKeys().hasOnly([month])
+        && after.diff(before).affectedKeys().hasOnly(['people'])
+        && after.people.diff(before.people).affectedKeys().hasOnly([key])
+        && afterPerson.diff(beforePerson).affectedKeys().hasOnly(['days','daysShared'])
+        && afterPerson.daysShared == true && afterPerson.days is map
+        && afterPerson.days == own.billingMonths[month].days;
     }
     function assignmentAtMatches(assignments, index, taskId, memberId) {
       return assignments.size() > index
@@ -173,6 +196,7 @@ service cloud.firestore {
     match /rooms/{roomId} {
       allow read: if hasActiveAccess(roomId) || isPrimaryAdmin(roomId);
       allow create, update: if isAdmin(roomId) && validRoomWrite(roomId);
+      allow update: if hasActiveAccess(roomId) && publishOwnBillingDays(roomId);
       allow delete: if false;
 
       match /security/{configId} {
@@ -202,7 +226,7 @@ service cloud.firestore {
         allow update: if isAdmin(roomId) || (signedIn() && uid == request.auth.uid && hasActiveAccess(roomId)
           && validMemberData(roomId)
           && editableMemberBill(roomId,request.resource.data.billingMonths.diff(resource.data.billingMonths).affectedKeys())
-          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['memberId', 'presence', 'billingMonths', 'updatedBy', 'updatedAt','billingPatchMonth']));
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['memberId', 'presence', 'billingMonths', 'updatedBy', 'updatedAt','billingPatchMonth','billingPatchPerson']));
         allow delete: if isAdmin(roomId);
       }
 

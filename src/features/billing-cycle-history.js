@@ -45,7 +45,7 @@
       const day=Number(legacyKey);if(!Number.isInteger(day)||day<1||day>31)continue;
       const targetMonth=day>=28?Period.shiftMonth(bill.month,-1):bill.month;
       const candidate=`${targetMonth}-${String(day).padStart(2,"0")}`;
-      if(allowedSet.has(candidate))output[candidate]=true;
+      if(allowedSet.has(candidate)&&!Object.hasOwn(raw,candidate))output[candidate]=true;
     }
     return output;
   }
@@ -267,51 +267,56 @@
   }
   function isDateInBill(bill,date){return calendarDateKeys(bill).includes(date);}
 
+  const pendingDays=new Set();
+  async function saveDaySelection(dates,value,action,message){
+    const bill=currentBill(),person=activeBillPerson(bill);
+    if(!person)return toast("Chọn người trước.");
+    if(!canEditBillingPerson(person))return toast("Bạn chỉ được chỉnh ngày ở của mình.");
+    if(bill.closed)return toast("Kỳ đã chốt sổ.");
+    if(!realtimeEngine?.saveBillingDays)return toast("Chưa kết nối Firebase. Hãy thử lại.");
+    const actor=authSession.user?.uid,keys=dates.map(date=>storageKeyForDate(bill,date));
+    const writes=keys.map(key=>JSON.stringify([actor,bill.month,person.id,key]));
+    if(writes.some(key=>pendingDays.has(key)))return toast("Ngày đã chọn đang được lưu. Hãy thử lại sau khi đồng bộ.");
+    writes.forEach(key=>pendingDays.add(key));
+    toast("Đang lưu ngày ở…");
+    try{
+      await realtimeEngine.saveBillingDays({month:bill.month,billId:bill.id,personId:person.id,memberId:person.memberId||null,
+        changes:Object.fromEntries(keys.map((key,index)=>[key,value(dates[index])])),
+        audit:{action,summary:`${person.name}: ${message}`,targetMemberId:person.memberId||null}});
+      if(authSession.user?.uid===actor)toast(message);
+    }catch(error){
+      if(authSession.user?.uid===actor)toast(error?.code==="permission-denied"?"Không thể lưu ngày ở. Kiểm tra quyền và kỳ rồi thử lại.":error?.message||"Không thể lưu ngày ở. Hãy thử lại.",5000);
+    }
+    finally{writes.forEach(key=>pendingDays.delete(key));}
+  }
+
   setBillDay=function(value){
-    const bill=currentBill(),person=activeBillPerson(bill);if(!person)return toast("Chọn người trước");
-    if(!canEditBillingPerson(person))return toast("Bạn chỉ được chỉnh ngày ở của chính mình");
-    if(bill.closed)return toast("Kỳ đã chốt sổ");
-    const date=actualDateForInput(bill,value);if(!date||!isDateInBill(bill,date))return toast("Ngày nằm ngoài kỳ điện nước");
-    const key=storageKeyForDate(bill,date);person.days=person.days&&typeof person.days==="object"?person.days:{};
-    person.days[key]=person.days[key]!==true;person.updatedAt=nowIso();bill.updatedAt=nowIso();
+    const bill=currentBill(),person=activeBillPerson(bill);if(!person)return toast("Chọn người trước.");
+    const date=actualDateForInput(bill,value);if(!date||!isDateInBill(bill,date))return toast("Ngày nằm ngoài kỳ điện nước.");
+    const present=person.days?.[storageKeyForDate(bill,date)]!==true;
     const label=isCycleBill(bill)?displayDate(date):`ngày ${Number(date.slice(-2))}`;
-    persist(person.days[key]?`${label}: Có ở`:`${label}: Vắng`,{
-      action:"UPDATE_BILL_DAY",summary:`${person.name} ${label}: ${person.days[key]?"Có ở":"Vắng"}`,targetMemberId:person.memberId||null
-    });
+    return saveDaySelection([date],()=>present,"UPDATE_BILL_DAY",`${label}: ${present?"Có ở":"Vắng"}`);
   };
 
   applyStayRange=function(value){
-    const bill=currentBill(),person=activeBillPerson(bill);if(!person)return toast("Chọn người trước");
-    if(!canEditBillingPerson(person))return toast("Bạn chỉ được chỉnh ngày ở của mình");
-    if(bill.closed)return toast("Kỳ đã chốt sổ");
+    const bill=currentBill(),person=activeBillPerson(bill);if(!person)return toast("Chọn người trước.");
     let from=$("#stayFrom")?.value||"",to=$("#stayTo")?.value||"";
-    if(!isDateInBill(bill,from)||!isDateInBill(bill,to))return toast("Chọn ngày nằm trong kỳ điện nước");
+    if(!isDateInBill(bill,from)||!isDateInBill(bill,to))return toast("Chọn ngày nằm trong kỳ điện nước.");
     if(from>to)[from,to]=[to,from];
     if(!value&&!confirm(`Đánh dấu vắng từ ${displayDate(from)} đến ${displayDate(to)}?`))return;
-    person.days=person.days&&typeof person.days==="object"?person.days:{};
-    for(const date of calendarDateKeys(bill)){
-      if(date<from||date>to)continue;
-      person.days[storageKeyForDate(bill,date)]=!!value;
-    }
-    person.updatedAt=nowIso();bill.updatedAt=nowIso();
-    persist(value?`Đã đánh dấu ở ${displayDate(from)} – ${displayDate(to)}`:`Đã đánh dấu vắng ${displayDate(from)} – ${displayDate(to)}`,{
-      action:"UPDATE_BILL_RANGE",summary:`${person.name}: ${value?"Có ở":"Vắng"} ${displayDate(from)} – ${displayDate(to)}`,targetMemberId:person.memberId||null
-    });
+    const dates=calendarDateKeys(bill).filter(date=>date>=from&&date<=to);
+    return saveDaySelection(dates,()=>!!value,"UPDATE_BILL_RANGE",
+      `Đã đánh dấu ${value?"ở":"vắng"} ${displayDate(from)} – ${displayDate(to)}`);
   };
 
   presetStay=function(mode){
-    const bill=currentBill(),person=activeBillPerson(bill);if(!person)return toast("Chọn người trước");
-    if(!canEditBillingPerson(person))return toast("Bạn chỉ được chỉnh ngày ở của mình");
-    if(bill.closed)return toast("Kỳ đã chốt sổ");
-    if(!["all","weekdays","none"].includes(mode))return toast("Chế độ không hợp lệ");
+    const bill=currentBill(),person=activeBillPerson(bill);if(!person)return toast("Chọn người trước.");
+    if(!["all","weekdays","none"].includes(mode))return toast("Chế độ không hợp lệ.");
     if(mode==="none"&&!confirm("Bỏ toàn bộ ngày ở trong kỳ?"))return;
-    person.days=person.days&&typeof person.days==="object"?{...person.days}:{};
-    for(const dateKey of calendarDateKeys(bill)){
-      const parts=dateKey.split("-").map(Number),date=new Date(parts[0],parts[1]-1,parts[2]),dow=date.getDay();
-      person.days[storageKeyForDate(bill,dateKey)]=mode==="all"||(mode==="weekdays"&&dow!==0&&dow!==6);
-    }
-    person.updatedAt=nowIso();bill.updatedAt=nowIso();
-    persist("Đã cập nhật nhanh ngày ở",{action:"PRESET_BILL_DAYS",summary:`${person.name}: cập nhật nhanh ngày ở ${billingPeriodTitle(bill.month)}`,targetMemberId:person.memberId||null});
+    return saveDaySelection(calendarDateKeys(bill),date=>{
+      const weekday=Period.parseDateKey(date).getUTCDay();
+      return mode==="all"||(mode==="weekdays"&&weekday!==0&&weekday!==6);
+    },"PRESET_BILL_DAYS","Đã cập nhật nhanh ngày ở");
   };
 
   let billingPeriodSavePending=false;
@@ -422,7 +427,7 @@
     const edit=$("#billingPeriodEdit");if(edit){edit.classList.toggle("role-hidden",!isAdmin());edit.disabled=!cycle;edit.title=bill.closed?"Kỳ đang khóa — bấm để xem hướng dẫn":"Chỉnh ngày bắt đầu và kết thúc kỳ";}
   }
 
-  let calendarMarkup="",calendarPersonId=null;
+  let calendarMarkup="",calendarPersonId=null,billingPeopleMarkup="";
   renderBilling=function(){
     ensureBillingCycleUi();
     const realBill=currentBill(),bill=periodBillForDisplay(),calc=billCalc(bill);
@@ -442,11 +447,16 @@
     $("#billOverviewStay").textContent=own?`${stayCount(own,bill)} ngày ở · ${bill.closed?"Đã chốt":"Tạm tính"}`:"";
     $("#billClosedBadge").textContent=bill.closed?"🔒 Đã chốt":"Đang mở";$("#billClosedBadge").className=`badge ${bill.closed?"warning":"success"}`;
 
-    $("#billPeopleList").innerHTML=calc.people.length?calc.people.map(item=>{
+    const peopleMarkup=calc.people.length?calc.people.map(item=>{
       const due=calc.due[item.id]||0;
       return `<button class="person-pick ${person?.id===item.id?"active":""}" data-person="${item.id}" type="button"><span class="avatar">${esc(item.name.charAt(0).toUpperCase())}</span><span><b>${esc(item.name)}${item.memberId===myMemberId()?" · Bạn":""}</b><small>${stayCount(item,bill)} ngày · ${esc(paymentLabel(item,due))}</small></span><span class="person-amount">${money(due)}</span></button>`;
     }).join(""):'<div class="empty">Chưa có người trong kỳ này.</div>';
-    $$('[data-person]').forEach(button=>button.addEventListener("click",()=>selectBillPerson(button.dataset.person)));
+    if(billingPeopleMarkup!==peopleMarkup){
+      billingPeopleMarkup=peopleMarkup;
+      const list=$("#billPeopleList");
+      list.innerHTML=peopleMarkup;
+      list.querySelectorAll('[data-person]').forEach(button=>button.addEventListener("click",()=>selectBillPerson(button.dataset.person)));
+    }
 
     const editable=!!realBill&&canEditBillingPerson(person)&&!bill.closed;
     $("#calendarPersonTitle").textContent=person?`Lịch ở của ${person.name}`:"Chọn một người";

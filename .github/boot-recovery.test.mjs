@@ -7,7 +7,7 @@ const start=fs.readFileSync(new URL("../src/boot/app-start.js",import.meta.url),
 const worker=fs.readFileSync(new URL("../sw.js",import.meta.url),"utf8");
 const app=fs.readFileSync(new URL("../app.js",import.meta.url),"utf8");
 
-const release="20261127-4";
+const release="20261127-5";
 
 assert.ok(index.includes("setTimeout(showRecovery,15000)"),"stalled boots must show recovery");
 assert.ok(index.includes('id="bootRetryButton"'),"recovery should offer an explicit retry");
