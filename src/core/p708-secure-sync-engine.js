@@ -399,6 +399,10 @@ export function createP708SecureEngine({firebaseConfig,roomCode,deviceId,onShape
     const shapeOperations=diffJson(optimisticShape,desired),forbidden=shapeOperations.find(op=>!memberAllowedOperation(op,memberId,optimisticShape,desired));
     if(forbidden)throw new Error("Bạn chỉ được chỉnh trạng thái và ngày ở của chính mình.");
     const previousOwn=extractMemberData(optimisticShape,memberId,memberDataByUid.get(user.uid)),desiredOwn=extractMemberData(desired,memberId,memberDataByUid.get(user.uid)),ownOperations=diffJson(previousOwn,desiredOwn),ownRef=doc(memberDataCollection,user.uid);
+    // Keep explicit presence changes even when the prior write's snapshot has not arrived.
+    if(audit.action==="UPDATE_PRESENCE"&&audit.targetMemberId===memberId&&!ownOperations.some(operation=>operation.path[0]==="presence")){
+      ownOperations.push({type:"set",path:["presence"],value:desiredOwn.presence});
+    }
     const billingMonths=[...new Set(ownOperations.filter(operation=>operation.path[0]==="billingMonths").map(operation=>operation.path[1]))];
     const mergedOwn=await runTransaction(db,async tx=>{
       const snap=await tx.get(ownRef),month=billingMonths[0];

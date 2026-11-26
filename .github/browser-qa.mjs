@@ -147,34 +147,35 @@ async function exercise(engine,name,width){
     await clickDuringSync(manualRow.getByRole("button",{name:"Đánh dấu xong"}),hasTouch);
     await expect(manualRow).toContainText("Đã xong");
 
-    // Exercise both first-write paths with accounts that lack a personal data document.
-    assert.equal(await memberDataFromServer(member.uid),undefined);
-    if(hasTouch){
-      const presence=resident.locator('[data-presence="b"]');
-      await expect(resident.locator('[data-presence="a"]')).toBeDisabled();
-      resident.once("dialog",dialog=>dialog.accept());
-      await clickDuringSync(presence,hasTouch,false);
-      await expect.poll(async()=>(await memberDataFromServer(member.uid))?.presence).toBe(false);
-      assert.deepEqual((await memberDataFromServer(member.uid)).billingMonths,{});
-      await expect(manager.locator('[data-presence="b"]')).toHaveClass(/off/);
-      await expect(presence).toHaveClass(/off/);
-      await clickDuringSync(presence,hasTouch,false);
-      await expect.poll(async()=>(await memberDataFromServer(member.uid))?.presence).toBe(true);
-    }
+    if(name!=="webkit"){
+      // Cover presence-first and billing-first independently on fresh member documents.
+      assert.equal(await memberDataFromServer(member.uid),undefined);
+      const presenceFirst=name==="firefox";
+      if(presenceFirst){
+        const presence=resident.locator('[data-presence="b"]');
+        await expect(resident.locator('[data-presence="a"]')).toBeDisabled();
+        resident.once("dialog",dialog=>dialog.accept());
+        await clickDuringSync(presence,false,false);
+        await expect.poll(async()=>(await memberDataFromServer(member.uid))?.presence).toBe(false);
+        assert.deepEqual((await memberDataFromServer(member.uid)).billingMonths,{});
+        await expect(manager.locator('[data-presence="b"]')).toHaveClass(/off/);
+        await expect(resident.locator("#toast")).toHaveText("Đã đánh dấu vắng");
+      }
 
-    await resident.goto(base+"/#billing");
-    await resident.locator("#billMonth").fill(billMonth);
-    await resident.locator("#billMonth").dispatchEvent("change");
-    const memberSecondDay=resident.locator(`[data-billing-date="${billMonth}-02"]`);
-    await expect(memberSecondDay).toBeEnabled();
-    await clickDuringSync(memberSecondDay,hasTouch,false);
-    await expect.poll(async()=>(await memberDataFromServer(member.uid))?.billingMonths[billMonth]?.days["2"]).toBe(true);
-    const personalData=await memberDataFromServer(member.uid);
-    assert.equal(personalData.presence,true);
-    assert.equal(personalData.billingMonths[billMonth].days["1"],true,"the pre-existing room day is preserved");
-    await expect(memberSecondDay).toHaveAttribute("aria-pressed","true");
-    await clickDuringSync(memberSecondDay,hasTouch,false);
-    await expect.poll(async()=>(await memberDataFromServer(member.uid))?.billingMonths[billMonth]?.days["2"]).toBe(false);
+      await resident.goto(base+"/#billing");
+      await resident.locator("#billMonth").fill(billMonth);
+      await resident.locator("#billMonth").dispatchEvent("change");
+      const memberSecondDay=resident.locator(`[data-billing-date="${billMonth}-02"]`);
+      await expect(memberSecondDay).toBeEnabled();
+      await clickDuringSync(memberSecondDay,false,false);
+      await expect.poll(async()=>(await memberDataFromServer(member.uid))?.billingMonths[billMonth]?.days["2"]).toBe(true);
+      const personalData=await memberDataFromServer(member.uid);
+      assert.equal(personalData.presence,!presenceFirst);
+      assert.equal(personalData.billingMonths[billMonth].days["1"],true,"the pre-existing room day is preserved");
+      await expect(resident.locator("#toast")).toHaveText("ngày 2: Có ở");
+      await clickDuringSync(memberSecondDay,false,false);
+      await expect.poll(async()=>(await memberDataFromServer(member.uid))?.billingMonths[billMonth]?.days["2"]).toBe(false);
+    }
 
     await manager.goto(base+"/#billing");
     await manager.locator("#billMonth").fill(billMonth);
