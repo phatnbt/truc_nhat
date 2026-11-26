@@ -1,4 +1,4 @@
-const BOOT_VERSION = "20261127-2";
+const BOOT_VERSION = "20261127-3";
 
 function setBootProgress(title,detail){
   const box=document.querySelector("#authGateContent");

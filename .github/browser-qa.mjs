@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import fs from "node:fs/promises";
+import {randomUUID} from "node:crypto";
 import {chromium,firefox,webkit,expect} from "@playwright/test";
 import {initializeTestEnvironment} from "@firebase/rules-unit-testing";
 import {doc,setDoc,getDocFromServer,Timestamp} from "firebase/firestore";
@@ -13,6 +14,7 @@ const monday=dateKey(addUtcDays(clock,-((clock.getUTCDay()+6)%7)));
 const billMonth="2026-08";
 const password="local-test-password";
 const auth=process.env.FIREBASE_AUTH_EMULATOR_HOST;
+const testRun=randomUUID();
 
 async function roomPayloadFromServer(){
   let payload;
@@ -24,7 +26,7 @@ async function roomPayloadFromServer(){
 }
 
 async function testAccount(kind, browser){
-  const email=`${kind}-${browser}@example.test`;
+  const email=`${kind}-${browser}-${testRun}@example.test`;
   const response=await fetch(`http://${auth}/identitytoolkit.googleapis.com/v1/accounts:signUp?key=demo-p708-emulator-key`,{
     method:"POST",headers:{"Content-Type":"application/json"},
     body:JSON.stringify({email,password,returnSecureToken:true})
@@ -54,6 +56,19 @@ function assertBrowserErrors(name,errors){
   assert.deepEqual(errors.filter(message=>!emulatorWarnings.includes(message)),[]);
 }
 
+async function clickDuringSync(button,useTouch){
+  await button.evaluate(element=>element.addEventListener("pointerdown",()=>{
+    const [taskId]=element.closest("tr").dataset.taskKey.split(":");
+    const otherTask=currentSchedule().assignments.find(assignment=>assignment.taskId!==taskId);
+    const reassigned=otherTask.reassigned;
+    otherTask.reassigned=!reassigned;
+    renderAll();
+    otherTask.reassigned=reassigned;
+  },{once:true}));
+  if(useTouch)await button.tap();
+  else await button.click();
+}
+
 async function exercise(engine,name,width){
   await env.clearFirestore();
   const admin=await testAccount("admin",name),member=await testAccount("member",name);
@@ -74,8 +89,9 @@ async function exercise(engine,name,width){
   const activate=target=>name==="webkit"?target.press("Enter"):target.click();
   try{
     const viewport={width,height:820};
-    const manager=await browser.newPage({viewport,timezoneId:"America/Los_Angeles"});
-    const resident=await browser.newPage({viewport,timezoneId:"Asia/Ho_Chi_Minh"});
+    const hasTouch=name==="webkit";
+    const manager=await browser.newPage({viewport,hasTouch,timezoneId:"America/Los_Angeles"});
+    const resident=await browser.newPage({viewport,hasTouch,timezoneId:"Asia/Ho_Chi_Minh"});
     const managerErrors=await login(manager,admin), residentErrors=await login(resident,member);
     await expect(resident.locator("#homeGreeting")).toHaveText("P708 · Bình");
     await expect(manager.locator("#homeDate")).toHaveText(await resident.locator("#homeDate").innerText());
@@ -101,16 +117,15 @@ async function exercise(engine,name,width){
     const taskRow=resident.locator("#cleanScheduleBox tr").filter({hasText:"Lavabo"});
     await activate(taskRow.getByRole("button",{name:"Bắt đầu"}));
     await expect(taskRow).toContainText("Đang thực hiện");
-    await activate(taskRow.getByRole("button",{name:"Tôi đã làm"}));
+    await clickDuringSync(taskRow.getByRole("button",{name:"Tôi đã làm"}),hasTouch);
+    await expect(resident.locator("#taskChecklistModal")).toBeVisible();
     await resident.locator('#taskChecklistForm [value="task"]').check();
     await resident.locator('#taskChecklistForm [value="finish"]').check();
     await activate(resident.getByRole("button",{name:"Gửi xác nhận"}));
     await expect(taskRow).toContainText("Chờ xác nhận");
     const approval=manager.locator("#cleanScheduleBox tr").filter({hasText:"Lavabo"}).getByRole("button",{name:"Xác nhận",exact:true});
     await expect(approval).toBeEnabled();
-    // WebKit can replace the row between keydown and keyup when the snapshot arrives.
-    if(name==="webkit")await approval.evaluate(button=>button.click());
-    else await approval.click();
+    await clickDuringSync(approval,hasTouch);
     await expect(taskRow).toContainText("Đã xong");
     await resident.reload();
     await expect(resident.locator("#authGate")).toBeHidden();
@@ -124,12 +139,31 @@ async function exercise(engine,name,width){
     await activate(manager.locator("#taskSwapList").getByRole("button",{name:"Duyệt đổi"}));
     await expect(manager.locator("#taskSwapList")).toContainText("Đã đổi");
     await expect(resident.locator("#cleanScheduleBox")).toContainText("Đã đổi");
+    const manualRow=manager.locator('#cleanScheduleBox tr[data-task-key^="san:"]');
+    await clickDuringSync(manualRow.getByRole("button",{name:"Đánh dấu xong"}),hasTouch);
+    await expect(manualRow).toContainText("Đã xong");
 
     await manager.goto(base+"/#billing");
     await manager.locator("#billMonth").fill(billMonth);
     await manager.locator("#billMonth").dispatchEvent("change");
     await expect(manager.locator("#billMonth")).toHaveValue(billMonth);
     await expect(manager.locator("#billingTable")).toContainText("6.000");
+    const secondDay=manager.locator(`[data-billing-date="${billMonth}-02"]`);
+    await activate(manager.locator("#billRangePanel summary"));
+    await manager.locator("#stayFrom").fill(`${billMonth}-02`);
+    await manager.locator("#stayTo").fill(`${billMonth}-02`);
+    await activate(manager.locator("#markStayButton"));
+    await expect(secondDay).toHaveAttribute("aria-pressed","true");
+    await expect.poll(async()=>{
+      const bill=(await roomPayloadFromServer()).billingMonths[billMonth];
+      return bill.people["person:a"].days["2"];
+    }).toBe(true);
+    await activate(secondDay);
+    await expect(secondDay).toHaveAttribute("aria-pressed","false");
+    await expect.poll(async()=>{
+      const bill=(await roomPayloadFromServer()).billingMonths[billMonth];
+      return bill.people["person:a"].days["2"]===true;
+    }).toBe(false);
     await manager.locator("#billCloseButton").evaluate(button=>button.scrollIntoView({block:"center",behavior:"instant"}));
     await manager.locator("#billCloseButton").press("Enter");
     await expect(manager.locator("#billingDecisionModal")).toBeVisible();

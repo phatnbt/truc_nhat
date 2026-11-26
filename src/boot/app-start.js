@@ -88,6 +88,52 @@ function bindStaticEvents(){
   $("#cleanHistorySearch")?.addEventListener("input",renderCleaningHistory);
   $("#confirmScheduleButton")?.addEventListener("click",confirmSchedule);
   $("#sendSwapButton")?.addEventListener("click",sendTaskSwap);
+  const cleaningActions={
+    submitTask:openChecklist,
+    startTask:index=>submitTask(index,"in_progress"),
+    swapTask:openTaskSwap,
+    reviewApprove:index=>reviewTask(index,true),
+    reviewReject:index=>reviewTask(index,false),
+    adminTask:adminCompleteTask
+  };
+  const cleaningScheduleBox=$("#cleanScheduleBox");
+  const holdCleaningView=(event,id)=>{
+    if(event.target.closest("button:not(:disabled)"))cleaningTaskPress={id};
+  };
+  const releaseCleaningView=id=>{
+    const press=cleaningTaskPress;
+    if(!press||press.id!==id)return;
+    // Wait until the click following release has been dispatched.
+    requestAnimationFrame(()=>{
+      if(cleaningTaskPress!==press)return;
+      cleaningTaskPress=null;
+      if(cleaningRenderQueued)renderCleaning();
+    });
+  };
+  cleaningScheduleBox?.addEventListener("pointerdown",event=>{
+    if(event.isPrimary&&event.button===0)holdCleaningView(event,event.pointerId);
+  },true);
+  window.addEventListener("pointerup",event=>releaseCleaningView(event.pointerId),true);
+  window.addEventListener("pointercancel",event=>releaseCleaningView(event.pointerId),true);
+  cleaningScheduleBox?.addEventListener("keydown",event=>{
+    if(event.key===" "&&!event.repeat)holdCleaningView(event,"space");
+  },true);
+  window.addEventListener("keyup",event=>{if(event.key===" ")releaseCleaningView("space");},true);
+  window.addEventListener("blur",()=>releaseCleaningView(cleaningTaskPress?.id));
+  cleaningScheduleBox?.addEventListener("click",event=>{
+    const button=event.target.closest("button");
+    if(!button||button.disabled)return;
+    for(const [key,action] of Object.entries(cleaningActions)){
+      if(!Object.hasOwn(button.dataset,key))continue;
+      const index=Number(button.dataset[key]),schedule=currentSchedule(),assignment=schedule?.assignments[index];
+      if(!assignment||schedule.id!==cleaningScheduleBox.dataset.scheduleId||button.closest("tr")?.dataset.taskKey!==cleaningTaskKey(assignment,index)){
+        toast("Phân công vừa thay đổi. Hãy kiểm tra lại lịch trực.");
+        return;
+      }
+      action(index);
+      return;
+    }
+  });
   $("#taskChecklistForm")?.addEventListener("submit",confirmChecklist);
   $("#roomCalendarView")?.addEventListener("change",renderRoomCalendar);
   $("#roomEventForm")?.addEventListener("submit",saveRoomCalendarEvent);
@@ -136,7 +182,7 @@ function bindStaticEvents(){
 async function registerPwa(){
   if(!("serviceWorker" in navigator)||location.protocol==="file:")return;
   try{
-    const reg=await navigator.serviceWorker.register("./sw.js?v=20261127-2",{scope:"./",updateViaCache:"none"});
+    const reg=await navigator.serviceWorker.register("./sw.js?v=20261127-3",{scope:"./",updateViaCache:"none"});
     const banner=$("#pwaUpdateBanner");
     const showUpdate=()=>{banner.hidden=!(reg.waiting&&reg.active&&reg.waiting!==reg.active&&navigator.serviceWorker.controller);};
     showUpdate();

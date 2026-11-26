@@ -1,4 +1,14 @@
+let cleaningTaskPress=null;
+let cleaningRenderQueued=false;
+let cleaningScheduleMarkup="";
+function cleaningTaskKey(assignment,index){
+  return `${assignment.taskId}:${assignment.personId}:${index}`;
+}
+
 function renderCleaning(){
+  // An incoming snapshot can move a pressed button before the browser delivers its click.
+  if(cleaningTaskPress){cleaningRenderQueued=true;return;}
+  cleaningRenderQueued=false;
   const list=$("#cleanMemberList");if(!list)return;
   list.innerHTML=state.members.length?state.members.map(m=>{
     const mine=m.id===myMemberId(),editable=canEditMember(m.id);
@@ -13,6 +23,8 @@ function renderCleaning(){
   $("#manualScheduleButton").disabled=!!s?.locked;
   renderRoomCalendar();
   if(!s){
+    cleaningScheduleMarkup="";
+    delete box.dataset.scheduleId;
     box.innerHTML=`<div class="empty" style="margin-top:14px">${isAdmin()?"Chọn tuần rồi tạo lịch công bằng.":"Trưởng phòng chưa tạo lịch."}</div>`;
   }else{
     const done=s.assignments.filter(a=>!a.cut&&a.completed).length,total=s.assignments.filter(a=>!a.cut).length;
@@ -36,16 +48,17 @@ function renderCleaning(){
       const suggestion=replacements[a.taskId];
       const task=TASKS.find(t=>t.id===a.taskId);
       const weight=P708CleaningFairness.effectiveTaskWeight(a.taskId,state.settings.weights,task?.w);
-      return `<tr class="${mine?"own-task ":""}${a.completed?"done-row":sub?.status==="submitted"?"submitted-row":""}"><td data-label="Công việc"><div><b>${task?.emoji||""} ${esc(a.task)}</b>${a.cut?"":`<small class="task-weight">${formatCleaningPoints(weight)} điểm${mine?" · Việc của bạn":""}</small>`}</div></td><td data-label="Phụ trách"><div class="task-assignee">${a.cut?'<span class="unpaid-text">Tạm cắt</span>':`<span class="task-initial" aria-hidden="true">${esc((a.personName||"?").trim().split(/\\s+/).at(-1)?.charAt(0)||"?")}</span>${esc(a.personName)}`}${a.reassigned?" · Đã đổi":""}${suggestion?`<small class="replacement-hint">Đề xuất: ${esc(suggestion)}</small>`:""}</div></td><td data-label="Trạng thái">${esc(status)}</td><td data-label="Thao tác">${action}</td></tr>`;
+      return `<tr data-task-key="${esc(cleaningTaskKey(a,index))}" class="${mine?"own-task ":""}${a.completed?"done-row":sub?.status==="submitted"?"submitted-row":""}"><td data-label="Công việc"><div><b>${task?.emoji||""} ${esc(a.task)}</b>${a.cut?"":`<small class="task-weight">${formatCleaningPoints(weight)} điểm${mine?" · Việc của bạn":""}</small>`}</div></td><td data-label="Phụ trách"><div class="task-assignee">${a.cut?'<span class="unpaid-text">Tạm cắt</span>':`<span class="task-initial" aria-hidden="true">${esc((a.personName||"?").trim().split(/\\s+/).at(-1)?.charAt(0)||"?")}</span>${esc(a.personName)}`}${a.reassigned?" · Đã đổi":""}${suggestion?`<small class="replacement-hint">Đề xuất: ${esc(suggestion)}</small>`:""}</div></td><td data-label="Trạng thái">${esc(status)}</td><td data-label="Thao tác">${action}</td></tr>`;
     }).join("");
     const mine=s.assignments.filter(a=>!a.cut&&a.personId===myMemberId());
-    box.innerHTML=`<div class="schedule-card"><div class="schedule-head"><div><h3>${weekRange(s.weekStart)}</h3><p>${s.absentNames?.length?`Vắng: ${esc(s.absentNames.join(", "))}`:"Tất cả thành viên có mặt"}</p>${mine.length?`<p>Việc của bạn: ${mine.filter(a=>a.completed).length}/${mine.length}</p>`:""}</div><span class="badge ${done===total&&total?"success":""}">${done}/${total} xác nhận</span></div>${rows?`<div class="table-wrap"><table><thead><tr><th>Công việc</th><th>Phụ trách</th><th>Trạng thái</th><th>Thao tác</th></tr></thead><tbody>${rows}</tbody></table></div>`:'<p class="empty">Không có công việc khớp bộ lọc.</p>'}</div>`;
-    $$('[data-submit-task]').forEach(btn=>btn.addEventListener("click",()=>openChecklist(Number(btn.dataset.submitTask))));
-    $$('[data-start-task]').forEach(btn=>btn.addEventListener("click",()=>submitTask(Number(btn.dataset.startTask),"in_progress")));
-    $$('[data-swap-task]').forEach(btn=>btn.addEventListener("click",()=>openTaskSwap(Number(btn.dataset.swapTask))));
-    $$('[data-review-approve]').forEach(btn=>btn.addEventListener("click",()=>reviewTask(Number(btn.dataset.reviewApprove),true)));
-    $$('[data-review-reject]').forEach(btn=>btn.addEventListener("click",()=>reviewTask(Number(btn.dataset.reviewReject),false)));
-    $$('[data-admin-task]').forEach(btn=>btn.addEventListener("click",()=>adminToggleTask(Number(btn.dataset.adminTask))));
+    const heading=`<div class="schedule-head"><div><h3>${weekRange(s.weekStart)}</h3><p>${s.absentNames?.length?`Vắng: ${esc(s.absentNames.join(", "))}`:"Tất cả thành viên có mặt"}</p>${mine.length?`<p>Việc của bạn: ${mine.filter(a=>a.completed).length}/${mine.length}</p>`:""}</div><span class="badge ${done===total&&total?"success":""}">${done}/${total} xác nhận</span></div>`;
+    const table=rows?`<div class="table-wrap"><table><thead><tr><th>Công việc</th><th>Phụ trách</th><th>Trạng thái</th><th>Thao tác</th></tr></thead><tbody>${rows}</tbody></table></div>`:'<p class="empty">Không có công việc khớp bộ lọc.</p>';
+    const markup=`<div class="schedule-card">${heading}${table}</div>`;
+    if(box.dataset.scheduleId!==s.id||cleaningScheduleMarkup!==markup){
+      box.dataset.scheduleId=s.id;
+      cleaningScheduleMarkup=markup;
+      box.innerHTML=markup;
+    }
   }
   const swaps=taskSwaps.filter(item=>item.scheduleId===s?.id);
   $("#taskSwapList").innerHTML=swaps.length?swaps.map(item=>{

@@ -208,7 +208,7 @@ const CHECK_ITEMS={
 let checklistDraft=null;
 function openChecklist(index){
   const schedule=currentSchedule(),assignment=schedule?.assignments[index];
-  if(!assignment||assignment.personId!==myMemberId())return;
+  if(!assignment||assignment.personId!==myMemberId()||assignment.cut||assignment.completed)return;
   checklistDraft={scheduleId:schedule.id,taskId:assignment.taskId,actor:authSession.user?.uid};
   $("#checklistTitle").textContent=assignment.task;
   $("#checklistTaskLabel").textContent=CHECK_ITEMS[assignment.taskId]||assignment.task;
@@ -229,7 +229,7 @@ async function confirmChecklist(event){
 async function submitTask(index,status="submitted",checks=[]){
   if(!navigator.onLine)return toast("Đang ngoại tuyến · hãy kết nối mạng trước khi báo hoàn thành",5000);
   const s=currentSchedule(),a=s?.assignments?.[index];
-  if(!s||!a||a.cut)return;
+  if(!s||!a||a.cut||a.completed)return;
   if(a.personId!==myMemberId())return toast("Bạn chỉ được báo hoàn thành việc của mình");
   const existing=submissionFor(s,a);
   if(existing?.status==="submitted")return toast("Công việc này đã báo hoàn thành và đang chờ xác nhận");
@@ -277,15 +277,15 @@ async function reviewTask(index,approved){
     toast(approved?"Đã xác nhận công việc":"Đã yêu cầu làm lại");
   }catch(e){toast(e?.message||"Không thể cập nhật xác nhận");}
 }
-function adminToggleTask(index){
+function adminCompleteTask(index){
   if(!requireAdmin())return;
   const s=currentSchedule(),a=s?.assignments?.[index];
-  if(!s||!a||a.cut)return;
+  if(!s||!a||a.cut||a.completed)return;
   const sub=submissionFor(s,a);
   if(sub?.status==="submitted")return toast("Thành viên đang chờ xác nhận. Hãy dùng Xác nhận hoặc Làm lại.");
-  a.completed=!a.completed;s.updatedAt=nowIso();
-  persist(a.completed?"Đã đánh dấu hoàn thành":"Đã bỏ hoàn thành",{
-    action:"UPDATE_TASK",summary:`${a.task}: ${a.completed?"Đã xong":"Chưa xong"}`,targetMemberId:a.personId
+  a.completed=true;s.updatedAt=nowIso();
+  persist("Đã đánh dấu hoàn thành",{
+    action:"UPDATE_TASK",summary:`${a.task}: Đã xong`,targetMemberId:a.personId
   });
 }
 function scheduleText(){
