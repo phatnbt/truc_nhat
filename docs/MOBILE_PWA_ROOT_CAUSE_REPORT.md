@@ -1,6 +1,6 @@
 # P708 · Điều tra lỗi PWA trên điện thoại
 
-Bản kiểm thử `20261127-10`, nhánh `fix/critical-mobile-pwa-standalone` kế thừa bản sửa trực nhật đã xác minh tại `703e1fe`. Phân công, công thức hóa đơn 29–28, Rules, dự án Firebase và dữ liệu lịch sử giữ nguyên.
+Bản kiểm thử `20261127-11`, nhánh `fix/critical-mobile-pwa-standalone` kế thừa bản sửa trực nhật đã xác minh tại `703e1fe`. Phân công, công thức hóa đơn 29–28, Rules, dự án Firebase và dữ liệu lịch sử giữ nguyên.
 
 ## Bằng chứng và nguyên nhân
 
