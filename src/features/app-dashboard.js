@@ -147,4 +147,7 @@ function renderHome(){
     if(item.action==="billing")setBillMonth(bill.month);
     showPage(item.action);
   }));
+  runOptionalFeature("pet-widget",globalThis.P708PetWidget?.refresh);
+  runOptionalFeature("utility-chart",globalThis.renderUtilityHeroChart);
+  runOptionalFeature("pet-garden",globalThis.renderHomePetGarden);
 }

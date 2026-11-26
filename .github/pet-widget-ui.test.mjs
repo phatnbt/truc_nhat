@@ -53,8 +53,10 @@ assert.doesNotMatch(css,/\.pet-float-card\{/);
 
 // Runtime version may advance for unrelated UI/security fixes. Verify the features
 // are still part of the boot graph and PWA shell instead of pinning an old version.
-assert.match(loader,/home-pet-garden\.js\?v=\d{8}-\d+/);
-assert.match(loader,/cleaning-pet-streak\.js\?v=\d{8}-\d+/);
+const optionalParts=loader.match(/const optionalParts=\[([\s\S]*?)\];/)?.[1]||"";
+assert.match(optionalParts,/home-pet-garden\.js/);
+assert.match(optionalParts,/cleaning-pet-streak\.js/);
+assert.match(loader,/new URL\(`\$\{path\}\?v=\$\{LOADER_RELEASE\}`/);
 assert.match(sw,/home-pet-garden\.js/);
 assert.match(sw,/cleaning-pet-streak\.js/);
 assert.match(sw,/cleaning-pet\.css/);

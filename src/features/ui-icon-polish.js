@@ -64,7 +64,10 @@
   function polishActionIcons(){const map={"👤":"person-fill","🧹":"brush-fill","💰":"cash-stack","🔓":"unlock-fill","⚠️":"exclamation-triangle-fill","⏳":"hourglass-split","💳":"credit-card-2-front-fill","✅":"check-circle-fill","🔔":"bell-fill","📋":"clipboard2-fill"};document.querySelectorAll(".action-icon").forEach(box=>{const name=map[box.textContent.trim()];if(name)box.innerHTML=icon(name);});}
   function polish(){ensureIconStyles();replaceKpis();replaceModuleIcons();replaceBottomNav();polishActionIcons();replaceTextIcons();}
   let scheduled=false;const schedule=()=>{if(scheduled)return;scheduled=true;requestAnimationFrame(()=>{scheduled=false;polish();});};
-  const observer=new MutationObserver(schedule);observer.observe(document.documentElement,{childList:true,subtree:true,characterData:true});
+  if(typeof MutationObserver==="function"){
+    const observer=new MutationObserver(schedule);
+    observer.observe(document.documentElement,{childList:true,subtree:true,characterData:true});
+  }
   if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",polish,{once:true});else polish();
   globalThis.P708PolishIcons=polish;
 })();

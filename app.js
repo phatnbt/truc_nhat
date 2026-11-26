@@ -1,6 +1,7 @@
-const BOOT_VERSION = "20261127-11";
+const BOOT_VERSION = "20261127-13";
 globalThis.P708_RELEASE=BOOT_VERSION;
 globalThis.P708Debug?.("release",BOOT_VERSION);
+globalThis.P708Boot?.mark("SCRIPT_START");
 
 function setBootProgress(title,detail){
   const box=document.querySelector("#authGateContent");
@@ -22,12 +23,17 @@ window.addEventListener("appinstalled",()=>{
   window.dispatchEvent(new Event("p708appinstalled"));
 });
 
-try{
-  const requested=new URL(import.meta.url).searchParams.get("v");
-  if(requested&&requested!==BOOT_VERSION)throw new Error("release-mismatch");
-  setBootProgress("Đang tải ứng dụng…","Đang chuẩn bị kết nối Firebase.");
-  await import(`./src/boot/app-loader.js?v=${BOOT_VERSION}`);
-}catch(error){
-  console.error("P708 startup",error?.code||error?.name);
-  globalThis.P708ShowBootRecovery?.(error.message==="release-mismatch"?"release-mismatch":"module-load");
+async function boot(){
+  let code="module-load";
+  try{
+    const requested=new URL(import.meta.url).searchParams.get("v");
+    if(requested&&requested!==BOOT_VERSION){code="release-mismatch";throw new Error(code);}
+    if(typeof fetch!=="function"||typeof Promise!=="function"){code="browser-api";throw new Error(code);}
+    globalThis.P708Boot?.mark("COMPAT_CHECK");
+    const loader=await import(`./src/boot/app-loader.js?v=${BOOT_VERSION}`);
+    await loader.startApplication();
+  }catch(error){
+    globalThis.P708ShowBootRecovery?.(error?.bootCode||(error?.message==="release-mismatch"?"release-mismatch":code));
+  }
 }
+void boot();

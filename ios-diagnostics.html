@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="vi">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Kiểm tra iPhone · P708</title>
+<style>
+  html { color-scheme: light dark }
+  body { font: 16px/1.5 system-ui, sans-serif; margin: 18px auto; width: 92%; max-width: 720px }
+  h1 { margin: 0 }
+  button { font: inherit; padding: 10px 14px; border: 1px solid #64748b; border-radius: 12px; margin-bottom: 8px }
+  table { width: 100%; border-collapse: collapse; text-align: left; font-size: 14px }
+  th,td { border-bottom: 1px solid #64748b; padding: 6px; vertical-align: top; overflow-wrap: anywhere }
+  td { font-family: ui-monospace, monospace }
+  textarea { width: 100%; min-height: 150px; box-sizing: border-box }
+</style>
+<main>
+  <h1>Kiểm tra thiết bị P708</h1>
+  <p>Trang này chạy riêng với ứng dụng. Bấm sao chép để gửi kết quả cho người bảo trì.</p>
+  <a href="./index.html">Mở P708</a>
+  <p><button id="diag-copy" type="button" disabled>Sao chép báo cáo</button></p>
+  <p id="diag-message" role="status"></p>
+  <textarea id="diag-report" aria-label="Báo cáo thiết bị" readonly hidden></textarea>
+  <noscript>JavaScript đang tắt. Chỉ kiểm được HTML và CSS.</noscript>
+  <table aria-label="Kết quả từng bước">
+    <thead><tr><th>Tầng</th><th>Kết quả</th></tr></thead>
+    <tbody>
+      <tr><th scope="row">HTML</th><td id="html">PASS</td></tr>
+      <tr><th scope="row">CSS</th><td id="css">NOT TESTED</td></tr>
+      <tr><th scope="row">JavaScript</th><td id="javascript">NOT TESTED</td></tr>
+      <tr><th scope="row">Tương tác DOM</th><td id="dom">NOT TESTED</td></tr>
+      <tr><th scope="row">Promise</th><td id="promise">NOT TESTED</td></tr>
+      <tr><th scope="row">Fetch</th><td id="fetch">NOT TESTED</td></tr>
+      <tr><th scope="row">ES modules</th><td id="module">NOT TESTED</td></tr>
+      <tr><th scope="row">Dynamic import</th><td id="dynamic">NOT TESTED</td></tr>
+      <tr><th scope="row">LocalStorage</th><td id="local">NOT TESTED</td></tr>
+      <tr><th scope="row">SessionStorage</th><td id="session">NOT TESTED</td></tr>
+      <tr><th scope="row">IndexedDB</th><td id="indexed">NOT TESTED</td></tr>
+      <tr><th scope="row">Cache Storage</th><td id="cache">NOT TESTED</td></tr>
+      <tr><th scope="row">Service Worker</th><td id="worker">NOT TESTED</td></tr>
+      <tr><th scope="row">Firebase config</th><td id="config">NOT TESTED</td></tr>
+      <tr><th scope="row">Firebase SDK</th><td id="sdk">NOT TESTED</td></tr>
+      <tr><th scope="row">Firebase App</th><td id="firebase">NOT TESTED</td></tr>
+      <tr><th scope="row">Firebase Auth</th><td id="auth">NOT TESTED</td></tr>
+      <tr><th scope="row">Kết nối Firestore</th><td id="firestore">NOT TESTED</td></tr>
+    </tbody>
+  </table>
+</main>
+<script src="./src/boot/ios-diagnostics.js"></script>
+<script type="module">
+  window.P708IOSChecks && window.P708IOSChecks.moduleReady();
+</script>
