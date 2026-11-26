@@ -422,6 +422,7 @@
     const edit=$("#billingPeriodEdit");if(edit){edit.classList.toggle("role-hidden",!isAdmin());edit.disabled=!cycle;edit.title=bill.closed?"Kỳ đang khóa — bấm để xem hướng dẫn":"Chỉnh ngày bắt đầu và kết thúc kỳ";}
   }
 
+  let calendarMarkup="",calendarPersonId=null;
   renderBilling=function(){
     ensureBillingCycleUi();
     const realBill=currentBill(),bill=periodBillForDisplay(),calc=billCalc(bill);
@@ -461,8 +462,13 @@
       const currentDay=dateKey===today;
       cells+=`<button class="day-cell ${stay?"stay":""} ${currentDay?"today":""}" data-billing-date="${dateKey}" type="button" ${person&&editable?"":"disabled"} ${currentDay?'aria-current="date"':""} aria-label="${displayDate(dateKey)}, ${stay?"có ở":"vắng"}" aria-pressed="${stay}">${showMonth?`<span class="day-month-tag">T${parts[1]}</span>`:""}<b>${day}</b><small>${stay?"✓ Có ở":"Vắng"}</small></button>`;
     }
-    $("#billCalendar").innerHTML=cells;
-    $$('[data-billing-date]').forEach(button=>button.addEventListener("click",()=>setBillDay(button.dataset.billingDate)));
+    const personId=person?.id||null;
+    if(calendarMarkup!==cells||calendarPersonId!==personId){
+      calendarMarkup=cells;calendarPersonId=personId;
+      const calendar=$("#billCalendar");
+      calendar.innerHTML=cells;
+      calendar.querySelectorAll('[data-billing-date]').forEach(button=>button.addEventListener("click",()=>setBillDay(button.dataset.billingDate)));
+    }
 
     if(person){
       const due=calc.due[person.id]||0,status=billPaymentState(person,due),suffix=status==="none"?" · Không phát sinh":status==="paid"?" · ✅ Đã đóng":" · 🔴 Chưa đóng";

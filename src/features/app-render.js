@@ -1,6 +1,7 @@
 let cleaningTaskPress=null;
 let cleaningRenderQueued=false;
 let cleaningScheduleMarkup="";
+let cleaningMemberMarkup="";
 function cleaningTaskKey(assignment,index){
   return `${assignment.taskId}:${assignment.personId}:${index}`;
 }
@@ -10,14 +11,18 @@ function renderCleaning(){
   if(cleaningTaskPress){cleaningRenderQueued=true;return;}
   cleaningRenderQueued=false;
   const list=$("#cleanMemberList");if(!list)return;
-  list.innerHTML=state.members.length?state.members.map(m=>{
+  const memberMarkup=state.members.length?state.members.map(m=>{
     const mine=m.id===myMemberId(),editable=canEditMember(m.id);
     const totalPoints=historicalPoints(m.id);
     const pointText=isAdmin()?` · <b>${formatCleaningPoints(totalPoints)} điểm</b>`:"";
     return `<div class="member-row"><button class="presence ${state.presence[m.id]===false?"off":""}" data-presence="${m.id}" type="button" ${editable?"":"disabled"} aria-label="${state.presence[m.id]===false?"Đánh dấu có mặt":"Đánh dấu vắng"}: ${esc(m.name)}"></button><div><b>${esc(m.name)} ${mine?'<span class="badge success">Bạn</span>':""}</b><small>${state.presence[m.id]===false?"⚪ Vắng":"🟢 Có mặt"}${pointText}${editable?"":" · Chỉ xem"}</small></div>${isAdmin()?`<button class="btn small danger" data-remove-member="${m.id}" type="button">Xóa</button>`:""}</div>`;
   }).join(""):'<div class="empty">Chưa có thành viên.</div>';
-  $$('[data-presence]').forEach(btn=>btn.addEventListener("click",()=>togglePresence(btn.dataset.presence)));
-  $$('[data-remove-member]').forEach(btn=>btn.addEventListener("click",()=>removeMember(btn.dataset.removeMember)));
+  if(cleaningMemberMarkup!==memberMarkup){
+    cleaningMemberMarkup=memberMarkup;
+    list.innerHTML=memberMarkup;
+    list.querySelectorAll('[data-presence]').forEach(btn=>btn.addEventListener("click",()=>togglePresence(btn.dataset.presence)));
+    list.querySelectorAll('[data-remove-member]').forEach(btn=>btn.addEventListener("click",()=>removeMember(btn.dataset.removeMember)));
+  }
 
   const s=currentSchedule(),box=$("#cleanScheduleBox");
   $("#manualScheduleButton").disabled=!!s?.locked;

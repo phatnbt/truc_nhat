@@ -59,15 +59,16 @@ function assertBrowserErrors(name,errors){
   assert.deepEqual(errors.filter(message=>!emulatorWarnings.includes(message)),[]);
 }
 
-async function clickDuringSync(button,useTouch){
-  await button.evaluate(element=>element.addEventListener("pointerdown",()=>{
+async function clickDuringSync(button,useTouch,changeOtherTask=true){
+  await button.evaluate((element,changeTask)=>element.addEventListener("pointerdown",()=>{
+    if(!changeTask){renderAll();return;}
     const [taskId]=element.closest("tr").dataset.taskKey.split(":");
     const otherTask=currentSchedule().assignments.find(assignment=>assignment.taskId!==taskId);
     const reassigned=otherTask.reassigned;
     otherTask.reassigned=!reassigned;
     renderAll();
     otherTask.reassigned=reassigned;
-  },{once:true}));
+  },{once:true}),changeOtherTask);
   if(useTouch)await button.tap();
   else await button.click();
 }
@@ -152,11 +153,12 @@ async function exercise(engine,name,width){
       const presence=resident.locator('[data-presence="b"]');
       await expect(resident.locator('[data-presence="a"]')).toBeDisabled();
       resident.once("dialog",dialog=>dialog.accept());
-      await activate(presence);
+      await clickDuringSync(presence,hasTouch,false);
       await expect.poll(async()=>(await memberDataFromServer(member.uid))?.presence).toBe(false);
       assert.deepEqual((await memberDataFromServer(member.uid)).billingMonths,{});
       await expect(manager.locator('[data-presence="b"]')).toHaveClass(/off/);
-      await activate(presence);
+      await expect(presence).toHaveClass(/off/);
+      await clickDuringSync(presence,hasTouch,false);
       await expect.poll(async()=>(await memberDataFromServer(member.uid))?.presence).toBe(true);
     }
 
@@ -165,12 +167,13 @@ async function exercise(engine,name,width){
     await resident.locator("#billMonth").dispatchEvent("change");
     const memberSecondDay=resident.locator(`[data-billing-date="${billMonth}-02"]`);
     await expect(memberSecondDay).toBeEnabled();
-    await activate(memberSecondDay);
+    await clickDuringSync(memberSecondDay,hasTouch,false);
     await expect.poll(async()=>(await memberDataFromServer(member.uid))?.billingMonths[billMonth]?.days["2"]).toBe(true);
     const personalData=await memberDataFromServer(member.uid);
     assert.equal(personalData.presence,true);
     assert.equal(personalData.billingMonths[billMonth].days["1"],true,"the pre-existing room day is preserved");
-    await activate(memberSecondDay);
+    await expect(memberSecondDay).toHaveAttribute("aria-pressed","true");
+    await clickDuringSync(memberSecondDay,hasTouch,false);
     await expect.poll(async()=>(await memberDataFromServer(member.uid))?.billingMonths[billMonth]?.days["2"]).toBe(false);
 
     await manager.goto(base+"/#billing");
