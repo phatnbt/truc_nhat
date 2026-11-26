@@ -163,7 +163,7 @@ function renderAuthGate(){
     const destination=P708MobileAuth.authDestination(location.hash);
     const error=authSession.authError?P708MobileAuth.authErrorMessage(authSession.authError):offline?"Hãy kết nối mạng để đăng nhập.":"";
     const hint=embedded?"Mở menu ⋯ của ứng dụng, chọn mở bằng Safari hoặc Chrome. Bạn cũng có thể sao chép link rồi dán vào trình duyệt."
-      :standalone?"Nếu Google mở trong Safari hoặc Chrome, phiên trong trình duyệt có thể khác với phiên của ứng dụng đã cài.":mobile?"Dùng Safari hoặc Chrome để hoàn tất đăng nhập.":"";
+      :standalone?"Hãy đăng nhập từ ứng dụng này. Nếu Google không quay về P708, sao chép link Firebase và dùng link đó để cài P708.":mobile?"Dùng Safari hoặc Chrome để hoàn tất đăng nhập.":"";
     box.innerHTML=`<h2>${embedded?"Mở P708 bằng trình duyệt":"Đăng nhập để vào P708"}</h2>
       ${hint?`<p>${hint}</p>`:""}${error?`<p class="auth-feedback" role="alert">${esc(error)}</p>`:""}
       <div class="auth-actions">${embedded?"":`<button class="btn primary" id="googleLoginButton" type="button" ${status==="signingIn"||offline?"disabled":""}>${status==="signingIn"?"Đang mở Google…":"G · Đăng nhập bằng Google"}</button>`}
@@ -196,11 +196,20 @@ function renderAccessModal(){
   const body=$("#accessModalBody");if(!body)return;const u=authSession.user,a=authSession.access;
   const modalHint=$("#accessModal .card-head p");if(modalHint)modalHint.textContent="Bản Free: xóa khỏi phòng sẽ gỡ quyền, email và dữ liệu Firestore; Firebase Authentication vẫn được giữ.";
   let html=`<section class="access-section"><h4>Tài khoản hiện tại</h4><div class="auth-user">${u?.photoURL?`<img src="${esc(u.photoURL)}" alt="">`:`<span class="avatar">${esc((u?.displayName||u?.email||"?").charAt(0))}</span>`}<div><b>${esc(a?.displayName||u?.displayName||"Tài khoản")}</b><small>${esc(u?.email||"")}</small></div><span class="badge ${isAdmin()?"admin":"success"}">${isAdmin()?"👑 Trưởng phòng":"👤 Thành viên"}</span></div></section>`;
+  html+=`<p class="muted">Phiên bản P708 <span id="appVersionText">${esc(globalThis.P708_RELEASE||"chưa rõ")}</span></p>`;
+  if(!globalThis.P708Debug)html+='<button class="btn small" id="openPwaDiagnostics" type="button">Mở chẩn đoán</button>';
   if(isAdmin()){
     html+=`<section class="access-section"><h4>Yêu cầu đang chờ (${accessRequests.length})</h4><div class="access-grid">${accessRequests.length?accessRequests.map(r=>`<div class="access-row"><div><b>${esc(r.displayName||"Chưa đặt tên")}</b><small>${esc(r.email||"")}</small></div><select data-approve-member="${r.uid}">${memberOptions()}</select><select data-approve-role="${r.uid}"><option value="member">Thành viên</option><option value="admin">Quản trị viên</option></select><div class="access-actions"><button class="btn small primary" data-approve="${r.uid}" type="button">Duyệt</button></div></div>`).join(""):'<div class="empty">Không có yêu cầu mới.</div>'}</div></section>`;
     html+=`<section class="access-section"><h4>Tài khoản đã cấp quyền (${accessAccounts.length})</h4><div class="access-grid">${accessAccounts.length?accessAccounts.map(x=>`<div class="access-row"><div><b>${esc(x.displayName||"Thành viên")}${x.uid===u?.uid?" · Bạn":""}</b><small>${esc(x.email||x.uid)} · ${x.active===false?"Đã khóa":"Đang hoạt động"}</small></div><select data-access-member="${x.uid}">${memberOptions(x.memberId||"")}</select><select data-access-role="${x.uid}" ${x.uid===u?.uid?"disabled":""}><option value="member" ${x.role!=="admin"?"selected":""}>Thành viên</option><option value="admin" ${x.role==="admin"?"selected":""}>Quản trị viên</option></select><div class="access-actions"><button class="btn small soft" data-save-access="${x.uid}" type="button">Lưu</button>${x.uid!==u?.uid?`<button class="btn small" data-revoke="${x.uid}" type="button">Khóa</button><button class="btn small danger" data-delete-account="${x.uid}" type="button">Xóa khỏi phòng</button>`:""}</div></div>`).join(""):'<div class="empty">Chưa có tài khoản.</div>'}</div><div class="danger-zone" style="margin-top:12px"><b>Bản Free:</b> “Xóa khỏi phòng” sẽ xóa quyền, email và dữ liệu tài khoản trong Firestore, xóa báo công việc của tài khoản và gỡ email khỏi nhật ký. Tài khoản Firebase Authentication vẫn tồn tại; nếu muốn xóa luôn Auth, thực hiện thủ công trong Firebase Console → Authentication → Users.</div></section>`;
   }
   body.innerHTML=html;
+  $("#openPwaDiagnostics")?.addEventListener("click",()=>{
+    if(realtimeEngine?.hasPendingWork()||globalThis.P708HasExternalWrites?.())
+      return toast("Đợi lưu xong rồi mở chẩn đoán.");
+    const target=new URL(location.href);
+    target.searchParams.set("debug","1");
+    location.assign(target.href);
+  });
   $$('[data-approve]').forEach(btn=>btn.addEventListener("click",()=>approveAccess(btn.dataset.approve)));
   $$('[data-save-access]').forEach(btn=>btn.addEventListener("click",()=>saveAccess(btn.dataset.saveAccess)));
   $$('[data-revoke]').forEach(btn=>btn.addEventListener("click",()=>revokeAccess(btn.dataset.revoke)));

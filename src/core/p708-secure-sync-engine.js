@@ -10,8 +10,8 @@ import {
   doc, collection, query, where, orderBy, limit, onSnapshot, runTransaction, serverTimestamp, FieldPath,
   setDoc, deleteDoc, getDoc, getDocFromServer, getDocs, writeBatch, Timestamp, increment
 } from "https://www.gstatic.com/firebasejs/12.16.0/firebase-firestore.js";
-import { assertBillingPeriodUpdate, periodDateKeys, daysInMonthKey } from "./billing-cycle-period.js?v=20261126-1";
-import {authEnvironment,authDestination} from "./mobile-auth-policy.js?v=20261127-8";
+import { assertBillingPeriodUpdate, periodDateKeys, daysInMonthKey } from "./billing-cycle-period.js?v=20261127-9";
+import {authEnvironment,signInMethod,sessionStorageAvailable} from "./mobile-auth-policy.js?v=20261127-9";
 
 const clone=value=>value==null?value:JSON.parse(JSON.stringify(value));
 const isObject=value=>value!==null&&typeof value==="object"&&!Array.isArray(value);
@@ -99,6 +99,8 @@ function escapeRegExp(value){return String(value||"").replace(/[.*+?^${}()|[\]\\
 export function createP708SecureEngine({firebaseConfig,roomCode,deviceId,onShape,onStatus,onSession,onAdminData,onTaskData,onSwapData}){
   if(!firebaseConfig?.apiKey)throw new Error("Chưa cấu hình Firebase.");
   const useEmulators=["localhost","127.0.0.1","[::1]"].includes(location.hostname)&&firebaseConfig.projectId==="demo-p708-production-audit";
+  const supportsRedirect=useEmulators||location.host===firebaseConfig.authDomain;
+  const diagnostic=(key,value)=>globalThis.P708Debug?.(key,value);
   const appName="p708-secure-manager-v5";
   const appExists=getApps().some(x=>x.name===appName);
   const app=appExists?getApp(appName):initializeApp(firebaseConfig,appName);
@@ -107,13 +109,16 @@ export function createP708SecureEngine({firebaseConfig,roomCode,deviceId,onShape
   catch{db=getFirestore(app);}
   const auth=appExists?getAuth(app):initializeAuth(app,{
     persistence:[browserLocalPersistence,indexedDBLocalPersistence,browserSessionPersistence,inMemoryPersistence],
-    popupRedirectResolver:browserPopupRedirectResolver
+    ...(supportsRedirect?{popupRedirectResolver:browserPopupRedirectResolver}:{})
   }),provider=new GoogleAuthProvider();
   if(useEmulators&&!appExists){
     connectAuthEmulator(auth,"http://127.0.0.1:9099",{disableWarnings:true});
     connectFirestoreEmulator(db,"127.0.0.1",8080);
   }
   provider.setCustomParameters({prompt:"select_account"});
+  diagnostic("firebase","initialized");
+  diagnostic("sdk","12.16.0");
+  diagnostic("persistence","firebase-managed-fallback");
   const roomRef=doc(db,"rooms",roomCode),configRef=doc(db,"rooms",roomCode,"security","config");
   const accessCollection=collection(db,"rooms",roomCode,"access"),
     requestCollection=collection(db,"rooms",roomCode,"accessRequests"),
@@ -144,6 +149,8 @@ export function createP708SecureEngine({firebaseConfig,roomCode,deviceId,onShape
   };
   const emitSession=()=>{
     const status=sessionStatus();
+    diagnostic("auth",status);
+    if(authError)diagnostic("authError",authError);
     const waiting=status==="checking"||status==="loadingRoom"?status:"";
     if(waitingFor!==waiting){
       clearTimeout(waitingTimer);
@@ -206,7 +213,8 @@ export function createP708SecureEngine({firebaseConfig,roomCode,deviceId,onShape
     roomUnsub?.();memberDataUnsub?.();adminAccessUnsub?.();adminRequestsUnsub?.();auditUnsub?.();taskUnsub?.();swapUnsub?.();
     roomUnsub=memberDataUnsub=adminAccessUnsub=adminRequestsUnsub=auditUnsub=taskUnsub=swapUnsub=null;
     memberDataByUid=new Map();accessByUid=new Map();memberDataReady=false;
-    remoteShape={};optimisticShape={};roomReady=false;remoteRevision=0;
+    remoteShape={};optimisticShape={};roomReady=false;remoteRevision=0;pendingRoomWrite=false;
+    diagnostic("listener","stopped");
   };
   const dataListener=callback=>{
     const epoch=dataGeneration;
@@ -238,10 +246,17 @@ export function createP708SecureEngine({firebaseConfig,roomCode,deviceId,onShape
     const onRoomError=error=>{
       if(!stillCurrent())return;
       roomError=error?.code||"room";
+      diagnostic("firestoreError",roomError);
+      diagnostic("listener","error");
       emitSession();emitStatus("offline","Không thể đọc dữ liệu phòng");
     };
+    diagnostic("listener","connecting");
     roomUnsub=onSnapshot(roomRef,{includeMetadataChanges:true},snap=>{
-      if(!stillCurrent()||snap.metadata.hasPendingWrites)return;
+      if(!stillCurrent())return;
+      pendingRoomWrite=snap.metadata.hasPendingWrites;
+      diagnostic("pendingWrites",pendingRoomWrite||activeWrites>0);
+      diagnostic("snapshot",pendingRoomWrite?"pending":snap.metadata.fromCache?"cache":"server");
+      if(pendingRoomWrite)return;
       if(snap.metadata.fromCache){
         emitStatus(navigator.onLine?"syncing":"offline","Chưa xác nhận dữ liệu với máy chủ");
         return;
@@ -252,6 +267,8 @@ export function createP708SecureEngine({firebaseConfig,roomCode,deviceId,onShape
       }
       roomError="";
       acceptRoomShape(snap.data()?.payload,Number(snap.data()?.revision)||0);
+      diagnostic("listener","active");
+      diagnostic("lastSync",Date.now());
       emitSession();
       emitStatus(navigator.onLine?"online":"offline",navigator.onLine?"Đã đồng bộ":"Đang dùng dữ liệu ngoại tuyến");
     },onRoomError);
@@ -288,7 +305,7 @@ export function createP708SecureEngine({firebaseConfig,roomCode,deviceId,onShape
       accessError="";
       accessReady=true;
       handleAccessChange(s.exists()?{uid:s.id,...s.data()}:null);
-    },e=>{if(epoch!==generation)return;stopDataListeners();access=null;accessError=e?.code||"access";emitSession();});
+    },e=>{if(epoch!==generation)return;stopDataListeners();access=null;accessError=e?.code||"access";diagnostic("firestoreError",accessError);emitSession();});
     requestUnsub=onSnapshot(doc(requestCollection,user.uid),{includeMetadataChanges:true},s=>{
       if(epoch!==generation||s.metadata.fromCache)return;
       if(accessReady&&accessError==="slow")accessError="";
@@ -306,10 +323,34 @@ export function createP708SecureEngine({firebaseConfig,roomCode,deviceId,onShape
     if(!user)return;
     clearUserListeners();emitSession();attachUserListeners();
   };
-  const onlineHandler=()=>{emitStatus("syncing","Đang kết nối lại…");if(user&&(accessError||roomError))retryAccess();else emitSession();};
+  let wasHidden=false,lastRecoveryAt=0,activeWrites=0,pendingRoomWrite=false;
+  const trackWrite=operation=>async(...args)=>{
+    activeWrites++;
+    diagnostic("pendingWrites",true);
+    try{return await operation(...args);}
+    catch(error){diagnostic("firestoreError",error?.code||"write-rejected");throw error;}
+    finally{activeWrites--;diagnostic("pendingWrites",activeWrites>0||pendingRoomWrite);}
+  };
+  const resume=()=>{
+    if(!navigator.onLine||!user)return;
+    const now=Date.now();
+    if(now-lastRecoveryAt<750)return;
+    lastRecoveryAt=now;
+    if(accessError||roomError){retryAccess();return;}
+    if(!hasAccess()||!roomReady)return;
+    emitStatus("syncing","Đang xác nhận dữ liệu với máy chủ…");
+    void forceSync();
+  };
+  const onlineHandler=()=>{emitStatus("syncing","Đang kết nối lại…");lastRecoveryAt=0;resume();emitSession();};
   const offlineHandler=()=>{emitStatus("offline","Đang ngoại tuyến");emitSession();};
+  const pageHideHandler=()=>{wasHidden=true;};
+  const visibilityHandler=()=>{
+    if(document.visibilityState==="hidden"){wasHidden=true;return;}
+    if(wasHidden){wasHidden=false;resume();}
+  };
   const pageShowHandler=event=>{
     if(event.persisted&&signingIn&&!user){signingIn=false;authError="auth/cancelled-popup-request";emitSession();}
+    if(event.persisted||wasHidden){wasHidden=false;resume();}
   };
 
   const start=async()=>{
@@ -317,7 +358,13 @@ export function createP708SecureEngine({firebaseConfig,roomCode,deviceId,onShape
     authRestoring=true;emitSession();
     window.addEventListener("online",onlineHandler);window.addEventListener("offline",offlineHandler);
     window.addEventListener("pageshow",pageShowHandler);
-    await Promise.all([auth.authStateReady(),getRedirectResult(auth).catch(error=>{authError=error?.code||"redirect";})]);
+    window.addEventListener("pagehide",pageHideHandler);
+    document.addEventListener("visibilitychange",visibilityHandler);
+    const redirect=supportsRedirect&&sessionStorageAvailable()
+      ?getRedirectResult(auth,browserPopupRedirectResolver).catch(error=>{authError=error?.code||"redirect";})
+      :Promise.resolve(null);
+    diagnostic("authFlow",supportsRedirect?"restore-same-origin":"restore-popup-context");
+    await Promise.all([auth.authStateReady(),redirect]);
     if(!started)return;
     authRestoring=false;
     authUnsub=onAuthStateChanged(auth,next=>{
@@ -335,17 +382,18 @@ export function createP708SecureEngine({firebaseConfig,roomCode,deviceId,onShape
   const signInGoogle=async()=>{
     if(signingIn||authRestoring||user)return;
     if(!navigator.onLine){authError="auth/network-request-failed";emitSession();return;}
-    const {embedded,mobile,standalone}=environment();
-    if(embedded){authError="auth/operation-not-supported-in-this-environment";emitSession();return;}
-    const firstParty=location.hostname===firebaseConfig.authDomain;
-    const redirect=()=>firstParty||useEmulators
-      ?signInWithRedirect(auth,provider):location.assign(authDestination(location.hash));
+    const environmentInfo=environment();
+    const canRedirect=supportsRedirect&&sessionStorageAvailable();
+    const method=signInMethod({...environmentInfo,sameOrigin:supportsRedirect,sessionStorage:canRedirect});
+    if(method==="unavailable"){authError="auth/operation-not-supported-in-this-environment";emitSession();return;}
+    const redirect=()=>signInWithRedirect(auth,provider,browserPopupRedirectResolver);
     signingIn=true;authError="";emitSession();
+    diagnostic("authFlow",method);
     try{
-      if(!useEmulators&&(mobile||standalone))await redirect();
+      if(method==="redirect")await redirect();
       else{
-        try{await signInWithPopup(auth,provider);}
-        catch(error){if(error?.code!=="auth/popup-blocked")throw error;await redirect();}
+        try{await signInWithPopup(auth,provider,browserPopupRedirectResolver);}
+        catch(error){if(error?.code!=="auth/popup-blocked"||!canRedirect)throw error;await redirect();}
       }
     }catch(error){authError=error?.code||"unknown";}
     finally{
@@ -754,12 +802,18 @@ export function createP708SecureEngine({firebaseConfig,roomCode,deviceId,onShape
     const actor=user.uid,epoch=dataGeneration;
     const pending=getDocFromServer(roomRef).then(snap=>{
       if(user?.uid!==actor||epoch!==dataGeneration||!hasAccess())return false;
+      if(snap.metadata.hasPendingWrites||snap.metadata.fromCache)return false;
       if(!snap.exists()||(!isAdmin()&&!snap.data()?.payload?.members?.[access.memberId]))return false;
       acceptRoomShape(snap.data()?.payload,Number(snap.data()?.revision)||0);
-      emitStatus("online","Đã đồng bộ");
+      diagnostic("lastSync",Date.now());
+      diagnostic("snapshot","server");
+      if(navigator.onLine)emitStatus("online","Đã đồng bộ");
       return true;
     }).catch(e=>{
-      if(user?.uid===actor&&epoch===dataGeneration)emitStatus("offline","Không thể đồng bộ");
+      if(user?.uid===actor&&epoch===dataGeneration){
+        diagnostic("firestoreError",e?.code||"server-read");
+        emitStatus("offline","Không thể đồng bộ");
+      }
       return false;
     }).finally(()=>{if(restoreInFlight===pending)restoreInFlight=null;});
     restoreInFlight=pending;
@@ -769,7 +823,15 @@ export function createP708SecureEngine({firebaseConfig,roomCode,deviceId,onShape
   const stop=()=>{
     authUnsub?.();clearUserListeners();clearTimeout(waitingTimer);waitingFor="";
     window.removeEventListener("online",onlineHandler);window.removeEventListener("offline",offlineHandler);
-    window.removeEventListener("pageshow",pageShowHandler);started=false;
+    window.removeEventListener("pageshow",pageShowHandler);
+    window.removeEventListener("pagehide",pageHideHandler);
+    document.removeEventListener("visibilitychange",visibilityHandler);
+    started=false;
   };
-  return {start,stop,signInGoogle,signOut,retryAccess,environment,requestAccess,cancelAccessRequest,approveRequest,updateAccess,revokeAccess,recordShape,saveBillingDays,submitTask,reviewTask,completeTask,requestTaskSwap,reviewTaskSwap,reconcileTaskSubmissions,deleteTaskSubmissionsForWeek,deleteAccountFromRoom,cleanupAuditLogs,forceSync,flush};
+  const writes={requestAccess,cancelAccessRequest,approveRequest,updateAccess,revokeAccess,recordShape,
+    saveBillingDays,submitTask,reviewTask,completeTask,requestTaskSwap,reviewTaskSwap,reconcileTaskSubmissions,
+    deleteTaskSubmissionsForWeek,deleteAccountFromRoom,cleanupAuditLogs};
+  for(const key of Object.keys(writes))writes[key]=trackWrite(writes[key]);
+  return {start,stop,signInGoogle,signOut,retryAccess,environment,forceSync,flush,...writes,
+    hasPendingWork:()=>authRestoring||signingIn||activeWrites>0||pendingRoomWrite};
 }

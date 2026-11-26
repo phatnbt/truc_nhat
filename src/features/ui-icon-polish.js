@@ -1,6 +1,6 @@
 (()=>{
   const BOOTSTRAP_ICONS_CSS="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css";
-  const ICON_CSS_VERSION="20260913-2";
+  const ICON_CSS_VERSION=globalThis.P708_RELEASE;
   const iconMap=new Map([
     ["🔐","lock-fill"],["🏠","house-door-fill"],["🔔","bell-fill"],["🧹","brush-fill"],
     ["⚡","lightning-charge-fill"],["👥","people-fill"],["💳","credit-card-2-front-fill"],

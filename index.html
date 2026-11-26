@@ -11,9 +11,9 @@
   <link rel="manifest" href="./manifest.webmanifest">
   <link rel="icon" type="image/png" sizes="32x32" href="./icons/icon-32.png">
   <link rel="apple-touch-icon" sizes="192x192" href="./icons/icon-192.png">
-  <link rel="stylesheet" href="./styles.css?v=20261127-8">
-  <link rel="stylesheet" href="./landing-ui.css?v=20261127-8">
-  <link rel="stylesheet" href="./billing-cycle.css?v=20261127-8">
+  <link rel="stylesheet" href="./styles.css?v=20261127-9">
+  <link rel="stylesheet" href="./landing-ui.css?v=20261127-9">
+  <link rel="stylesheet" href="./billing-cycle.css?v=20261127-9">
   <title>Quản lý phòng P708</title>
 </head>
 <body>
@@ -329,33 +329,34 @@
   <div id="pwaUpdateBanner" class="pwa-update" hidden>
     <span>Có bản cập nhật</span><button id="pwaUpdateButton" class="btn small primary" type="button">Cập nhật</button>
   </div>
+  <details id="pwaDebugPanel" class="pwa-debug" hidden>
+    <summary>Chẩn đoán P708</summary>
+    <button class="btn small" id="pwaDebugCopy" type="button">Sao chép báo cáo</button>
+    <span id="pwaDebugCopyStatus" role="status"></span>
+    <pre id="pwaDebugOutput" tabindex="0"></pre>
+  </details>
+  <script src="./src/boot/pwa-diagnostics.js?v=20261127-9"></script>
   <script>
     (()=>{
-      const baseUrl=new URL("./",location.href).href;
-      const cachePrefix=`p708-manager-${encodeURIComponent(baseUrl)}-`;
-      const clearAppShell=async()=>{
-        try{if("caches" in window){const keys=await caches.keys();await Promise.all(keys.filter(key=>key.startsWith(cachePrefix)).map(key=>caches.delete(key)));}}catch{}
-        try{if("serviceWorker" in navigator){const registrations=await navigator.serviceWorker.getRegistrations();await Promise.all(registrations.filter(item=>item.scope===baseUrl).map(item=>item.unregister()));}}catch{}
-      };
-      const reload=async()=>{
-        await Promise.race([clearAppShell(),new Promise(resolve=>setTimeout(resolve,1500))]);
+      const reload=()=>{
         const next=new URL(location.href);
         next.searchParams.set("refresh",Date.now());
         location.replace(next.href);
       };
-      const showRecovery=()=>{
+      const showRecovery=(reason="boot-timeout")=>{
         const box=document.querySelector("#authGateContent");
         if(!box)return;
+        globalThis.P708Debug?.("runtimeError",reason);
         delete box.dataset.bootProgress;
         document.querySelector("#authGate").classList.remove("hidden");
         box.innerHTML='<h2>Chưa thể mở P708</h2><p>Kiểm tra mạng, rồi thử tải lại ứng dụng.</p><div class="auth-actions"><button class="btn primary" id="bootRetryButton" type="button">Thử lại</button><a class="btn" href="https://p708-room-manager.firebaseapp.com/">Mở P708 trên Firebase</a></div>';
-        document.querySelector("#bootRetryButton").addEventListener("click",event=>{event.currentTarget.disabled=true;void reload();});
+        document.querySelector("#bootRetryButton").addEventListener("click",event=>{event.currentTarget.disabled=true;reload();});
       };
       const timer=setTimeout(showRecovery,15000);
-      globalThis.P708ShowBootRecovery=()=>{clearTimeout(timer);showRecovery();};
+      globalThis.P708ShowBootRecovery=(reason="boot-failed")=>{clearTimeout(timer);showRecovery(reason);};
       window.addEventListener("p708:boot-ready",()=>clearTimeout(timer),{once:true});
     })();
   </script>
-  <script type="module" src="./app.js?v=20261127-8"></script>
+  <script type="module" src="./app.js?v=20261127-9"></script>
 </body>
 </html>

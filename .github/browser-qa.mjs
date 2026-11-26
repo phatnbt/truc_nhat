@@ -108,10 +108,23 @@ async function exercise(engine,name,width){
   try{
     const viewport={width,height:820};
     const hasTouch=name==="webkit";
-    const manager=await browser.newPage({viewport,hasTouch,timezoneId:"America/Los_Angeles"});
+    const managerContext=await browser.newContext({viewport,hasTouch,timezoneId:"America/Los_Angeles"});
+    const manager=await managerContext.newPage();
     const resident=await browser.newPage({viewport,hasTouch,timezoneId:"Asia/Ho_Chi_Minh"});
+    const firestore="https://www.gstatic.com/firebasejs/12.16.0/firebase-firestore.js";
+    if(name==="chromium"){
+      await manager.route(firestore,route=>route.fulfill({
+        contentType:"text/javascript",
+        body:`export * from "${firestore}?p708-original";
+          import {runTransaction as transact} from "${firestore}?p708-original";
+          export async function runTransaction(...args){
+            if(window.p708HoldTransaction)await new Promise(resolve=>{window.p708ReleaseTransaction=resolve;});
+            return transact(...args);
+          }`
+      }));
+    }
     if(hasTouch){
-      const firestore="https://www.gstatic.com/firebasejs/12.16.0/firebase-firestore.js";
+      for(const page of [manager,resident])await page.addInitScript(()=>Object.defineProperty(navigator,"standalone",{value:true}));
       await resident.route(firestore,route=>route.fulfill({
         contentType:"text/javascript",
         body:`export * from "${firestore}?p708-original";
@@ -303,7 +316,7 @@ async function exercise(engine,name,width){
       const bill=(await roomPayloadFromServer()).billingMonths[billMonth];
       return bill.people["person:a"].days["2"];
     }).toBe(true);
-    await activate(secondDay);
+    await clickDuringSync(secondDay,hasTouch,false);
     await expect(secondDay).toHaveAttribute("aria-pressed","false");
     await expect.poll(async()=>{
       const bill=(await roomPayloadFromServer()).billingMonths[billMonth];
@@ -317,6 +330,7 @@ async function exercise(engine,name,width){
       const payload=await roomPayloadFromServer();
       return payload.billingMonths[billMonth].closedDaysVersion;
     }).toBe(1);
+    await expect(manager.locator("#billingDecisionModal")).toBeHidden();
     await manager.locator('[data-payment="b"]').evaluate(button=>button.scrollIntoView({block:"center",behavior:"instant"}));
     await manager.locator('[data-payment="b"]').press("Enter");
     await manager.locator("#billingDecisionAmount").fill("2500");
@@ -360,6 +374,27 @@ async function exercise(engine,name,width){
       await manager.locator("#pwaUpdateButton").click();
       await expect(manager.locator("#stockForm [name=name]")).toHaveValue("Bản nháp");
       await manager.locator("#stockForm [name=name]").clear();
+      await manager.evaluate(()=>{
+        window.p708HoldTransaction=true;
+        const schedule=currentSchedule(),task=schedule.assignments.find(item=>item.completed&&!item.cut);
+        window.p708PendingQA=realtimeEngine.completeTask({
+          weekStart:schedule.weekStart,scheduleId:schedule.id,taskId:task.taskId,memberId:task.personId
+        });
+      });
+      await manager.waitForFunction(()=>typeof window.p708ReleaseTransaction==="function");
+      await manager.locator("#pwaUpdateButton").click();
+      await expect(manager.locator("#toast")).toContainText("Đợi các thay đổi");
+      await manager.evaluate(()=>{
+        window.p708HoldTransaction=false;
+        window.p708ReleaseTransaction();
+        return window.p708PendingQA;
+      });
+      const parallelTab=await manager.context().newPage();
+      await parallelTab.goto(base);
+      try{
+        await manager.locator("#pwaUpdateButton").click();
+        await expect(manager.locator("#toast")).toContainText("Đóng các cửa sổ P708 khác");
+      }finally{await parallelTab.close();}
       await Promise.all([manager.waitForEvent("framenavigated"),manager.locator("#pwaUpdateButton").click()]);
       await expect(manager.locator("#authGate")).toBeHidden();
       await manager.context().setOffline(true);
