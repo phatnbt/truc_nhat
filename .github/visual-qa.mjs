@@ -60,8 +60,15 @@ async function capture(browser,browserName,ref,width){
         const widthUsed=await page.evaluate(()=>document.documentElement.scrollWidth);
         if(widthUsed>width)errors.push(`${view} ${theme}: ${widthUsed} > ${width}`);
         if(ref==="working"&&theme==="dark"){
-          const heading=await page.locator("#page-"+view+" h1").first().evaluate(node=>getComputedStyle(node).color);
-          if(!heading.includes("240, 243, 255"))errors.push(`${view} dark heading: ${heading}`);
+          const selector="#page-"+view+" h1";
+          const contrastReady=await page.waitForFunction(selector=>{
+            const heading=document.querySelector(selector);
+            return heading&&getComputedStyle(heading).color==="rgb(240, 243, 255)";
+          },selector,{timeout:1500}).then(()=>true,()=>false);
+          if(!contrastReady){
+            const color=await page.locator(selector).first().evaluate(node=>getComputedStyle(node).color);
+            errors.push(`${view} dark heading: ${color}`);
+          }
         }
         if([390,1440].includes(width))await page.screenshot({path:`${out}/${ref}-${browserName}-${width}-${theme}-${view}.png`});
       }
