@@ -98,7 +98,12 @@ jobs:
         run: npx firebase-tools emulators:exec --only firestore --project demo-p708-production-audit "node .github/rules.test.mjs"
 
       - name: Install browser engines
+        id: browsers
         run: npx playwright install --with-deps chromium firefox webkit
 
       - name: Browser QA with local Auth, Firestore and Hosting
-        run: npx firebase-tools emulators:exec --only auth,firestore,hosting --project demo-p708-production-audit "node .github/mobile-boot-qa.mjs && node .github/browser-qa.mjs && node .github/visual-qa.mjs --all"
+        run: npx firebase-tools emulators:exec --only auth,firestore,hosting --project demo-p708-production-audit "node .github/mobile-boot-qa.mjs && node .github/browser-qa.mjs"
+
+      - name: Responsive layout and theme QA
+        if: ${{ !cancelled() && steps.browsers.outcome == 'success' }}
+        run: npx firebase-tools emulators:exec --only hosting --project demo-p708-production-audit "node .github/visual-qa.mjs --all"

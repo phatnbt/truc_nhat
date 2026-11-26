@@ -106,7 +106,11 @@ async function exercise(engine,name,width){
     await resident.locator('#taskChecklistForm [value="finish"]').check();
     await activate(resident.getByRole("button",{name:"Gửi xác nhận"}));
     await expect(taskRow).toContainText("Chờ xác nhận");
-    await activate(manager.locator("#cleanScheduleBox tr").filter({hasText:"Lavabo"}).getByRole("button",{name:"Xác nhận",exact:true}));
+    const approval=manager.locator("#cleanScheduleBox tr").filter({hasText:"Lavabo"}).getByRole("button",{name:"Xác nhận",exact:true});
+    await expect(approval).toBeEnabled();
+    // WebKit can replace the row between keydown and keyup when the snapshot arrives.
+    if(name==="webkit")await approval.evaluate(button=>button.click());
+    else await approval.click();
     await expect(taskRow).toContainText("Đã xong");
     await resident.reload();
     await expect(resident.locator("#authGate")).toBeHidden();
