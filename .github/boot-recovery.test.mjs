@@ -7,7 +7,7 @@ const start=fs.readFileSync(new URL("../src/boot/app-start.js",import.meta.url),
 const worker=fs.readFileSync(new URL("../sw.js",import.meta.url),"utf8");
 const app=fs.readFileSync(new URL("../app.js",import.meta.url),"utf8");
 
-const release="20261127-9";
+const release="20261127-10";
 
 assert.ok(index.includes("setTimeout(showRecovery,15000)"),"stalled boots must show recovery");
 assert.ok(index.includes('id="bootRetryButton"'),"recovery should offer an explicit retry");
@@ -53,10 +53,13 @@ assert.equal(intercepted("/?refresh=42","navigate"),false,"the explicit recovery
 assert.equal(intercepted("/api/unknown","navigate"),false,"API navigations must retain their server response");
 assert.equal(intercepted("/index.html?debug=1","navigate"),true);
 const htmlFor=release=>new Response(`<script type="module" src="./app.js?v=${release}"></script>`,{headers:{"Content-Type":"text/html"}});
-workerContext.fetch=async()=>htmlFor("20261127-10");
+workerContext.fetch=async()=>htmlFor("20261127-11");
 workerContext.caches.open=async()=>({match:async url=>url.endsWith("/index.html")?htmlFor(release):null});
 assert.match(await (await workerContext.navigateApp(new Request("https://p708-room-manager.web.app/index.html"))).text(),
   new RegExp(`app.js\\?v=${release}`),"a controlled launch must pair an older worker with its own HTML until it can update");
+const missingAsset=new URL(`/src/features/app-actions2.js?v=${release}`,jsRequest.url);
+assert.equal((await workerContext.releaseAsset(new Request(missingAsset),missingAsset)).type,"error",
+  "an evicted entry must not be reloaded from a different server release");
 
 const loader=fs.readFileSync(new URL("../src/boot/app-loader.js",import.meta.url),"utf8");
 assert.ok(loader.includes("await Promise.all(partUrls.map"),"classic scripts must download in parallel");

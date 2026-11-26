@@ -1,6 +1,6 @@
 (()=>{
   const link=document.createElement("link");
-  link.rel="stylesheet";link.href="./utility-chart.css?v=20261127-9";link.dataset.utilityChart="1";
+  link.rel="stylesheet";link.href="./utility-chart.css?v=20261127-10";link.dataset.utilityChart="1";
   if(!document.querySelector('link[data-utility-chart="1"]'))document.head.appendChild(link);
 
   document.querySelector(".hero-proof")?.remove();

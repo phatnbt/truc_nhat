@@ -1,5 +1,5 @@
 const CACHE_SCOPE=`p708-manager-${encodeURIComponent(self.registration.scope)}-`;
-const APP_RELEASE="20261127-9";
+const APP_RELEASE="20261127-10";
 const CACHE_NAME=CACHE_SCOPE+`runtime-fallback-${APP_RELEASE}`;
 const APP_SHELL=[
   "./index.html","./src/boot/pwa-diagnostics.js","./styles.css","./landing-ui.css","./utility-chart.css","./mobile-notification-ui.css","./kpi-polish.css","./billing-cycle.css","./cleaning-pet.css","./icon-polish.css","./app.js","./src/boot/app-loader.js","./src/boot/app-start.js","./src/core/mobile-auth-policy.js","./src/core/app-core1.js","./src/core/app-core2.js","./src/core/p708-secure-sync-engine.js","./src/core/p708-authoritative-repair.js","./src/core/p708-identity-plan.js","./src/core/p708-canonical-mapping-repair.js","./src/core/billing-cycle-period.js","./src/core/cleaning-fairness.js","./src/core/cleaning-streak.js","./src/core/expense-split.js","./src/core/cleaning-schedule-store.js","./src/features/app-actions1.js","./src/features/app-actions2.js","./src/features/cleaning-delete-fix.js","./src/features/app-dashboard.js","./src/features/app-render.js","./src/features/cleaning-pet-streak.js","./src/features/app-integrity-fixes.js","./src/features/inactive-mapping-dedup-fix.js","./src/features/canonical-identity-repair.js","./src/features/billing-canonical-repair.js","./src/features/billing-stable-repair.js","./src/features/billing-membership-exclusion.js","./src/features/billing-cycle-history.js","./src/features/home-enhancements.js","./src/features/home-pet-garden.js","./src/features/ui-icon-polish.js","./src/features/notification-enhancements.js","./src/features/today-calendar.js","./src/features/room-resources.js","./src/features/mobile-install-bridge.js","./src/features/mobile-install-guide.js","./manifest.webmanifest","./offline.html","./icons/icon-32.png","./icons/icon-192.png","./icons/icon-512.png","./icons/icon-maskable-512.png","./icons/pets/cloud-egg.svg","./icons/pets/cloud-sprout.svg","./icons/pets/cloud-cat.svg","./icons/pets/cloud-guardian.svg","./icons/pets/cloud-celestial.svg"
@@ -12,6 +12,10 @@ const shell=new Map(APP_SHELL.map(path=>{
 const indexUrl=new URL("./index.html",self.registration.scope);
 const offlineUrl=new URL("./offline.html",self.registration.scope);
 const validHtmlRelease=async response=>(await response.clone().text()).includes(`src="./app.js?v=${APP_RELEASE}"`);
+const codeMarkers=new Map([
+  [new URL("./app.js",self.registration.scope).pathname,`const BOOT_VERSION = "${APP_RELEASE}"`],
+  [new URL("./src/boot/app-loader.js",self.registration.scope).pathname,`const LOADER_RELEASE="${APP_RELEASE}"`]
+]);
 
 function isValidRuntimeResponse(request,response){
   if(!response?.ok)return false;
@@ -24,15 +28,28 @@ function isValidRuntimeResponse(request,response){
   if(/\.(?:png|svg)$/.test(url.pathname))return type.startsWith("image/");
   return true;
 }
+async function verifyLiveRelease(){
+  const response=await fetch(indexUrl.href,{cache:"no-store"});
+  if(!isValidRuntimeResponse(indexUrl.href,response)||!await validHtmlRelease(response))
+    throw new Error("Incompatible P708 HTML release");
+}
+async function verifyAsset(request,url,response){
+  if(!isValidRuntimeResponse(request,response))throw new Error("Invalid P708 release asset");
+  const marker=codeMarkers.get(url.pathname);
+  if(marker&&!(await response.clone().text()).includes(marker))throw new Error("Incompatible P708 module release");
+}
 async function precacheAppShell(){
-  const cache=await caches.open(CACHE_NAME);
-  await Promise.all([...shell.values()].map(async url=>{
+  await verifyLiveRelease();
+  const entries=await Promise.all([...shell.values()].map(async url=>{
     const request=new Request(url.href,{cache:"reload"});
     const response=await fetch(request);
-    if(!isValidRuntimeResponse(request,response)||url.href===indexUrl.href&&!await validHtmlRelease(response))
-      throw new Error("Invalid P708 release asset");
-    await cache.put(request,response);
+    await verifyAsset(request,url,response);
+    if(url.pathname===indexUrl.pathname&&!await validHtmlRelease(response))throw new Error("Incompatible P708 shell");
+    return [request,response];
   }));
+  await verifyLiveRelease();
+  const cache=await caches.open(CACHE_NAME);
+  await Promise.all(entries.map(([request,response])=>cache.put(request,response)));
 }
 self.addEventListener("install",event=>event.waitUntil(precacheAppShell()));
 self.addEventListener("activate",event=>event.waitUntil((async()=>{
@@ -86,8 +103,11 @@ async function releaseAsset(request,url){
   const cached=await cachedResponse(url).catch(()=>null);
   if(cached)return cached;
   try{
+    if(url.search)await verifyLiveRelease();
     const response=await fetch(request,{cache:"no-store"});
-    if(isValidRuntimeResponse(request,response))return response;
+    await verifyAsset(request,url,response);
+    if(url.search)await verifyLiveRelease();
+    return response;
   }catch{}
   return Response.error();
 }
