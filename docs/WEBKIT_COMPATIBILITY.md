@@ -16,4 +16,6 @@ Verified 2026-11-27. P708 source references describe checkout commit `54d91aa`. 
 
 ## Audit verification
 
+The recovery build moves async work into functions, removes the app's calls to the two Safari 15.4 built-ins and retains the Firebase 12.16.0 pin. Start physical compatibility verification on **iOS 16.4** and a current iOS as separate targets. Safari 16.4 is a practical starting point for verifying the optional features, including Home Screen Web Push. The minimum supported iOS for the complete P708 workflow remains unverified. [WebKit Safari 16.4 release](https://webkit.org/blog/13966/webkit-features-in-safari-16-4/#web-push-on-ios-and-ipados)
+
 Playwright uses a patched WebKit build from upstream sources. Its iPhone profiles emulate properties such as viewport, touch and user agent. A pass covers the tested engine and configuration. Safari tab and installed Home Screen behavior across OAuth, backgrounding, lock and process termination still require physical iPhone evidence. Record the exact iOS version, app release, mode and first error when comparing a pre-27 device with a 27.0-or-later control. [Playwright WebKit](https://playwright.dev/docs/browsers#webkit) · [Playwright emulation](https://playwright.dev/docs/emulation) · [P708 device test matrix](MOBILE_DEVICE_TEST_MATRIX.md)

@@ -1,6 +1,6 @@
 # Gửi báo cáo từ iPhone
 
-1. Trên Safari, mở **Kiểm tra thiết bị** từ màn hình lỗi P708 hoặc vào `/ios-diagnostics.html` trên cùng máy chủ đang thử. Nếu kiểm bản preview, dùng link preview trong báo cáo kiểm thử.
+1. Trên Safari, mở trang diagnostics của preview. Khi bản này đã được phát hành chính thức, nút **Kiểm tra thiết bị** trên màn hình lỗi sẽ mở trang cùng origin. [Mở diagnostics trên preview](https://p708-room-manager--ios-recovery-s0p96q7o.web.app/ios-diagnostics.html)
 2. Chờ các dòng Firebase và Firestore hoàn tất. Bấm **Sao chép báo cáo**. Nếu Safari chặn clipboard, chọn phần văn bản được hiện và sao chép thủ công.
 3. Gửi báo cáo kèm phiên bản iOS, model iPhone, thời điểm, mạng đã dùng và cách mở app. Ghi riêng Safari trực tiếp, dấu trang, link chia sẻ hoặc biểu tượng màn hình chính. Có thể chỉ gửi hostname và đường dẫn thường, bỏ query OAuth.
 4. Nếu trang chính hiện **Chưa thể mở P708**, gửi thêm báo cáo từ nút **Sao chép báo cáo** ngay trên màn hình khôi phục.
