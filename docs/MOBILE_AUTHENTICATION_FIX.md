@@ -21,7 +21,7 @@ Kiểm tra chỉ đọc trên production cho thấy hai endpoint `/__/firebase/i
 
 Firebase khuyến nghị cấu hình redirect và persistence bằng SDK. Bản sửa ưu tiên LocalStorage rồi IndexedDB, SessionStorage và bộ nhớ. Trình duyệt có thể tách phiên Safari khỏi PWA đã cài. [Google Sign-In](https://firebase.google.com/docs/auth/web/google-signin) · [Redirect](https://firebase.google.com/docs/auth/web/redirect-best-practices) · [Persistence](https://firebase.google.com/docs/auth/web/auth-state-persistence) · [Khởi tạo Auth](https://firebase.google.com/docs/auth/web/custom-dependencies) · [Chính sách WebView của Google](https://developers.google.com/identity/protocols/oauth2/policies)
 
-Đối chiếu các mẫu [Firebase Quickstart](https://github.com/firebase/quickstart-js), [Firebase SDK](https://github.com/firebase/firebase-js-sdk), [Firebase Testing](https://github.com/firebase/quickstart-testing) và [Playwright](https://github.com/microsoft/playwright). URL PWA Compat được nêu trong yêu cầu trả 404 khi kiểm tra.
+Đối chiếu các mẫu [Firebase Quickstart](https://github.com/firebase/quickstart-js), [Firebase SDK](https://github.com/firebase/firebase-js-sdk), [Firebase Testing](https://github.com/firebase/quickstart-testing), [Playwright](https://github.com/microsoft/playwright) và [PWACompat](https://github.com/GoogleChromeLabs/pwacompat). URL PWACompat có dấu gạch nối trong yêu cầu trả 404.
 
 Chưa thấy thiếu authorized domain trong danh sách được đọc. Nếu production báo lỗi OAuth, kiểm tra **Firebase Console → Authentication → Settings → Authorized domains**, **Sign-in method → Google** và **Google Cloud Console → Google Auth Platform → Clients**. URI cần đối chiếu là `https://p708-room-manager.firebaseapp.com/__/auth/handler`. Kiểm tra API key trong **APIs & Services → Credentials** nếu Firebase trả lỗi hạn chế theo referrer. Kiểm tra lại bằng Safari và Chrome trên thiết bị sau khi có thay đổi được phê duyệt.
 
@@ -29,6 +29,9 @@ Chưa thấy thiếu authorized domain trong danh sách được đọc. Nếu p
 
 - Regression chuyên biệt nằm ở `.github/mobile-auth-qa.mjs` và chạy trong workflow QA. Các nhánh đóng popup, popup bị chặn và lỗi redirect tải lại dùng giả lập kết quả API. Ca redirect thành công đi qua trình xử lý Google của Firebase Auth Emulator và quay lại ứng dụng.
 - Kiểm thử tích hợp gồm tài khoản chờ duyệt, tài khoản bị khóa, lỗi đọc tài liệu phòng và thử lại, khôi phục sau refresh, chuyển offline rồi online, đổi tài khoản và xác nhận dữ liệu phòng không được lưu lại trong LocalStorage. Bộ hồi quy PWA kiểm tra watchdog, thử lại và service worker.
+- CI của bản mã `1081b50` đã qua trên Chromium, Firefox và WebKit. Bộ kiểm thử Auth cũng qua trên Chrome và Edge cài trên Windows. Ca cùng UID đổi `memberId` cập nhật đúng hồ sơ. Chromium giữ được phiên qua reload khi LocalStorage bị chặn. [GitHub Actions](https://github.com/phatnbt/truc_nhat/actions/runs/45869591509)
+- Một lượt bổ sung đã vô hiệu hóa tài khoản trong Auth Emulator. SDK từ chối làm mới token với `auth/user-disabled` và giao diện quay lại trạng thái chưa đăng nhập. [Firebase Auth Emulator](https://firebase.google.com/docs/emulator-suite/connect_auth)
+- Khi chạy mã ứng viên trong trình duyệt thử nghiệm với các endpoint Hosting công khai, iPhone Safari mô phỏng, iPhone ở chế độ standalone mô phỏng, hồ sơ UA Chrome iPhone và Chrome Android mô phỏng đã tới ô nhập tài khoản Google. Bài kiểm thử dừng trước khi nhập tài khoản thật.
 - Playwright và UA giả lập không xác minh iPhone vật lý, Android vật lý, Samsung Internet thật hoặc Zalo/Messenger/Facebook thật. Chưa xác minh token bị thu hồi bởi Identity Toolkit production, hoặc phiên tiếp tục qua Safari và Home Screen của thiết bị thật. Trình duyệt nhúng chỉ được hỗ trợ bằng hướng dẫn mở ngoài.
 
 ## Rollback
