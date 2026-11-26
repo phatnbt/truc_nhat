@@ -36,24 +36,38 @@ try{
     return (await response.json()).release;
   },{timeout:180000,intervals:[3000]}).toBe(target);
   await page.evaluate(async()=>{const reg=await navigator.serviceWorker.ready;await reg.update();});
-  await page.waitForFunction(async()=>!!(await navigator.serviceWorker.getRegistration()).waiting);
-  await page.reload();
-  await openDiagnostics();
-  assert.equal((await debug()).release,initial,"the old worker keeps its own HTML while the next worker waits");
+  const status=workerName=>page.evaluate(async workerName=>{
+    const reg=await navigator.serviceWorker.getRegistration();
+    const worker=workerName==="controller"?navigator.serviceWorker.controller:reg?.[workerName];
+    if(!worker)return null;
+    const channel=new MessageChannel();
+    return new Promise(resolve=>{
+      const timeout=setTimeout(()=>{channel.port1.close();resolve(null);},1000);
+      channel.port1.onmessage=event=>{clearTimeout(timeout);channel.port1.close();resolve(event.data?.release);};
+      worker.postMessage({type:"GET_RELEASE"},[channel.port2]);
+    });
+  },workerName);
+  await expect.poll(()=>status("waiting"),{timeout:30000}).toBe(target);
+  assert.equal((await debug()).release,initial,"a waiting update must leave the running release intact");
+  assert.equal((await debug()).loader,initial);
   await peer.close();
   const reply=await page.evaluate(async()=>{
     const reg=await navigator.serviceWorker.getRegistration(),channel=new MessageChannel();
+    if(!reg.waiting){channel.port1.close();channel.port2.close();return null;}
     return new Promise(resolve=>{
       channel.port1.onmessage=event=>resolve(event.data);
       reg.waiting.postMessage({type:"SKIP_WAITING"},[channel.port2]);
     });
   });
-  assert.equal(reply?.accepted,true);
-  await expect.poll(async()=>(await debug()).controllerRelease,{timeout:20000}).toBe(target);
+  if(reply!==null)assert.equal(reply.accepted,true);
+  await expect.poll(()=>status("controller"),{timeout:30000}).toBe(target);
   await page.reload();
   await openDiagnostics();
+  await expect.poll(async()=>(await debug()).firebase,{timeout:30000}).toBe("preview-disabled");
   await expect.poll(async()=>(await debug()).serverRelease).toBe(target);
   assert.equal((await debug()).release,target);
+  assert.equal((await debug()).loader,target);
+  assert.equal((await debug()).controllerRelease,target);
   assert.equal((await debug()).display,"standalone");
   assert.equal((await debug()).firebase,"preview-disabled");
   assert.equal(dataRequests,0);

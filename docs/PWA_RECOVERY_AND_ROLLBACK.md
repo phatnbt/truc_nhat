@@ -10,6 +10,10 @@
 
 Dùng Firebase Emulator với project `demo-p708-production-audit` cho đăng nhập và nghiệp vụ bằng dữ liệu tổng hợp. Firebase Hosting preview của `p708-room-manager` có guard chỉ xem trước tài nguyên. Guard chặn khởi tạo Auth và Firestore từ hostname preview. Điều này cho phép kiểm bytes, headers, manifest, worker, build và endpoint OAuth công khai mà giữ dữ liệu phòng cách ly khỏi lượt thử.
 
+Preview `pwa-recovery` đã phục vụ build `20261127-11`, commit `5a7545b`. Đã đối chiếu byte của HTML, boot, loader, diagnostics, service worker, manifest và build JSON với gói phát hành. Firebase init và helper OAuth trả 200. JS không tồn tại trả 404. WebKit mô phỏng iPhone đã nhận được controller `20261127-11`. Firebase Hosting production vẫn phục vụ `20261127-4`. [Hosting preview](https://p708-room-manager--pwa-recovery-33jgz8or.web.app/index.html?debug=1)
+
+Script `.github/pwa-preview-upgrade.mjs <origin-preview> <bản-cũ> <bản-mới>` tái hiện luồng hai bản trên cùng preview. Sau thông báo `READY`, phát hành bản mới lên kênh đó. Ca thực tế `20261127-9 → 20261127-11` đạt và controller, loader, app cùng báo bản mới. Tất cả dữ liệu nghiệp vụ được kiểm trong Emulator.
+
 Workflow production được chạy thủ công trên `main`. Sau khi có phê duyệt và QA, workflow sinh build metadata, triển khai, rồi so byte app.js, sw.js, manifest và metadata từ Firebase Hosting. GitHub Pages là một origin và workflow riêng. Cùng một commit không tự đồng nghĩa với cùng build đã công bố.
 
 ## Rollback
