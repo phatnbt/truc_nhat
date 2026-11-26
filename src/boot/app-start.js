@@ -76,6 +76,16 @@ async function startCloud(){
 }
 
 function bindStaticEvents(){
+  const themeButton=$("#themeButton"),updateTheme=dark=>{
+    document.documentElement.dataset.theme=dark?"dark":"light";
+    themeButton?.setAttribute("aria-pressed",String(dark));
+  };
+  const storedTheme=storageGet("P708_THEME");
+  updateTheme(storedTheme?storedTheme==="dark":matchMedia("(prefers-color-scheme: dark)").matches);
+  themeButton?.addEventListener("click",()=>{
+    const dark=document.documentElement.dataset.theme!=="dark";
+    updateTheme(dark);storageSet("P708_THEME",dark?"dark":"light");
+  });
   $$('[data-go]').forEach(btn=>btn.addEventListener("click",()=>showPage(btn.dataset.go)));
   $$('[data-close]').forEach(btn=>btn.addEventListener("click",()=>closeModal(btn.dataset.close)));
   $$(".modal").forEach(modal=>modal.addEventListener("click",e=>{if(e.target===modal)closeModal(modal.id);}));

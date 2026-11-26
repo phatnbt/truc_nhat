@@ -86,3 +86,45 @@
   .landing-nav{padding:8px}.brand-symbol{width:38px;height:38px}.brand-lockup b{font-size:12px}.live-status{font-size:9px}.live-status span{max-width:92px}.hero-panel h1{font-size:42px;line-height:1.02}.hero-actions{grid-template-columns:1fr}.hero-proof{display:grid;grid-template-columns:1fr 1fr;font-size:9px}.hero-visual{min-height:275px}.preview-shell{width:100%}.preview-top{height:36px}.preview-card strong{font-size:20px}.preview-large strong{font-size:27px}.bento-kpis{grid-template-columns:1fr!important}.bento-kpis .kpi-card{display:grid;grid-template-columns:auto 1fr}.section-intro{align-items:flex-start}.feature-card h2{font-size:21px}
 }
 @media(prefers-reduced-motion:reduce){.home-aurora i,.preview-shell,.live-status>i{animation:none!important}.feature-card,.spotlight-card,.bento-kpis .kpi-card{transition:none!important}}
+
+.room-dashboard{background:var(--bg)}
+.room-dashboard .home-shell{padding-top:76px}
+.room-overview{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:6px 16px;align-items:center}
+.room-overview p,.room-overview h1{margin:0;letter-spacing:0;overflow-wrap:anywhere}
+.room-overview p,.room-sync{color:var(--muted);font-size:.875rem}
+.room-overview h1{font-size:2rem;margin-top:4px}
+.room-overview .header-actions{margin:0;flex-wrap:nowrap}
+.room-overview .nav-notify{width:auto;min-width:42px}
+.room-sync{grid-column:1/-1}
+.room-shortcuts{display:flex;gap:8px;flex-wrap:wrap;margin:18px 0}
+.room-dashboard .bento-kpis{margin-bottom:20px}
+.room-dashboard .bento-kpis .kpi-card,.room-work .card{background:var(--card);border:1px solid var(--line);border-radius:8px;box-shadow:none;backdrop-filter:none}
+.room-dashboard .bento-kpis .kpi-card:after{display:none}
+.room-dashboard .bento-kpis .kpi-card:hover{transform:none;box-shadow:none}
+.room-dashboard .bento-kpis .kpi-card small{white-space:normal}
+.room-dashboard .bento-kpis .kpi-card b{letter-spacing:0;overflow-wrap:anywhere}
+.room-work{grid-template-columns:repeat(auto-fit,minmax(min(100%,360px),1fr))}
+.room-work .card-head h2,.room-details h2{font-size:1.125rem}
+.room-work .action-item b{font-size:.9375rem;overflow-wrap:anywhere}
+.room-work .action-item small{font-size:.8125rem}
+.room-details{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,320px),1fr));gap:20px;margin-top:24px}
+.room-details h2{margin:0 0 8px}
+.room-details .room-utility{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:16px;min-width:0}
+.room-presence{display:flex;justify-content:space-between;gap:12px;padding:10px 0;border-bottom:1px solid var(--line)}
+.room-presence b{overflow-wrap:anywhere}
+.room-presence span{white-space:nowrap;color:var(--muted)}
+:root[data-theme="dark"]{color-scheme:dark;--bg:#121513;--card:#1d231f;--text:#edf3ef;--muted:#acbcb1;--line:#38453c;--blue-soft:#233746;--blue-dark:#9dc8f9;--green-soft:#153829;--amber-soft:#3c2b19;--red-soft:#402823;--purple-soft:#30263c}
+[data-theme="dark"] body,[data-theme="dark"] .auth-gate{background:var(--bg)}
+[data-theme="dark"] :is(.card,.topbar,.btn:not(.primary,.green,.danger,.soft),.icon-btn,.modal-card,.auth-card,.auth-user,.account-fab,.mobile-nav,.action-item,.empty,input,select,.member-row,.history-details,.history-btn:not(.active),.schedule-head,.access-row,.audit-group,.audit-group summary,th,.table-wrap tr:not(.done-row,.submitted-row)){background:var(--card);color:var(--text)}
+[data-theme="dark"] .btn.primary{background:#23568e;border-color:#3273bc}
+[data-theme="dark"] .unpaid-text{color:#ffaaa4}
+[data-theme="dark"] .paid-text{color:#8ee2b3}
+@media(max-width:640px){
+  .room-dashboard .home-shell{padding-top:calc(58px + env(safe-area-inset-top))}
+  .room-overview h1{font-size:1.5rem}
+  .room-dashboard .bento-kpis{grid-template-columns:repeat(2,minmax(0,1fr))!important}
+  .room-dashboard .bento-kpis .kpi-card{display:block;padding:10px}
+  .room-dashboard .bento-kpis .kpi-icon{display:none}
+  .room-dashboard .bento-kpis .kpi-card b{font-size:1.125rem}
+  .modal-card{max-height:calc(100dvh - 32px - env(safe-area-inset-top) - env(safe-area-inset-bottom))}
+}

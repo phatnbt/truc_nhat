@@ -29,58 +29,32 @@
   </div>
 
   <main>
-    <section class="page active home-landing" id="page-home" data-page="home">
-      <div class="home-aurora" aria-hidden="true"><i></i><i></i><i></i></div>
-      <div class="home-grid-overlay" aria-hidden="true"></div>
+    <section class="page active room-dashboard" id="page-home" data-page="home">
       <div class="shell home-shell">
-        <nav class="landing-nav" aria-label="Điều hướng trang chủ">
-          <div class="landing-brand">
-            <span class="brand-symbol">P</span>
-            <span class="brand-lockup"><b>P708 Manager</b><small>Room operations, simplified.</small></span>
+        <header class="room-overview">
+          <div>
+            <p id="homeDate"></p>
+            <h1 id="homeGreeting">Phòng P708</h1>
           </div>
-          <div class="landing-nav-actions">
-            <span class="live-status" title="Dữ liệu tự đồng bộ với Firestore"><i></i><span id="homeSyncText">Đang kết nối dữ liệu…</span></span>
-            <button class="btn nav-notify" id="notificationButton" type="button">🔔 <span>Bật nhắc việc</span></button>
+          <div class="header-actions">
+            <button class="icon-btn" id="themeButton" type="button" aria-label="Chế độ tối" aria-pressed="false" title="Chế độ tối">◐</button>
+            <button class="btn nav-notify" id="notificationButton" type="button" aria-label="Thông báo">🔔 <span>Bật nhắc việc</span></button>
           </div>
-        </nav>
-
-        <header class="hero-panel">
-          <div class="hero-copy">
-            <h1>Quản lý phòng <span class="gradient-text">gọn hơn mỗi ngày.</span></h1>
-            <p class="hero-lede">Một nơi để trưởng phòng và thành viên cùng theo dõi trực nhật, ngày ở, điện nước, thanh toán và việc cần xử lý — rõ ràng trên mọi thiết bị.</p>
-            <div class="hero-actions">
-              <button class="btn primary hero-primary" data-go="cleaning" type="button">🧹 Xem lịch trực <span>→</span></button>
-              <button class="btn hero-secondary" data-go="billing" type="button">⚡ Điện & nước</button>
-            </div>
-            <div class="hero-proof" aria-label="Điểm nổi bật">
-              <span>● Realtime Firestore</span><span>● PWA trên điện thoại</span><span>● Spark plan miễn phí</span>
-            </div>
-          </div>
-          <div class="hero-visual" aria-hidden="true">
-            <div class="hero-glow"></div>
-            <div class="preview-shell">
-              <div class="preview-top"><span><i></i><i></i><i></i></span><b>P708 / hôm nay</b><em>LIVE</em></div>
-              <div class="preview-grid">
-                <div class="preview-card preview-large"><small>Phòng đang hoạt động</small><strong>Realtime</strong><p>Mọi thay đổi tự xuất hiện trên thiết bị khác.</p><div class="preview-wave"><i></i><i></i><i></i><i></i><i></i></div></div>
-                <div class="preview-card"><small>Lịch trực</small><strong>01</strong><p>Việc cần bạn xử lý</p></div>
-                <div class="preview-card"><small>Điện nước</small><strong>✓</strong><p>Theo dõi đã đóng</p></div>
-                <div class="preview-card preview-wide"><span class="preview-avatar">P</span><div><small>Trưởng phòng</small><strong>Quản lý tập trung</strong></div><span class="preview-online">Online</span></div>
-              </div>
-            </div>
-          </div>
+          <span class="room-sync" id="homeSyncText" role="status">Đang kết nối…</span>
         </header>
-
+        <div class="room-shortcuts" aria-label="Thao tác nhanh">
+          <button class="btn primary" data-go="cleaning" type="button">Lịch trực</button>
+          <button class="btn" data-go="billing" type="button">Điện nước</button>
+          <button class="btn admin-only" data-go="audit" type="button">Nhật ký</button>
+        </div>
         <section class="dashboard-kpis bento-kpis" aria-label="Tổng quan phòng">
           <article class="kpi-card kpi-blue"><span class="kpi-icon">👥</span><div><span>Thành viên</span><b id="kpiMembers">0</b><small id="kpiPresent">0 có mặt</small></div></article>
           <article class="kpi-card kpi-purple"><span class="kpi-icon">🧹</span><div><span>Trực tuần này</span><b id="kpiTasks">0/0</b><small id="kpiTaskHint">Chưa có lịch</small></div></article>
-          <article class="kpi-card kpi-green"><span class="kpi-icon">💳</span><div><span>Còn phải thu</span><b id="kpiUnpaid">0 đ</b><small id="kpiUnpaidPeople">0 người chưa đóng</small></div></article>
+          <article class="kpi-card kpi-green"><span class="kpi-icon">💳</span><div><span id="homeBalanceLabel">Còn phải thu</span><b id="kpiUnpaid">—</b><small id="kpiUnpaidPeople"></small></div></article>
           <article class="kpi-card kpi-amber"><span class="kpi-icon">🔔</span><div><span>Yêu cầu chờ</span><b id="kpiPending">0</b><small id="kpiPendingHint">Tài khoản / công việc</small></div></article>
         </section>
 
-        <section class="section-intro">
-          <div><p class="eyebrow">TODAY</p><h2>Những gì cần chú ý ngay</h2><p>Ưu tiên việc cần xử lý trước, phần còn lại để hệ thống tự theo dõi.</p></div>
-        </section>
-        <section class="dashboard-layout spotlight-grid">
+        <section class="dashboard-layout room-work">
           <article class="card action-card spotlight-card admin-only">
             <div class="card-head"><div><p class="eyebrow">CẦN XỬ LÝ</p><h2>Việc của trưởng phòng</h2></div><span class="badge admin">👑 Quản trị</span></div>
             <div class="action-list" id="managerActionList"></div>
@@ -91,29 +65,12 @@
           </article>
         </section>
 
-        <section class="module-section">
-          <div class="section-intro module-intro"><div><p class="eyebrow">WORKSPACE</p><h2>Mọi việc phòng trong 3 khu vực</h2><p>Đi thẳng vào đúng việc cần làm, không phải tìm trong menu dài.</p></div></div>
-          <div class="module-grid bento-modules">
-            <article class="module-card cleaning-card feature-card">
-              <div class="feature-card-top"><div class="module-icon">🧹</div><span class="feature-number">01</span></div>
-              <div><h2>Lịch trực nhật</h2><p>Phân công công bằng, hạn chế lặp việc, thành viên báo hoàn thành và trưởng phòng xác nhận.</p></div>
-              <div class="feature-tags"><span>Công bằng</span><span>Xác nhận</span><span>Lịch sử</span></div>
-              <button class="btn primary" data-go="cleaning" type="button">Mở lịch trực <span>→</span></button>
-            </article>
-            <article class="module-card billing-card feature-card feature-card-tall">
-              <div class="feature-card-top"><div class="module-icon">⚡</div><span class="feature-number">02</span></div>
-              <div><h2>Điện & nước</h2><p>Chia tiền theo ngày ở thực tế, chốt sổ và biết ngay ai đã đóng hoặc còn thiếu.</p></div>
-              <div class="feature-meter"><span><i style="width:72%"></i></span><small>Minh bạch theo ngày-người</small></div>
-              <div class="feature-tags"><span>Ngày ở</span><span>Thanh toán</span><span>CSV</span></div>
-              <button class="btn green" data-go="billing" type="button">Mở điện nước <span>→</span></button>
-            </article>
-            <article class="module-card audit-card feature-card admin-only">
-              <div class="feature-card-top"><div class="module-icon">🧾</div><span class="feature-number">03</span></div>
-              <div><h2>Nhật ký</h2><p>Kiểm tra thay đổi theo thành viên và tự quản lý chính sách lưu nhật ký 30 ngày.</p></div>
-              <div class="feature-tags"><span>30 ngày</span><span>Bộ lọc</span><span>Quản trị</span></div>
-              <button class="btn" data-go="audit" type="button">Mở nhật ký <span>→</span></button>
-            </article>
-          </div>
+        <section class="module-section room-details" aria-label="Điện nước và thành viên">
+          <div class="preview-large room-utility"></div>
+          <section>
+            <h2>Thành viên</h2>
+            <div id="homePresence"></div>
+          </section>
         </section>
 
       </div>

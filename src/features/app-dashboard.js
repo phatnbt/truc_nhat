@@ -16,25 +16,43 @@ function relevantTaskSubmissions(){
   });
 }
 
+function roomScheduleToday(){
+  const today=P708BillingCycle.roomDateKey();
+  return state.schedules.find(s=>s.weekStart<=today&&dateValue(addDays(parseDate(s.weekStart),6))>=today)||null;
+}
+
 function renderHome(){
-  const bill=currentBill()||{people:[],electricity:0,water:0,month:state.billing.selectedMonth,closed:false};
-  const calc=billCalc(bill),schedule=currentSchedule();
+  const bills=[...state.billing.months].sort((a,b)=>b.month.localeCompare(a.month));
+  const bill=bills.find(item=>item.closed)||bills[0]||{people:[],electricity:0,water:0,month:state.billing.selectedMonth,closed:false};
+  const calc=billCalc(bill),schedule=roomScheduleToday(),myId=myMemberId();
+  const mine=myId?calc.people.find(p=>p.memberId===myId):null;
+  const balance=person=>{
+    if(!person)return 0;
+    const due=calc.due[person.id]||0;
+    return Math.max(0,due-Math.max(0,Number(person.paidAmount)||0));
+  };
   const taskTotal=schedule?.assignments.filter(a=>!a.cut).length||0;
   const taskDone=schedule?.assignments.filter(a=>!a.cut&&a.completed).length||0;
   const present=state.members.filter(m=>state.presence[m.id]!==false).length;
-  const unpaidPeople=calc.people.filter(p=>(calc.due[p.id]||0)>0&&!isBillPaid(p,calc.due[p.id]||0));
-  const unpaid=unpaidPeople.reduce((sum,p)=>sum+(calc.due[p.id]||0),0);
+  const unpaidPeople=calc.people.filter(p=>balance(p)>0);
+  const unpaid=unpaidPeople.reduce((sum,p)=>sum+balance(p),0);
   const validSubmissions=relevantTaskSubmissions();
   const submitted=validSubmissions.filter(s=>s.status==="submitted").length;
 
+  $("#homeDate").textContent=new Intl.DateTimeFormat("vi-VN",{dateStyle:"full",timeZone:"Asia/Ho_Chi_Minh"}).format(new Date());
+  const displayName=myMember()?.name||authSession.access?.displayName;
+  $("#homeGreeting").textContent=displayName?`P708 · ${displayName}`:"Phòng P708";
+  $("#homePresence").innerHTML=state.members.length?state.members.map(member=>`<div class="room-presence"><b>${esc(member.name)}</b><span>${state.presence[member.id]===false?"Vắng":"Có mặt"}</span></div>`).join(""):'<p class="empty">Chưa có thành viên.</p>';
   $("#kpiMembers").textContent=state.members.length;
-  $("#kpiPresent").textContent=`${present} có mặt`;
+  $("#kpiPresent").textContent=`${present} có mặt · ${state.members.length-present} vắng`;
   $("#kpiTasks").textContent=`${taskDone}/${taskTotal}`;
   $("#kpiTaskHint").textContent=schedule?weekRange(schedule.weekStart):"Chưa có lịch";
-  $("#kpiUnpaid").textContent=money(unpaid);
-  $("#kpiUnpaidPeople").textContent=`${unpaidPeople.length} người chưa đóng`;
-  $("#kpiPending").textContent=isAdmin()?accessRequests.length+submitted:0;
-  $("#kpiPendingHint").textContent=isAdmin()?`${accessRequests.length} tài khoản · ${submitted} việc`:"—";
+  $("#homeBalanceLabel").textContent=isAdmin()?"Còn phải thu":"Bạn còn phải đóng";
+  $("#kpiUnpaid").textContent=bills.length?money(isAdmin()?unpaid:balance(mine)):"—";
+  $("#kpiUnpaidPeople").textContent=bills.length?monthLabel(bill.month):"Chưa có hóa đơn";
+  const pendingMine=validSubmissions.filter(sub=>myId&&sub.memberId===myId&&sub.status==="submitted").length;
+  $("#kpiPending").textContent=isAdmin()?accessRequests.length+submitted:pendingMine;
+  $("#kpiPendingHint").textContent=isAdmin()?`${accessRequests.length} tài khoản · ${submitted} việc`:"Việc chờ xác nhận";
 
   const manager=[];
   if(accessRequests.length)manager.push({
@@ -72,7 +90,6 @@ function renderHome(){
 
   const reminders=[];
   if(authSession.status==="active"){
-    const myId=myMemberId();
     const sharedReminder=state.settings?.cleaningReminder;
     if(myId&&sharedReminder?.memberIds?.includes(myId)){
       const reminderSchedule=state.schedules.find(item=>item.weekStart===sharedReminder.weekStart);
@@ -94,16 +111,15 @@ function renderHome(){
         reminders.push({
           icon:sub?.status==="submitted"?"⏳":"🧹",
           title:sub?.status==="submitted"?`${a.task}: đang chờ xác nhận`:`Bạn có việc: ${a.task}`,
-          detail:weekRange(schedule.weekStart),action:"cleaning",label:"Mở"
+          detail:weekRange(schedule.weekStart),action:"cleaning",label:"Mở",scheduleId:schedule.id
         });
       });
     }
     if(myId){
-      const mine=calc.people.find(p=>p.memberId===myId);
-      if(mine&&(calc.due[mine.id]||0)>0&&!isBillPaid(mine,calc.due[mine.id]||0)){
+      if(balance(mine)>0){
         reminders.push({
-          icon:"💳",title:`Điện nước: ${money(calc.due[mine.id])}`,
-          detail:bill.closed?"Tháng đã chốt · chưa ghi nhận thanh toán":"Số tiền tạm tính",
+          icon:"💳",title:`Điện nước: ${money(balance(mine))}`,
+          detail:bill.closed?"Kỳ đã chốt · số tiền còn lại":"Số tiền tạm tính",
           action:"billing",label:"Xem"
         });
       }
@@ -115,5 +131,10 @@ function renderHome(){
   $("#personalReminderList").innerHTML=reminders.length
     ?reminders.map((r,i)=>`<div class="action-item"><span class="action-icon">${r.icon}</span><span><b>${esc(r.title)}</b><small>${esc(r.detail)}</small></span>${r.action?`<button class="btn small" data-reminder-action="${i}" type="button">${r.label}</button>`:""}</div>`).join("")
     :'<div class="empty">Bạn chưa có việc cần nhắc.</div>';
-  $$('[data-reminder-action]').forEach(btn=>btn.addEventListener("click",()=>showPage(reminders[Number(btn.dataset.reminderAction)].action)));
+  $$('[data-reminder-action]').forEach(btn=>btn.addEventListener("click",()=>{
+    const item=reminders[Number(btn.dataset.reminderAction)];
+    if(item.scheduleId)selectSchedule(item.scheduleId);
+    if(item.action==="billing")setBillMonth(bill.month);
+    showPage(item.action);
+  }));
 }

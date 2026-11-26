@@ -104,12 +104,22 @@ export function rangesOverlap(startA, endA, startB, endB) {
   return aStart <= bEnd && bStart <= aEnd;
 }
 
-export function currentPeriodMonth(input = new Date()) {
+const roomDateFormatter = new Intl.DateTimeFormat("en-CA", {
+  timeZone: "Asia/Ho_Chi_Minh", year: "numeric", month: "2-digit", day: "2-digit"
+});
+
+export function roomDateKey(input = new Date()) {
   const date = input instanceof Date ? input : new Date(input);
   if (Number.isNaN(date.getTime())) return "";
-  const year = date.getFullYear(), month = date.getMonth() + 1, day = date.getDate();
-  const base = `${year}-${pad(month)}`;
-  return day >= BILLING_CYCLE_START_DAY ? shiftMonth(base, 1) : base;
+  const parts = Object.fromEntries(roomDateFormatter.formatToParts(date).map(({type,value})=>[type,value]));
+  return `${parts.year}-${parts.month}-${parts.day}`;
+}
+
+export function currentPeriodMonth(input = new Date()) {
+  const key = roomDateKey(input);
+  if (!key) return "";
+  const month = key.slice(0,7);
+  return Number(key.slice(8)) >= BILLING_CYCLE_START_DAY ? shiftMonth(month, 1) : month;
 }
 
 export function formatDateRange(start, end, locale = "vi-VN") {
