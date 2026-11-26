@@ -87,8 +87,13 @@ const VALID_PAGES=new Set(["home","cleaning","billing","resources","audit"]);
 function showPage(page,options={}){
   page=VALID_PAGES.has(page)?page:"home";
   if(page==="audit"&&!isAdmin())page="home";
+  document.body.dataset.page=page;
   $$(".page").forEach(p=>p.classList.toggle("active",p.dataset.page===page));
-  $$(".mobile-nav button").forEach(b=>b.classList.toggle("active",b.dataset.go===page));
+  $$(".mobile-nav button,.desktop-nav button").forEach(button=>{
+    const current=button.dataset.go===page;
+    button.classList.toggle("active",current);
+    if(current)button.setAttribute("aria-current","page");else button.removeAttribute("aria-current");
+  });
   const target=page==="home"?`${location.pathname}${location.search}`:`${location.pathname}${location.search}#${page}`;
   const current=`${location.pathname}${location.search}${location.hash}`;
   if(current!==target){
@@ -98,8 +103,23 @@ function showPage(page,options={}){
   if(options.scroll!==false)window.scrollTo({top:0,behavior:"instant"});
   if(page==="audit")renderAudit();
 }
-function openModal(id){ $("#"+id)?.classList.add("show"); }
-function closeModal(id){ $("#"+id)?.classList.remove("show"); }
+const modalFocus=new WeakMap();
+function openModal(id){
+  const modal=document.getElementById(id);
+  if(!modal||modal.classList.contains("show"))return;
+  modalFocus.set(modal,document.activeElement);
+  modal.classList.add("show");
+  document.body.classList.add("modal-open");
+  modal.querySelector("[data-close]")?.focus({preventScroll:true});
+}
+function closeModal(id){
+  const modal=document.getElementById(id);
+  if(!modal?.classList.contains("show"))return;
+  modal.classList.remove("show");
+  document.body.classList.toggle("modal-open",!!$(".modal.show"));
+  const opener=modalFocus.get(modal);
+  if(opener?.isConnected)opener.focus({preventScroll:true});
+}
 
 function renderPermission(){
   $$(".admin-only").forEach(el=>el.classList.toggle("role-hidden",!isAdmin()));

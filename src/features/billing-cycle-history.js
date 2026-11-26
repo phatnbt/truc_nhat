@@ -443,6 +443,11 @@
     $("#billMonth").value=bill.month;
     $("#billElectricity").value=bill.electricity||"";$("#billWater").value=bill.water||"";
     $("#billTotalDays").textContent=calc.totalDays;$("#billTotalMoney").textContent=money(bill.electricity+bill.water);
+    const own=myMemberId()?calc.people.find(item=>item.memberId===myMemberId()):null;
+    const ownDue=own?Math.max(0,(calc.due[own.id]||0)-(Number(own.paidAmount)||0)):null;
+    $("#billOverviewPeriod").textContent=isCycleBill(bill)?periodRangeText(bill):monthLabel(bill.month);
+    $("#billOverviewDue").textContent=ownDue===null?"—":money(ownDue);
+    $("#billOverviewStay").textContent=own?`${stayCount(own,bill)} ngày ở · ${bill.closed?"Đã chốt":"Tạm tính"}`:"";
     $("#billClosedBadge").textContent=bill.closed?"🔒 Đã chốt":"Đang mở";$("#billClosedBadge").className=`badge ${bill.closed?"warning":"success"}`;
 
     $("#billPeopleList").innerHTML=calc.people.length?calc.people.map(item=>{

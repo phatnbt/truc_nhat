@@ -50,7 +50,17 @@
   }
   function replaceKpis(){const mapping=[["#kpiMembers","people-fill"],["#kpiTasks","clipboard2-check-fill"],["#kpiUnpaid","credit-card-2-front-fill"],["#kpiPending","bell-fill"]];for(const [valueSelector,iconName] of mapping){const value=document.querySelector(valueSelector),box=value?.closest(".kpi-card")?.querySelector(".kpi-icon");if(box&&!box.querySelector(".bi"))box.innerHTML=icon(iconName);}}
   function replaceModuleIcons(){const mapping={cleaning:"brush-fill",billing:"lightning-charge-fill",audit:"receipt-cutoff"};document.querySelectorAll(".module-card").forEach(card=>{const key=card.classList.contains("cleaning-card")?"cleaning":card.classList.contains("billing-card")?"billing":card.classList.contains("audit-card")?"audit":null;const box=card.querySelector(".module-icon");if(key&&box&&!box.querySelector(".bi"))box.innerHTML=icon(mapping[key]);});}
-  function replaceBottomNav(){const configs=[{page:"home",icon:"house-door-fill",label:"Trang chủ"},{page:"cleaning",icon:"brush-fill",label:"Trực nhật"},{page:"billing",icon:"lightning-charge-fill",label:"Điện nước"}];const candidates=[...document.querySelectorAll("nav button,[class*='bottom'] button,.mobile-nav button")];for(const cfg of configs){const btn=candidates.find(el=>el.dataset.go===cfg.page||el.dataset.page===cfg.page||el.getAttribute("data-page-target")===cfg.page||el.textContent.includes(cfg.label));if(!btn||btn.dataset.iconPolished==="1")continue;btn.dataset.iconPolished="1";btn.classList.add("polished-nav-icon");btn.innerHTML=`<span class="polished-nav-glyph">${icon(cfg.icon)}</span><span>${cfg.label}</span>`;}}
+  function replaceBottomNav(){
+    const icons={home:"house-door-fill",cleaning:"brush-fill",billing:"lightning-charge-fill",resources:"box-seam"};
+    document.querySelectorAll(".mobile-nav button[data-go]").forEach(button=>{
+      const name=icons[button.dataset.go],label=button.querySelector("span");
+      if(!name||!label||button.dataset.iconPolished==="1")return;
+      button.dataset.iconPolished="1";
+      button.classList.add("polished-nav-icon");
+      const glyph=document.createElement("span");glyph.className="polished-nav-glyph";glyph.append(createIcon(name));
+      button.replaceChildren(glyph,label);
+    });
+  }
   function polishActionIcons(){const map={"👤":"person-fill","🧹":"brush-fill","💰":"cash-stack","🔓":"unlock-fill","⚠️":"exclamation-triangle-fill","⏳":"hourglass-split","💳":"credit-card-2-front-fill","✅":"check-circle-fill","🔔":"bell-fill","📋":"clipboard2-fill"};document.querySelectorAll(".action-icon").forEach(box=>{const name=map[box.textContent.trim()];if(name)box.innerHTML=icon(name);});}
   function polish(){ensureIconStyles();replaceKpis();replaceModuleIcons();replaceBottomNav();polishActionIcons();replaceTextIcons();}
   let scheduled=false;const schedule=()=>{if(scheduled)return;scheduled=true;requestAnimationFrame(()=>{scheduled=false;polish();});};

@@ -50,6 +50,12 @@ function renderHome(){
   $("#kpiPresent").textContent=`${present} có mặt · ${state.members.length-present} vắng`;
   $("#kpiTasks").textContent=`${taskDone}/${taskTotal}`;
   $("#kpiTaskHint").textContent=schedule?weekRange(schedule.weekStart):"Chưa có lịch";
+  $("#homeWeekProgress").max=taskTotal||1;
+  $("#homeWeekProgress").value=taskDone;
+  const pet=globalThis.P708CleaningStreak;
+  const stage=pet.petStage(pet.memberStreak({schedules:state.schedules,member:myMember()}).current);
+  if($("#homePetArt").getAttribute("src")!==stage.asset)$("#homePetArt").src=stage.asset;
+  $("#homePetStage").textContent=stage.name;
   $("#homeBalanceLabel").textContent=isAdmin()?"Còn phải thu":"Bạn còn phải đóng";
   $("#kpiUnpaid").textContent=bills.length?money(isAdmin()?unpaid:balance(mine)):"—";
   $("#kpiUnpaidPeople").textContent=bills.length?monthLabel(bill.month):"Chưa có hóa đơn";

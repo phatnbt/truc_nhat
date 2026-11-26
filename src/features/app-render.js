@@ -17,7 +17,10 @@ function renderCleaning(){
   }else{
     const done=s.assignments.filter(a=>!a.cut&&a.completed).length,total=s.assignments.filter(a=>!a.cut).length;
     const replacements=isAdmin()&&s===roomScheduleToday()?suggestReplacements(s):{};
+    const filter=$("#cleanFilter").value;
     const rows=s.assignments.map((a,index)=>{
+      if(filter==="mine"&&(a.cut||a.personId!==myMemberId()))return "";
+      if(filter==="pending"&&(a.cut||a.completed))return "";
       const sub=submissionFor(s,a),mine=a.personId===myMemberId();let action="—";
       if(!a.cut){
         if(a.completed)action='<span class="badge success">✅ Đã xác nhận</span>';
@@ -31,9 +34,12 @@ function renderCleaning(){
       const overdue=dateValue(addDays(parseDate(s.weekStart),6))<P708BillingCycle.roomDateKey();
       const status=a.cut?"Được miễn":a.completed?"Đã xong":sub?.status==="approved"?"Đã duyệt · chưa khớp lịch":sub?.status==="submitted"?"Chờ xác nhận":sub?.status==="rejected"?"Cần làm lại":overdue?"Quá hạn":sub?.status==="in_progress"?"Đang thực hiện":"Chưa thực hiện";
       const suggestion=replacements[a.taskId];
-      return `<tr class="${a.completed?"done-row":sub?.status==="submitted"?"submitted-row":""}"><td data-label="Công việc"><b>${TASKS.find(t=>t.id===a.taskId)?.emoji||""} ${esc(a.task)}</b></td><td data-label="Phụ trách"><div>${a.cut?'<span class="unpaid-text">Tạm cắt</span>':esc(a.personName)}${a.reassigned?" · Đã đổi":""}${suggestion?`<small class="replacement-hint">Đề xuất: ${esc(suggestion)}</small>`:""}</div></td><td data-label="Trạng thái">${esc(status)}</td><td data-label="Thao tác">${action}</td></tr>`;
+      const task=TASKS.find(t=>t.id===a.taskId);
+      const weight=P708CleaningFairness.effectiveTaskWeight(a.taskId,state.settings.weights,task?.w);
+      return `<tr class="${mine?"own-task ":""}${a.completed?"done-row":sub?.status==="submitted"?"submitted-row":""}"><td data-label="Công việc"><div><b>${task?.emoji||""} ${esc(a.task)}</b>${a.cut?"":`<small class="task-weight">${formatCleaningPoints(weight)} điểm${mine?" · Việc của bạn":""}</small>`}</div></td><td data-label="Phụ trách"><div class="task-assignee">${a.cut?'<span class="unpaid-text">Tạm cắt</span>':`<span class="task-initial" aria-hidden="true">${esc((a.personName||"?").trim().split(/\\s+/).at(-1)?.charAt(0)||"?")}</span>${esc(a.personName)}`}${a.reassigned?" · Đã đổi":""}${suggestion?`<small class="replacement-hint">Đề xuất: ${esc(suggestion)}</small>`:""}</div></td><td data-label="Trạng thái">${esc(status)}</td><td data-label="Thao tác">${action}</td></tr>`;
     }).join("");
-    box.innerHTML=`<div class="schedule-card"><div class="schedule-head"><div><h3>${weekRange(s.weekStart)}</h3><p>${s.absentNames?.length?`Vắng: ${esc(s.absentNames.join(", "))}`:"Tất cả thành viên có mặt"}</p></div><span class="badge ${done===total&&total?"success":""}">${done}/${total} xác nhận</span></div><div class="table-wrap"><table><thead><tr><th>Công việc</th><th>Phụ trách</th><th>Trạng thái</th><th>Thao tác</th></tr></thead><tbody>${rows}</tbody></table></div></div>`;
+    const mine=s.assignments.filter(a=>!a.cut&&a.personId===myMemberId());
+    box.innerHTML=`<div class="schedule-card"><div class="schedule-head"><div><h3>${weekRange(s.weekStart)}</h3><p>${s.absentNames?.length?`Vắng: ${esc(s.absentNames.join(", "))}`:"Tất cả thành viên có mặt"}</p>${mine.length?`<p>Việc của bạn: ${mine.filter(a=>a.completed).length}/${mine.length}</p>`:""}</div><span class="badge ${done===total&&total?"success":""}">${done}/${total} xác nhận</span></div>${rows?`<div class="table-wrap"><table><thead><tr><th>Công việc</th><th>Phụ trách</th><th>Trạng thái</th><th>Thao tác</th></tr></thead><tbody>${rows}</tbody></table></div>`:'<p class="empty">Không có công việc khớp bộ lọc.</p>'}</div>`;
     $$('[data-submit-task]').forEach(btn=>btn.addEventListener("click",()=>openChecklist(Number(btn.dataset.submitTask))));
     $$('[data-start-task]').forEach(btn=>btn.addEventListener("click",()=>submitTask(Number(btn.dataset.startTask),"in_progress")));
     $$('[data-swap-task]').forEach(btn=>btn.addEventListener("click",()=>openTaskSwap(Number(btn.dataset.swapTask))));
@@ -54,7 +60,13 @@ function renderCleaning(){
     catch(e){toast(e.message);}
     finally{button.disabled=false;}
   }));
-  $("#cleanHistory").innerHTML=state.schedules.length?[...state.schedules].sort((a,b)=>b.weekStart.localeCompare(a.weekStart)).map(x=>`<button class="history-btn ${x.id===ui.selectedScheduleId?"active":""}" data-schedule-id="${x.id}" type="button">${weekRange(x.weekStart)}</button>`).join(""):'<div class="empty">Chưa có lịch sử.</div>';
+  renderCleaningHistory();
+}
+
+function renderCleaningHistory(){
+  const query=$("#cleanHistorySearch").value.trim();
+  const schedules=state.schedules.filter(item=>!query||item.weekStart.includes(query)||weekRange(item.weekStart).includes(query));
+  $("#cleanHistory").innerHTML=schedules.length?schedules.sort((a,b)=>b.weekStart.localeCompare(a.weekStart)).map(x=>`<button class="history-btn ${x.id===ui.selectedScheduleId?"active":""}" data-schedule-id="${esc(x.id)}" type="button">${weekRange(x.weekStart)}</button>`).join(""):'<div class="empty">Không tìm thấy lịch trực.</div>';
   $$('[data-schedule-id]').forEach(btn=>btn.addEventListener("click",()=>selectSchedule(btn.dataset.scheduleId)));
 }
 

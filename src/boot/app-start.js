@@ -24,7 +24,7 @@ async function startCloud(){
         }
       }
       authSession={...authSession,...session};
-      renderAuthGate();signalBootReady();renderAll();
+      renderAuthGate();if(session.status!=="checking")signalBootReady();renderAll();
     },
     onAdminData:data=>{
       if(data.requests!==undefined)accessRequests=data.requests;
@@ -56,7 +56,24 @@ function bindStaticEvents(){
   $$('[data-go]').forEach(btn=>btn.addEventListener("click",()=>showPage(btn.dataset.go)));
   $$('[data-close]').forEach(btn=>btn.addEventListener("click",()=>closeModal(btn.dataset.close)));
   $$(".modal").forEach(modal=>modal.addEventListener("click",e=>{if(e.target===modal)closeModal(modal.id);}));
+  document.addEventListener("keydown",event=>{
+    const modal=$$(".modal.show").at(-1);
+    if(!modal)return;
+    if(event.key==="Escape"){event.preventDefault();closeModal(modal.id);return;}
+    if(event.key!=="Tab")return;
+    const focusable=[...modal.querySelectorAll("button:not(:disabled),input:not(:disabled),select:not(:disabled),a[href],summary")].filter(el=>el.getClientRects().length);
+    if(!focusable.length)return;
+    const next=event.shiftKey?focusable.at(-1):focusable[0];
+    if(!modal.contains(document.activeElement)||document.activeElement===(event.shiftKey?focusable[0]:focusable.at(-1))){
+      event.preventDefault();next.focus();
+    }
+  });
   $("#accountButton")?.addEventListener("click",()=>{renderAccessModal();openModal("accessModal");});
+  $("#homeCleaningButton")?.addEventListener("click",()=>{const week=roomScheduleToday();if(week)selectSchedule(week.id);});
+  $("#homePendingButton")?.addEventListener("click",()=>{
+    if(isAdmin())$(".room-queue")?.scrollIntoView({block:"center"});
+    else{showPage("cleaning");$("#cleanFilter").value="mine";renderCleaning();}
+  });
   $("#signOutButton")?.addEventListener("click",secureSignOut);
   $("#refreshReminderButton")?.addEventListener("click",()=>{renderHome();renderNotificationCenter();toast("Đã làm mới nhắc việc");});
   $("#cleaningRulesButton")?.addEventListener("click",()=>{renderCleaningRules();openModal("cleaningRulesModal");});
@@ -67,6 +84,8 @@ function bindStaticEvents(){
   $("#allPresentButton")?.addEventListener("click",setAllPresent);
   $("#resetCleaningPointsButton")?.addEventListener("click",resetAllCleaningPoints);
   $("#createScheduleButton")?.addEventListener("click",createSchedule);
+  $("#cleanFilter")?.addEventListener("change",renderCleaning);
+  $("#cleanHistorySearch")?.addEventListener("input",renderCleaningHistory);
   $("#confirmScheduleButton")?.addEventListener("click",confirmSchedule);
   $("#sendSwapButton")?.addEventListener("click",sendTaskSwap);
   $("#taskChecklistForm")?.addEventListener("submit",confirmChecklist);
@@ -117,7 +136,7 @@ function bindStaticEvents(){
 async function registerPwa(){
   if(!("serviceWorker" in navigator)||location.protocol==="file:")return;
   try{
-    const reg=await navigator.serviceWorker.register("./sw.js?v=20261126-1",{scope:"./",updateViaCache:"none"});
+    const reg=await navigator.serviceWorker.register("./sw.js?v=20261127-1",{scope:"./",updateViaCache:"none"});
     const banner=$("#pwaUpdateBanner");
     const showUpdate=()=>{banner.hidden=!(reg.waiting&&reg.active&&reg.waiting!==reg.active&&navigator.serviceWorker.controller);};
     showUpdate();

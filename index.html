@@ -11,20 +11,36 @@
   <link rel="manifest" href="./manifest.webmanifest">
   <link rel="icon" type="image/png" sizes="32x32" href="./icons/icon-32.png">
   <link rel="apple-touch-icon" sizes="192x192" href="./icons/icon-192.png">
-  <link rel="stylesheet" href="./styles.css?v=20261126-1">
-  <link rel="stylesheet" href="./landing-ui.css?v=20261126-1">
+  <link rel="stylesheet" href="./styles.css?v=20261127-1">
+  <link rel="stylesheet" href="./landing-ui.css?v=20261127-1">
   <title>Quản lý phòng P708</title>
 </head>
 <body>
-  <button class="account-fab" id="accountButton" type="button" aria-label="Tài khoản và phân quyền">
-    <span class="account-avatar" id="accountAvatar">🔐</span>
-    <span class="account-copy"><b id="accountName">Tài khoản</b><small id="accountRole">Chưa đăng nhập</small></span>
-  </button>
+  <header class="app-toolbar">
+    <div class="app-toolbar-inner">
+      <button class="room-brand" data-go="home" type="button" aria-label="Trang chủ P708">
+        <img src="./icons/icon-192.png" alt="" width="36" height="36"><span>P708 <small>PHÒNG SINH HOẠT</small></span>
+      </button>
+      <nav class="desktop-nav" aria-label="Điều hướng phòng">
+        <button data-go="home" type="button">Tổng quan</button><button data-go="cleaning" type="button">Trực nhật</button>
+        <button data-go="billing" type="button">Điện nước</button><button data-go="resources" type="button">Vật dụng</button>
+      </nav>
+      <div class="toolbar-actions">
+        <button class="icon-btn" id="themeButton" type="button" aria-label="Chế độ tối" aria-pressed="false" title="Chế độ tối">◐</button>
+        <button class="icon-btn nav-notify" id="notificationButton" type="button" aria-label="Thông báo">🔔<b id="noticeCount"></b></button>
+        <button class="account-fab" id="accountButton" type="button" aria-label="Tài khoản và phân quyền">
+          <span class="account-avatar" id="accountAvatar">👤</span>
+          <span class="account-copy"><b id="accountName">Tài khoản</b><small id="accountRole"></small></span>
+        </button>
+      </div>
+    </div>
+  </header>
 
   <div class="auth-gate" id="authGate">
     <div class="auth-card">
-      <div class="auth-logo">🏠</div>
-      <div id="authGateContent"><h2>Đang khởi động…</h2><p>Đang kiểm tra tài khoản và dữ liệu phòng P708.</p></div>
+      <img class="auth-logo" src="./icons/icon-192.png" alt="" width="56" height="56">
+      <div id="authGateContent" aria-live="polite"><h2>Đang khởi động…</h2><p>Đang kết nối phòng P708.</p></div>
+      <noscript><p>Bật JavaScript trong trình duyệt để mở P708.</p></noscript>
     </div>
   </div>
 
@@ -32,52 +48,54 @@
     <section class="page active room-dashboard" id="page-home" data-page="home">
       <div class="shell home-shell">
         <header class="room-overview">
-          <div>
-            <p id="homeDate"></p>
-            <h1 id="homeGreeting">Phòng P708</h1>
-          </div>
-          <div class="header-actions">
-            <button class="icon-btn" id="themeButton" type="button" aria-label="Chế độ tối" aria-pressed="false" title="Chế độ tối">◐</button>
-            <button class="btn nav-notify" id="notificationButton" type="button" aria-label="Thông báo">🔔 <b id="noticeCount"></b></button>
-          </div>
+          <div><p id="homeDate"></p><h1 id="homeGreeting">Phòng P708</h1></div>
           <span class="room-sync" id="homeSyncText" role="status">Đang kết nối…</span>
         </header>
-        <div class="room-shortcuts" aria-label="Thao tác nhanh">
-          <button class="btn primary" data-go="cleaning" type="button">Lịch trực</button>
-          <button class="btn" data-go="billing" type="button">Điện nước</button>
-          <button class="btn" data-go="resources" type="button">Vật dụng</button>
-          <button class="btn admin-only" data-go="audit" type="button">Nhật ký</button>
-        </div>
-        <section class="dashboard-kpis bento-kpis" aria-label="Tổng quan phòng">
-          <article class="kpi-card kpi-blue"><span class="kpi-icon">👥</span><div><span>Thành viên</span><b id="kpiMembers">0</b><small id="kpiPresent">0 có mặt</small></div></article>
-          <article class="kpi-card kpi-purple"><span class="kpi-icon">🧹</span><div><span>Trực tuần này</span><b id="kpiTasks">0/0</b><small id="kpiTaskHint">Chưa có lịch</small></div></article>
-          <article class="kpi-card kpi-green"><span class="kpi-icon">💳</span><div><span id="homeBalanceLabel">Còn phải thu</span><b id="kpiUnpaid">—</b><small id="kpiUnpaidPeople"></small></div></article>
-          <article class="kpi-card kpi-amber"><span class="kpi-icon">🔔</span><div><span>Yêu cầu chờ</span><b id="kpiPending">0</b><small id="kpiPendingHint">Tài khoản / công việc</small></div></article>
-        </section>
 
-        <section class="dashboard-layout room-work">
-          <article class="card action-card spotlight-card admin-only">
-            <div class="card-head"><div><p class="eyebrow">CẦN XỬ LÝ</p><h2>Việc của trưởng phòng</h2></div><span class="badge admin">👑 Quản trị</span></div>
-            <div class="action-list" id="managerActionList"></div>
-          </article>
-          <article class="card action-card spotlight-card">
-            <div class="card-head"><div><p class="eyebrow">NHẮC VIỆC</p><h2 id="personalReminderTitle">Việc của bạn</h2></div><button class="btn small soft" id="refreshReminderButton" type="button">Làm mới</button></div>
+        <div class="room-focus">
+          <section class="week-overview" aria-labelledby="weekTitle">
+            <div class="week-summary">
+              <p class="week-label" id="weekTitle">Trực nhật tuần này</p>
+              <p class="week-total"><strong id="kpiTasks">—</strong><span>việc hoàn thành</span></p>
+              <progress id="homeWeekProgress" value="0" max="1" aria-label="Tiến độ trực nhật"></progress>
+              <p id="kpiTaskHint" class="week-hint">Chưa có lịch</p>
+              <div class="room-shortcuts"><button class="btn primary" id="homeCleaningButton" data-go="cleaning" type="button">Xem lịch trực</button></div>
+            </div>
+            <div class="week-pet">
+              <img id="homePetArt" src="./icons/pets/cloud-egg.svg" width="108" height="108" alt="">
+              <span id="homePetStage"></span>
+            </div>
+          </section>
+          <section class="home-priority" aria-labelledby="personalReminderTitle">
+            <div class="room-section-head"><h2 id="personalReminderTitle">Việc của bạn</h2><button class="icon-btn" id="refreshReminderButton" type="button" aria-label="Làm mới việc của bạn" title="Làm mới">↻</button></div>
             <div class="action-list" id="personalReminderList"></div>
-          </article>
+          </section>
+        </div>
+
+        <section class="room-metrics" aria-label="Tổng quan phòng">
+          <button class="room-metric" data-go="cleaning" type="button"><span>Thành viên</span><b id="kpiMembers">—</b><small id="kpiPresent"></small></button>
+          <button class="room-metric" data-go="billing" type="button"><span id="homeBalanceLabel">Điện nước</span><b id="kpiUnpaid">—</b><small id="kpiUnpaidPeople"></small></button>
+          <button class="room-metric" id="homePendingButton" type="button"><span>Chờ xác nhận</span><b id="kpiPending">—</b><small id="kpiPendingHint"></small></button>
         </section>
 
-        <section class="module-section room-details" aria-label="Điện nước và thành viên">
-          <div class="preview-large room-utility"></div>
-          <section>
-            <h2>Thành viên</h2>
-            <div id="homePresence"></div>
-          </section>
-          <section>
-            <h2>Hoạt động gần đây</h2>
-            <div id="homeActivity"></div>
-          </section>
+        <section class="room-secondary">
+          <div class="room-secondary-main">
+            <section class="admin-only room-queue">
+              <div class="room-section-head"><h2>Cần xử lý</h2><button class="btn small" data-go="audit" type="button">Nhật ký</button></div>
+              <div class="action-list" id="managerActionList"></div>
+            </section>
+            <section class="room-utility preview-large" aria-label="Chi phí theo tháng"></section>
+          </div>
+          <section id="homePetGarden" class="home-pet-garden" aria-label="Pet của các thành viên P708"></section>
         </section>
 
+        <details class="module-section room-details">
+          <summary>Hoạt động và thành viên</summary>
+          <div class="room-detail-content">
+            <section><h2>Thành viên</h2><div id="homePresence"></div></section>
+            <section><h2>Hoạt động gần đây</h2><div id="homeActivity"></div></section>
+          </div>
+        </details>
       </div>
     </section>
 
@@ -100,6 +118,9 @@
             <div class="card-body">
               <div class="schedule-controls"><div class="field"><label>Tuần bắt đầu</label><input id="cleanWeek" type="date"></div><button class="btn primary admin-only" id="createScheduleButton" type="button">✨ Tạo lịch công bằng</button></div>
               <div class="button-row admin-only"><button class="btn soft" id="manualScheduleButton" type="button">Chỉnh phân công</button><button class="btn danger" id="deleteScheduleButton" type="button">Xóa tuần</button></div>
+              <label class="field cleaning-filter">Công việc
+                <select id="cleanFilter"><option value="all">Cả phòng</option><option value="mine">Việc của tôi</option><option value="pending">Chưa hoàn thành</option></select>
+              </label>
               <div id="cleanScheduleBox"></div>
               <details class="history-details"><summary>Yêu cầu đổi việc</summary><div id="taskSwapList" class="card-body"></div></details>
               <details class="history-details">
@@ -123,7 +144,7 @@
                   </details>
                 </div>
               </details>
-              <details class="history-details"><summary>Lịch sử các tuần</summary><div class="history-list" id="cleanHistory"></div></details>
+              <details class="history-details"><summary>Lịch sử các tuần</summary><label class="field history-search">Tìm theo ngày hoặc tuần<input id="cleanHistorySearch" type="search" placeholder="VD 23/11 hoặc 2026-11"></label><div class="history-list" id="cleanHistory"></div></details>
             </div>
           </section>
         </div>
@@ -133,20 +154,24 @@
     <section class="page" id="page-billing" data-page="billing">
       <div class="shell">
         <header class="topbar">
-          <div class="brand"><button class="icon-btn" data-go="home" type="button">←</button><div><h1>Điện & nước</h1><p>Ngày ở thực tế · chốt sổ · theo dõi thanh toán</p></div></div>
-          <div class="top-actions"><button class="btn soft" id="copyBillingButton" type="button">📋 Copy kết quả</button></div>
+          <div class="brand"><button class="icon-btn" data-go="home" type="button" aria-label="Trang chủ">←</button><h1>Điện nước</h1></div>
+          <div class="top-actions"><button class="btn soft" id="copyBillingButton" type="button">📋 Sao chép</button></div>
         </header>
+        <section class="billing-overview" aria-label="Tổng quan kỳ điện nước">
+          <div><span>Tổng hóa đơn</span><strong id="billTotalMoney">—</strong><small id="billOverviewPeriod"></small></div>
+          <div><span>Bạn còn phải đóng</span><strong id="billOverviewDue">—</strong><small id="billOverviewStay"></small></div>
+          <div class="billing-overview-days"><span>Tổng ngày ở</span><strong id="billTotalDays">—</strong><small>Ngày-người</small></div>
+        </section>
         <div class="billing-layout">
           <aside class="billing-sidebar">
             <section class="card compact-card">
-              <div class="section-title"><span>1</span><h3>Hóa đơn</h3></div>
+              <div class="section-title"><h3>Kỳ điện nước</h3></div>
               <div class="field"><label>Tháng</label><input id="billMonth" type="month"></div>
               <div class="field"><label>Tiền điện</label><input id="billElectricity" type="number" min="0" step="1000"></div>
               <div class="field"><label>Tiền nước</label><input id="billWater" type="number" min="0" step="1000"></div>
-              <div class="mini-kpis"><div><span>Tổng ngày-người</span><b id="billTotalDays">0</b></div><div><span>Tổng hóa đơn</span><b id="billTotalMoney">0 đ</b></div></div>
             </section>
             <section class="card compact-card">
-              <div class="section-title"><span>2</span><h3>Chọn người</h3></div>
+              <div class="section-title"><h3>Ngày ở theo người</h3></div>
               <div class="button-row admin-only"><button class="btn small soft" id="syncBillingMembersButton" type="button">Cập nhật danh sách</button><button class="btn small primary" id="addBillingPersonButton" type="button">+ Thêm</button></div>
               <div class="people-list" id="billPeopleList"></div>
             </section>
@@ -161,7 +186,7 @@
               <div class="calendar-wrap"><div class="weekday-grid"><span>T2</span><span>T3</span><span>T4</span><span>T5</span><span>T6</span><span>T7</span><span>CN</span></div><div class="day-grid" id="billCalendar"></div><div class="person-summary" id="billPersonSummary"></div></div>
             </article>
             <article class="card billing-result">
-              <div class="card-head"><div><h2>3. Bảng chốt tiền</h2><p>Trưởng phòng có thể đánh dấu đã thu tiền từng người.</p></div><div class="button-row"><button class="btn small" id="downloadBillingCsvButton" type="button">Tải CSV</button><button class="btn small admin-only" id="billCloseButton" type="button">🔒 Chốt sổ</button></div></div>
+              <div class="card-head"><div><h2>Thanh toán</h2></div><div class="button-row"><button class="btn small" id="downloadBillingCsvButton" type="button">Tải CSV</button><button class="btn small admin-only" id="billCloseButton" type="button">🔒 Chốt sổ</button></div></div>
               <div class="table-wrap" id="billingTable"></div>
             </article>
           </section>
@@ -238,7 +263,7 @@
     </section>
   </main>
 
-  <nav class="mobile-nav"><button data-go="home" type="button">🏠<span>Trang chủ</span></button><button data-go="cleaning" type="button">🧹<span>Trực nhật</span></button><button data-go="billing" type="button">⚡<span>Điện nước</span></button><button data-go="resources" type="button">▣<span>Vật dụng</span></button></nav>
+  <nav class="mobile-nav" aria-label="Điều hướng P708"><button data-go="home" type="button">🏠<span>Trang chủ</span></button><button data-go="cleaning" type="button">🧹<span>Trực nhật</span></button><button data-go="billing" type="button">⚡<span>Điện nước</span></button><button data-go="resources" type="button">▣<span>Vật dụng</span></button></nav>
 
   <div class="modal" id="billingPeriodModal"><div class="modal-card billing-period-modal-card"><div class="card-head"><div><h3 id="billingPeriodEditorTitle">Chỉnh kỳ điện nước</h3><p id="billingPeriodEditorCurrent">Chọn ngày bắt đầu và kết thúc của kỳ.</p></div><button class="icon-btn" data-close="billingPeriodModal" type="button">✕</button></div><div class="modal-body"><div class="period-editor-grid"><div class="field"><label>Ngày bắt đầu</label><input id="billingPeriodStart" type="date"></div><div class="field"><label>Ngày kết thúc</label><input id="billingPeriodEnd" type="date"></div></div><div class="period-editor-note" id="billingPeriodEditorWarning">Tiền điện nước sẽ tự tính lại theo số ngày ở trong kỳ.</div><div class="period-editor-safety"><b>Dữ liệu được bảo vệ</b><span>Các ngày ở nằm ngoài khoảng mới vẫn được lưu, nhưng sẽ không được tính tiền. Nếu kỳ đã có thanh toán, hãy hủy thanh toán trước; sau đó mở khóa kỳ rồi mới chỉnh.</span></div></div><div class="modal-actions period-editor-actions"><button class="btn soft" id="resetBillingPeriodButton" type="button">Khôi phục 29–28</button><button class="btn" data-close="billingPeriodModal" type="button">Hủy</button><button class="btn primary" id="saveBillingPeriodButton" type="button">Lưu kỳ</button></div></div></div>
   <div class="modal" id="memberModal"><div class="modal-card"><div class="card-head"><div><h3>Thêm người/khách</h3><p>Người này chỉ xuất hiện trong hóa đơn tháng.</p></div><button class="icon-btn" data-close="memberModal" type="button">✕</button></div><div class="modal-body"><div class="field"><label>Tên người</label><input id="billNewPersonName" placeholder="Ví dụ: Khách A"></div></div><div class="modal-actions"><button class="btn" data-close="memberModal" type="button">Hủy</button><button class="btn primary" id="confirmAddBillingPersonButton" type="button">Thêm</button></div></div></div>
@@ -302,26 +327,30 @@
   </div>
   <script>
     (()=>{
-      const repairKey="P708_BOOT_REPAIR_20261126_1",baseUrl=new URL("./",location.href).href;
+      const baseUrl=new URL("./",location.href).href;
       const cachePrefix=`p708-manager-${encodeURIComponent(baseUrl)}-`;
-      let timer=null;
       const clearAppShell=async()=>{
         try{if("caches" in window){const keys=await caches.keys();await Promise.all(keys.filter(key=>key.startsWith(cachePrefix)).map(key=>caches.delete(key)));}}catch{}
         try{if("serviceWorker" in navigator){const registrations=await navigator.serviceWorker.getRegistrations();await Promise.all(registrations.filter(item=>item.scope===baseUrl).map(item=>item.unregister()));}}catch{}
       };
-      const wasRepaired=()=>{try{return sessionStorage.getItem(repairKey)==="1";}catch{return false;}};
-      const markRepaired=()=>{try{sessionStorage.setItem(repairKey,"1");}catch{}};
-      const reload=async()=>{await clearAppShell();location.replace(`${location.pathname}?boot-repair=${Date.now()}${location.hash||""}`);};
-      const showRecovery=()=>{
-        const box=document.querySelector("#authGateContent");if(!box||(!box.textContent.includes("Đang khởi động")&&!box.dataset.bootProgress))return;
-        if(!wasRepaired()){markRepaired();void reload();return;}
-        box.innerHTML='<h2>Khởi động mất nhiều thời gian</h2><p>Bộ nhớ ứng dụng có thể đang giữ phiên bản cũ. Hãy kiểm tra mạng rồi thử làm mới an toàn.</p><div class="auth-actions"><button class="btn primary" id="bootRetryButton" type="button">Làm mới ứng dụng</button></div>';
-        document.querySelector("#bootRetryButton")?.addEventListener("click",()=>void reload());
+      const reload=async()=>{
+        await Promise.race([clearAppShell(),new Promise(resolve=>setTimeout(resolve,1500))]);
+        const next=new URL(location.href);
+        next.searchParams.set("refresh",Date.now());
+        location.replace(next.href);
       };
-      timer=setTimeout(showRecovery,10000);
-      window.addEventListener("p708:boot-ready",()=>{clearTimeout(timer);try{sessionStorage.removeItem(repairKey);}catch{}},{once:true});
+      const showRecovery=()=>{
+        const box=document.querySelector("#authGateContent");
+        if(!box)return;
+        document.querySelector("#authGate").classList.remove("hidden");
+        box.innerHTML='<h2>Chưa thể mở P708</h2><p>Kiểm tra mạng, rồi thử tải lại ứng dụng.</p><div class="auth-actions"><button class="btn primary" id="bootRetryButton" type="button">Thử lại</button><a class="btn" href="https://p708-room-manager.web.app/">Mở P708 trên Firebase</a></div>';
+        document.querySelector("#bootRetryButton").addEventListener("click",event=>{event.currentTarget.disabled=true;void reload();});
+      };
+      const timer=setTimeout(showRecovery,15000);
+      globalThis.P708ShowBootRecovery=()=>{clearTimeout(timer);showRecovery();};
+      window.addEventListener("p708:boot-ready",()=>clearTimeout(timer),{once:true});
     })();
   </script>
-  <script type="module" src="./app.js?v=20261126-1"></script>
+  <script type="module" src="./app.js?v=20261127-1"></script>
 </body>
 </html>

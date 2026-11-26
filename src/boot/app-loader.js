@@ -1,4 +1,4 @@
-import { createP708SecureEngine } from "../core/p708-secure-sync-engine.js?v=20261126-1";
+import { createP708SecureEngine } from "../core/p708-secure-sync-engine.js?v=20261127-1";
 import { createP708AuthoritativeRepair } from "../core/p708-authoritative-repair.js?v=20260913-1";
 import { createP708CanonicalMappingRepair } from "../core/p708-canonical-mapping-repair.js?v=20260913-1";
 import * as P708BillingCycle from "../core/billing-cycle-period.js?v=20261126-1";
@@ -25,16 +25,21 @@ function validFirebaseConfig(config){
 }
 
 async function fetchFirebaseConfig(url,{sameOrigin=false}={}){
-  const response=await fetch(url,{
-    cache:"no-store",
-    credentials:sameOrigin?"same-origin":"omit",
-    mode:sameOrigin?"same-origin":"cors",
-    headers:{Accept:"application/json"}
-  });
-  if(!response.ok)throw new Error(`${response.status}`);
-  const config=await response.json();
-  if(!validFirebaseConfig(config))throw new Error("invalid-config");
-  return Object.freeze({...config});
+  const controller=new AbortController();
+  const timeout=setTimeout(()=>controller.abort(),6000);
+  try{
+    const response=await fetch(url,{
+      cache:"no-store",
+      signal:controller.signal,
+      credentials:sameOrigin?"same-origin":"omit",
+      mode:sameOrigin?"same-origin":"cors",
+      headers:{Accept:"application/json"}
+    });
+    if(!response.ok)throw new Error(`${response.status}`);
+    const config=await response.json();
+    if(!validFirebaseConfig(config))throw new Error("invalid-config");
+    return Object.freeze({...config});
+  }finally{clearTimeout(timeout);}
 }
 
 async function loadFirebaseRuntimeConfig(){
@@ -45,22 +50,18 @@ async function loadFirebaseRuntimeConfig(){
     authDomain:"localhost",appId:"demo-p708-app"
   });
 
-  const errors=[],isFirebaseHosting=/\.(?:web\.app|firebaseapp\.com)$/i.test(location.hostname);
+  const isFirebaseHosting=["p708-room-manager.web.app","p708-room-manager.firebaseapp.com"].includes(location.hostname);
   if(isFirebaseHosting){
     try{
-      return await fetchFirebaseConfig(FIREBASE_RUNTIME_ENDPOINT,{sameOrigin:true});
-    }catch(error){
-      errors.push(`same-origin:${error?.message||"error"}`);
+      const config=await fetchFirebaseConfig(FIREBASE_RUNTIME_ENDPOINT,{sameOrigin:true});
+      return Object.freeze({...config,authDomain:location.hostname});
+    }catch{
+      const config=await fetchFirebaseConfig("./firebase-config.runtime.json",{sameOrigin:true});
+      return Object.freeze({...config,authDomain:location.hostname});
     }
   }
 
-  try{
-    return await fetchFirebaseConfig(FIREBASE_RUNTIME_FALLBACK);
-  }catch(error){
-    errors.push(`firebase-hosting:${error?.message||"error"}`);
-  }
-
-  throw new Error(`Không tải được cấu hình Firebase runtime (${errors.join(", ")}).`);
+  return fetchFirebaseConfig(FIREBASE_RUNTIME_FALLBACK);
 }
 
 globalThis.P708SetBootProgress?.("Đang kết nối dữ liệu…","Đang xác nhận cấu hình an toàn của phòng P708.");
@@ -76,26 +77,26 @@ globalThis.deleteScheduleAuthoritatively = deleteScheduleAuthoritatively;
 
 const parts = [
   "../core/app-core1.js?v=20261126-1",
-  "../core/app-core2.js?v=20261126-1",
+  "../core/app-core2.js?v=20261127-1",
   "../features/app-actions1.js?v=20261126-1",
   "../features/app-actions2.js?v=20261126-1",
   "../features/cleaning-delete-fix.js?v=20261126-1",
-  "../features/app-dashboard.js?v=20261126-1",
-  "../features/app-render.js?v=20261126-1",
+  "../features/app-dashboard.js?v=20261127-1",
+  "../features/app-render.js?v=20261127-1",
   "../features/cleaning-pet-streak.js?v=20260921-3",
   "../features/app-integrity-fixes.js?v=20260913-1",
   "../features/inactive-mapping-dedup-fix.js?v=20260913-1",
   "../features/canonical-identity-repair.js?v=20260913-1",
   "../features/billing-membership-exclusion.js?v=20260913-1",
-  "../features/billing-cycle-history.js?v=20260929-1",
+  "../features/billing-cycle-history.js?v=20261127-1",
   "../features/billing-canonical-repair.js?v=20260913-1",
   "../features/home-enhancements.js?v=20260913-1",
-  "../features/home-pet-garden.js?v=20261126-1",
-  "../features/ui-icon-polish.js?v=20261029-1",
+  "../features/home-pet-garden.js?v=20261127-1",
+  "../features/ui-icon-polish.js?v=20261127-1",
   "../features/today-calendar.js?v=20261126-1",
   "../features/room-resources.js?v=20261126-1",
   "../features/notification-enhancements.js?v=20261126-1",
-  "./app-start.js?v=20261126-1",
+  "./app-start.js?v=20261127-1",
   "../features/mobile-install-bridge.js?v=20260913-1",
   "../features/mobile-install-guide.js?v=20260913-1"
 ];

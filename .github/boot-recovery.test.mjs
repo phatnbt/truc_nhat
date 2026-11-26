@@ -7,11 +7,11 @@ const start=fs.readFileSync(new URL("../src/boot/app-start.js",import.meta.url),
 const worker=fs.readFileSync(new URL("../sw.js",import.meta.url),"utf8");
 const app=fs.readFileSync(new URL("../app.js",import.meta.url),"utf8");
 
-const release="20261126-1";
+const release="20261127-1";
 
-assert.ok(index.includes(`P708_BOOT_REPAIR_${release.replaceAll("-","_")}`),"boot watchdog marker is required");
-assert.ok(index.includes("setTimeout(showRecovery,10000)"),"a stalled boot must recover instead of hanging forever");
-assert.ok(index.includes("box.dataset.bootProgress"),"watchdog must cover a loader stalled after progress starts");
+assert.ok(index.includes("setTimeout(showRecovery,15000)"),"stalled boots must show recovery");
+assert.ok(index.includes('id="bootRetryButton"'),"recovery should offer an explicit retry");
+assert.ok(!index.includes("wasRepaired"),"boot recovery must not automatically reload");
 assert.ok(index.includes('item.scope===baseUrl'),"recovery must only unregister this app scope");
 assert.ok(index.includes('key.startsWith(cachePrefix)'),"recovery must only clear this app cache family");
 assert.ok(start.includes('window.dispatchEvent(new Event("p708:boot-ready"))'),"auth startup must cancel the watchdog");
@@ -42,5 +42,6 @@ assert.ok(loader.includes("await Promise.all(parts.map"),"classic scripts must d
 assert.ok(loader.includes("script.async = false"),"parallel downloads must preserve execution order");
 assert.ok(loader.includes("isFirebaseHosting"),"GitHub Pages must skip the guaranteed Firebase init 404");
 assert.ok(loader.includes("loadedParts"),"startup must show real loading progress");
+assert.ok(loader.includes("authDomain:location.hostname"),"Firebase Hosting uses a same-origin OAuth helper");
 
 console.log("Boot watchdog and stale-cache recovery QA PASSED");

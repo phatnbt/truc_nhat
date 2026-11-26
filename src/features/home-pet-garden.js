@@ -54,6 +54,7 @@
             <span class="garden-owner-name">${esc(member.name)}</span>
             <span class="garden-streak-line">${isMine?'<i class="mine-dot"></i>':""}<span>${esc(stage.name)} · 🔥 ${stats.current}</span></span>
             <small>Cấp ${experience.level} · ${experience.xp} EXP</small>
+            ${isMine?`<progress class="garden-progress" max="50" value="${experience.xp%50}" aria-label="EXP tới cấp tiếp theo"></progress>`:""}
           </${tag}>`;
         }).join("")}
       </div>`;

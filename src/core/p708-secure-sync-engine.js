@@ -5,7 +5,7 @@ import {
   signOut as firebaseSignOut, connectAuthEmulator
 } from "https://www.gstatic.com/firebasejs/12.16.0/firebase-auth.js";
 import {
-  initializeFirestore, getFirestore, memoryLocalCache, connectFirestoreEmulator, clearIndexedDbPersistence,
+  initializeFirestore, getFirestore, memoryLocalCache, connectFirestoreEmulator,
   doc, collection, query, where, orderBy, limit, onSnapshot, runTransaction, serverTimestamp,
   setDoc, deleteDoc, getDoc, getDocFromServer, getDocs, writeBatch, Timestamp, increment
 } from "https://www.gstatic.com/firebasejs/12.16.0/firebase-firestore.js";
@@ -236,15 +236,23 @@ export function createP708SecureEngine({firebaseConfig,roomCode,deviceId,onShape
 
   const start=async()=>{
     if(started)return;started=true;emitStatus("syncing","Đang khởi động bảo mật…");
-    try{await clearIndexedDbPersistence(db);}catch{}
     try{await setPersistence(auth,browserLocalPersistence);}catch(e){console.warn("P708 auth persistence",e);}
-    try{await getRedirectResult(auth);}catch{}
     authUnsub=onAuthStateChanged(auth,next=>{clearUserListeners();user=next;if(!user){emitSession();emitStatus("offline","Chưa đăng nhập");return;}emitSession({status:"checking"});attachUserListeners();emitStatus("syncing","Đang kiểm tra quyền…");});
+    void getRedirectResult(auth).catch(error=>onStatus?.({mode:"offline",text:"Không thể hoàn tất đăng nhập Google",error}));
     window.addEventListener("online",onlineHandler);window.addEventListener("offline",offlineHandler);
   };
   const signInGoogle=async()=>{
+    const external=location.hostname==="phatnbt.github.io";
+    const standalone=window.matchMedia("(display-mode: standalone)").matches||navigator.standalone===true;
+    const openFirebaseHosting=()=>location.assign(new URL(location.hash||"/","https://p708-room-manager.web.app/").href);
+    if(external&&standalone){openFirebaseHosting();return;}
+    if(!external&&standalone&&!useEmulators){await signInWithRedirect(auth,provider);return;}
     try{await signInWithPopup(auth,provider);}
-    catch(e){if(["auth/popup-blocked","auth/cancelled-popup-request","auth/operation-not-supported-in-this-environment"].includes(e?.code)){await signInWithRedirect(auth,provider);return;}throw e;}
+    catch(e){
+      if(!["auth/popup-blocked","auth/operation-not-supported-in-this-environment"].includes(e?.code))throw e;
+      if(external){openFirebaseHosting();return;}
+      await signInWithRedirect(auth,provider);
+    }
   };
   const signOut=()=>firebaseSignOut(auth);
 
