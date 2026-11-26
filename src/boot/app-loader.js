@@ -4,7 +4,7 @@ import { createP708CanonicalMappingRepair } from "../core/p708-canonical-mapping
 import * as P708BillingCycle from "../core/billing-cycle-period.js?v=20260929-1";
 import * as P708CleaningFairness from "../core/cleaning-fairness.js?v=20260921-2";
 import * as P708CleaningStreak from "../core/cleaning-streak.js?v=20260921-3";
-import { deleteScheduleAuthoritatively, restoreScheduleWeek } from "../core/cleaning-schedule-store.js?v=20260913-1";
+import { deleteScheduleAuthoritatively } from "../core/cleaning-schedule-store.js?v=20260913-1";
 
 const FIREBASE_RUNTIME_ENDPOINT="/__/firebase/init.json";
 const FIREBASE_RUNTIME_FALLBACK="https://p708-room-manager.web.app/firebase-config.runtime.json";
@@ -66,13 +66,11 @@ globalThis.P708BillingCycle = P708BillingCycle;
 globalThis.P708CleaningFairness = P708CleaningFairness;
 globalThis.P708CleaningStreak = P708CleaningStreak;
 globalThis.deleteScheduleAuthoritatively = deleteScheduleAuthoritatively;
-globalThis.restoreScheduleWeek = restoreScheduleWeek;
 
 const parts = [
   "../core/app-core1.js?v=20261029-1",
   "../core/app-core2.js?v=20260929-1",
   "../features/app-actions1.js?v=20261029-1",
-  "../features/cleaning-fairness-upgrade.js?v=20261029-1",
   "../features/app-actions2.js?v=20261029-1",
   "../features/cleaning-delete-fix.js?v=20260913-1",
   "../features/app-dashboard.js?v=20261029-1",
@@ -87,9 +85,9 @@ const parts = [
   "../features/home-enhancements.js?v=20260913-1",
   "../features/home-pet-garden.js?v=20260921-3",
   "../features/ui-icon-polish.js?v=20261029-1",
+  "../features/today-calendar.js?v=20260913-1",
   "./app-start.js?v=20261029-2",
   "../features/notification-enhancements.js?v=20261029-1",
-  "../features/today-calendar.js?v=20260913-1",
   "../features/mobile-install-bridge.js?v=20260913-1",
   "../features/mobile-install-guide.js?v=20260913-1"
 ];

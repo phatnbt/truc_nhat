@@ -295,6 +295,25 @@ export function createP708SecureEngine({firebaseConfig,roomCode,deviceId,onShape
         const roomSnap=await tx.get(roomRef),memberSnaps=[];
         for(const change of memberChanges)memberSnaps.push(await tx.get(doc(memberDataCollection,change.mappedUid)));
         const serverPayload=roomSnap.exists()?clone(roomSnap.data()?.payload)||{}:{},mergedShape=applyJsonOperations(serverPayload,roomOperations),mergedMembers=[];
+        const deletedSchedules=serverPayload._sync?.deletedSchedules||{};
+        const creating=audit.action==="CREATE_SCHEDULE"&&audit.week;
+        if(creating){
+          const week=audit.week;
+          const serverTombstone=deletedSchedules[week]||null;
+          if((serverPayload.schedules?.[week]&&!serverTombstone)
+            || !jsonEqual(serverTombstone,audit.tombstone)||!desired.schedules?.[week]){
+            throw new Error("Lịch tuần đã thay đổi trên thiết bị khác.");
+          }
+          mergedShape.schedules={...serverPayload.schedules,[week]:desired.schedules[week]};
+          if(mergedShape._sync?.deletedSchedules)delete mergedShape._sync.deletedSchedules[week];
+        }
+        for(const op of roomOperations){
+          const [collection,week]=op.path;
+          if(collection!=="schedules"||!week||creating===week)continue;
+          if(deletedSchedules[week]||!jsonEqual(serverPayload.schedules?.[week],previous.schedules?.[week])){
+            throw new Error("Lịch tuần đã thay đổi trên thiết bị khác.");
+          }
+        }
         assertBillingPeriodUpdate(serverPayload,mergedShape,audit);
         memberChanges.forEach((change,index)=>{
           const snap=memberSnaps[index],current=snap.exists()?clone(snap.data())||{}:{memberId:change.memberId},merged=applyJsonOperations(current,change.operations);
@@ -303,6 +322,10 @@ export function createP708SecureEngine({firebaseConfig,roomCode,deviceId,onShape
           mergedMembers.push([change.mappedUid,{...merged,memberId:change.memberId}]);
         });
         const fields={schemaVersion:5,roomCode,revision:increment(1),payload:mergedShape,lastAdminUid:actor,lastDeviceId:deviceId,updatedAt:serverTimestamp()};
+        if(creating&&roomSnap.data()?.deletedSchedules?.[creating]){
+          fields.deletedSchedules=clone(roomSnap.data().deletedSchedules);
+          delete fields.deletedSchedules[creating];
+        }
         if (roomSnap.exists()) tx.update(roomRef,fields);
         else tx.set(roomRef,fields);
         return {mergedShape,mergedMembers};
@@ -323,19 +346,22 @@ export function createP708SecureEngine({firebaseConfig,roomCode,deviceId,onShape
     memberDataByUid.set(actor,{uid:actor,...clone(mergedOwn)});rebuild();if(audit?.summary||audit?.action)await writeAudit(audit);emitStatus("online","Đã đồng bộ");return true;
   };
 
-  const submitTask=async({scheduleId,weekStart,taskId,taskName,memberId})=>{
+  const submitTask=async({scheduleId,weekStart,taskId,taskName,memberId,status="submitted"})=>{
     if(!user||!hasAccess())throw new Error("Chưa có quyền truy cập.");if(isAdmin())throw new Error("Trưởng phòng dùng nút xác nhận trực tiếp.");if(!navigator.onLine)throw new Error("Đang ngoại tuyến.");if(memberId!==access.memberId)throw new Error("Bạn chỉ được báo công việc của mình.");
     const schedule=optimisticShape?.schedules?.[weekStart],assignment=(schedule?.assignments||[]).find(a=>a?.taskId===taskId&&a?.personId===memberId&&!a?.cut);
     if(!schedule||schedule.id!==scheduleId||!assignment)throw new Error("Công việc này không còn được phân cho bạn.");if(assignment.completed)throw new Error("Công việc đã được xác nhận hoàn thành.");
     const id=taskDocId(weekStart,taskId,memberId),ref=doc(taskCollection,id);
+    if(!["in_progress","submitted"].includes(status))throw new Error("Trạng thái không hợp lệ.");
     await runTransaction(db,async tx=>{
       const old=await tx.get(ref);
       if(old.exists()){
         const oldStatus=old.data()?.status;if(oldStatus==="approved")throw new Error("Công việc đã được xác nhận.");if(oldStatus==="submitted")throw new Error("Công việc đang chờ trưởng phòng xác nhận.");
+        if(status==="in_progress")return;
         tx.set(ref,{status:"submitted",submittedAt:serverTimestamp(),updatedAt:serverTimestamp()},{merge:true});
-      }else tx.set(ref,{roomCode,actorUid:user.uid,actorName:access.displayName||user.displayName||user.email||"Thành viên",memberId,scheduleId,weekStart,taskId,taskName:assignment.task||taskName||taskId,status:"submitted",submittedAt:serverTimestamp(),updatedAt:serverTimestamp()});
+      }else tx.set(ref,{roomCode,actorUid:user.uid,actorName:access.displayName||user.displayName||user.email||"Thành viên",memberId,scheduleId,weekStart,taskId,taskName:assignment.task||taskName||taskId,status,submittedAt:serverTimestamp(),updatedAt:serverTimestamp()});
     });
-    await writeAudit({action:"SUBMIT_TASK",summary:`Báo hoàn thành: ${assignment.task||taskName||taskId}`,targetMemberId:memberId});return {id};
+    if(status==="submitted")await writeAudit({action:"SUBMIT_TASK",summary:`Báo hoàn thành: ${assignment.task||taskName||taskId}`,targetMemberId:memberId});
+    return {id};
   };
   const reviewTask=async({submissionId,status,note=""})=>{
     if(!isAdmin())throw new Error("Chỉ trưởng phòng được xác nhận.");if(!navigator.onLine)throw new Error("Đang ngoại tuyến.");if(!["approved","rejected"].includes(status))throw new Error("Trạng thái không hợp lệ.");

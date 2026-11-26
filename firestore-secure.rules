@@ -94,10 +94,8 @@ service cloud.firestore {
         && value.cut != true
         && value.get('completed', false) != true;
     }
-    function assignmentAtMatches(roomId, weekStart, index, taskId, memberId) {
-      let assignments = get(roomPath(roomId)).data.payload.schedules[weekStart].assignments;
-      return assignments is list
-        && assignments.size() > index
+    function assignmentAtMatches(assignments, index, taskId, memberId) {
+      return assignments.size() > index
         && assignmentMatches(assignments[index], taskId, memberId);
     }
     function taskIsCurrentlyAssigned(roomId, weekStart, scheduleId, taskId, memberId) {
@@ -106,12 +104,12 @@ service cloud.firestore {
         && schedules[weekStart].id == scheduleId
         && schedules[weekStart].assignments is list
         && (
-          assignmentAtMatches(roomId, weekStart, 0, taskId, memberId)
-          || assignmentAtMatches(roomId, weekStart, 1, taskId, memberId)
-          || assignmentAtMatches(roomId, weekStart, 2, taskId, memberId)
-          || assignmentAtMatches(roomId, weekStart, 3, taskId, memberId)
-          || assignmentAtMatches(roomId, weekStart, 4, taskId, memberId)
-          || assignmentAtMatches(roomId, weekStart, 5, taskId, memberId)
+          assignmentAtMatches(schedules[weekStart].assignments, 0, taskId, memberId)
+          || assignmentAtMatches(schedules[weekStart].assignments, 1, taskId, memberId)
+          || assignmentAtMatches(schedules[weekStart].assignments, 2, taskId, memberId)
+          || assignmentAtMatches(schedules[weekStart].assignments, 3, taskId, memberId)
+          || assignmentAtMatches(schedules[weekStart].assignments, 4, taskId, memberId)
+          || assignmentAtMatches(schedules[weekStart].assignments, 5, taskId, memberId)
         );
     }
     function validTaskIdentity(roomId) {
@@ -202,7 +200,7 @@ service cloud.firestore {
             && (!exists(taskSubmissionPath(roomId, submissionId)) || resource.data.actorUid == request.auth.uid));
         allow create: if signedIn() && hasActiveAccess(roomId) && validTaskIdentity(roomId)
           && submissionId == request.resource.data.weekStart + '__' + request.resource.data.taskId + '__' + request.resource.data.memberId
-          && request.resource.data.status == 'submitted'
+          && request.resource.data.status in ['in_progress', 'submitted']
           && request.resource.data.submittedAt == request.time
           && request.resource.data.updatedAt == request.time
           && request.resource.data.keys().hasOnly([
@@ -222,7 +220,7 @@ service cloud.firestore {
           || (signedIn() && hasActiveAccess(roomId)
             && resource.data.actorUid == request.auth.uid
             && resource.data.memberId == ownMemberId(roomId)
-            && resource.data.status == 'rejected'
+            && resource.data.status in ['rejected', 'in_progress']
             && request.resource.data.actorUid == resource.data.actorUid
             && request.resource.data.memberId == resource.data.memberId
             && request.resource.data.status == 'submitted'

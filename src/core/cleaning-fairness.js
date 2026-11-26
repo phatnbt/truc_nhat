@@ -105,3 +105,43 @@ export function historicalFairnessLoad({schedules=[],member,beforeWeek="9999-99-
       .reduce((z,a)=>z+effectiveTaskWeight(a.taskId,weights,3),0),0);
   return actual+longAbsenceCredit({schedules,member,beforeWeek,weights,minStreakWeeks})+cleaningPointAdjustment(manualAdjustment);
 }
+
+function seededRank(seed, taskId, memberId) {
+  let hash=2166136261;
+  for(const char of JSON.stringify([seed,taskId,memberId]))hash=Math.imul(hash^char.charCodeAt(0),16777619);
+  return hash>>>0;
+}
+
+export function proposeCleaningSchedule({members,presence,tasks,schedules,week,weights,adjustments={},resetThrough="",fixed={},seed=week}){
+  const absent=members.filter(member=>presence[member.id]===false);
+  const people=members.filter(member=>presence[member.id]!==false);
+  if(!people.length)return [];
+  const history=schedules.filter(schedule=>schedule.weekStart<week).sort((a,b)=>b.weekStart.localeCompare(a.weekStart));
+  const ledger=history.filter(schedule=>schedule.weekStart>resetThrough);
+  const loads=new Map(people.map(member=>[member.id,historicalFairnessLoad({
+    schedules:ledger,member,beforeWeek:week,weights,manualAdjustment:adjustments[member.id]
+  })]));
+  const weight=task=>effectiveTaskWeight(task.id,weights,task.w);
+  for(const task of tasks){
+    const memberId=fixed[task.id];
+    if(loads.has(memberId))loads.set(memberId,loads.get(memberId)+weight(task));
+  }
+  const assignment=(task,member,reason)=>({
+    taskId:task.id,task:task.name,personId:member?.id||null,personName:member?.name||"Tạm cắt",
+    completed:false,cut:!member,reason
+  });
+  return [...tasks].sort((a,b)=>weight(b)-weight(a)||a.id.localeCompare(b.id)).map(task=>{
+    const pinned=people.find(member=>member.id===fixed[task.id]);
+    if(pinned)return assignment(task,pinned,{kind:"fixed"});
+    if(fixed[task.id]===null||(absent.length===1&&task.id==="rac"))return assignment(task,null,{kind:"exempt"});
+    const ranked=people.map(member=>{
+      const lastSame=history.find(s=>s.assignments.some(a=>!a.cut&&a.personId===member.id&&a.taskId===task.id))?.weekStart||"";
+      const lastAny=history.find(s=>s.assignments.some(a=>!a.cut&&a.personId===member.id))?.weekStart||"";
+      return {member,load:loads.get(member.id),repeat:dateMs(week)-dateMs(lastSame)===7*DAY_MS,lastSame,lastAny,rank:seededRank(seed,task.id,member.id)};
+    }).sort((a,b)=>Number(a.repeat)-Number(b.repeat)||a.load-b.load||
+      a.lastSame.localeCompare(b.lastSame)||a.lastAny.localeCompare(b.lastAny)||a.rank-b.rank||a.member.id.localeCompare(b.member.id));
+    const {member,load,repeat,lastSame,lastAny}=ranked[0];
+    loads.set(member.id,load+weight(task));
+    return assignment(task,member,{kind:"proposal",load,repeat,lastSame,lastAny});
+  });
+}

@@ -101,6 +101,8 @@ function bindStaticEvents(){
   $("#allPresentButton")?.addEventListener("click",setAllPresent);
   $("#resetCleaningPointsButton")?.addEventListener("click",resetAllCleaningPoints);
   $("#createScheduleButton")?.addEventListener("click",createSchedule);
+  $("#confirmScheduleButton")?.addEventListener("click",confirmSchedule);
+  $("#roomCalendarView")?.addEventListener("change",renderRoomCalendar);
   $("#deleteScheduleButton")?.addEventListener("click",deleteSchedule);
   $("#manualScheduleButton")?.addEventListener("click",openManual);
   $("#saveManualScheduleButton")?.addEventListener("click",saveManual);

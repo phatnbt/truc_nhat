@@ -16,8 +16,9 @@ assert.match(fix,/deletedSchedules/);
 assert.match(fix,/for\(const weekStart of Object\.keys\(deleted\)\)delete clean\.schedules\[weekStart\]/);
 
 // Explicit recreation is the only path that clears the tombstone.
-assert.match(store,/restoreScheduleWeek/);
-assert.match(fix,/restoreScheduleWeek/);
+const sync=fs.readFileSync("src/core/p708-secure-sync-engine.js","utf8");
+assert.match(sync,/jsonEqual\(serverTombstone,audit.tombstone\)/);
+assert.match(sync,/delete mergedShape\._sync\.deletedSchedules\[week\]/);
 
 // Pure behavioral model: stale schedule + tombstone => no visible schedule.
 const serverShape={

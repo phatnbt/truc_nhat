@@ -2,7 +2,6 @@
   let deletingWeek=false;
   const baseToSyncShape=toSyncShape;
   const baseFromSyncShape=fromSyncShape;
-  const baseCreateSchedule=createSchedule;
 
   // Giữ tombstone trong shape đồng bộ và loại mọi lịch đã bị xóa trước khi đưa
   // dữ liệu server vào state. Đây là chốt chặn chống snapshot/device cũ resurrect.
@@ -37,32 +36,6 @@
     }
     return currentSchedule();
   }
-
-  // Khi người dùng CHỦ ĐỘNG tạo lại đúng tuần đã xóa thì mới gỡ tombstone.
-  createSchedule=async function(){
-    const week=$("#cleanWeek")?.value||"";
-    if(!week)return baseCreateSchedule();
-    const people=state.members.filter(m=>state.presence[m.id]!==false);
-    if(!people.length)return baseCreateSchedule();
-    const tombstone=state?._sync?.deletedSchedules?.[week];
-    if(tombstone&&typeof globalThis.restoreScheduleWeek==="function"){
-      try{
-        await globalThis.restoreScheduleWeek({
-          firebaseConfig:FIREBASE_CONFIG,
-          roomCode:ROOM_CODE,
-          deviceId:DEVICE_ID,
-          weekStart:week
-        });
-        state._sync=state._sync||{};
-        state._sync.deletedSchedules=state._sync.deletedSchedules||{};
-        delete state._sync.deletedSchedules[week];
-      }catch(error){
-        console.error("P708 restore deleted schedule week",error);
-        return toast(error?.message||"Không thể tạo lại tuần đã xóa",6000);
-      }
-    }
-    return baseCreateSchedule();
-  };
 
   deleteSchedule=async function(){
     if(!requireAdmin()||deletingWeek)return;

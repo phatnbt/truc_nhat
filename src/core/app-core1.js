@@ -37,7 +37,7 @@ function parseDate(v){ if(!validDateKey(v))return new Date(NaN); const [y,m,d]=S
 function addDays(d,n){ const x=new Date(d); x.setDate(x.getDate()+n); return x; }
 function monthDays(v){ if(!validMonthKey(v))return 0; const [y,m]=String(v).split("-").map(Number); return new Date(y,m,0).getDate(); }
 function monthLabel(v){ if(!validMonthKey(v)) return String(v||""); const [y,m]=v.split("-"); return `Tháng ${Number(m)}/${y}`; }
-function nextMonday(){ const d=new Date(); d.setHours(0,0,0,0); const day=d.getDay(); d.setDate(d.getDate()+(day===0?1:8-day)); return d; }
+function nextMonday(){ const d=parseDate(P708BillingCycle.roomDateKey()); const day=d.getDay(); return addDays(d,day===0?1:8-day); }
 function weekRange(v){ const s=parseDate(v); if(Number.isNaN(s.getTime()))return String(v||""); const e=addDays(s,6); const f=d=>new Intl.DateTimeFormat("vi-VN",{day:"2-digit",month:"2-digit",year:"numeric"}).format(d); return `${f(s)} – ${f(e)}`; }
 function timeMs(v){ const n=Date.parse(v||""); return Number.isFinite(n)?n:0; }
 function toast(message,duration=3000){ const el=$("#toast"); if(!el)return; el.textContent=message; el.classList.add("show"); clearTimeout(toast.timer); toast.timer=setTimeout(()=>el.classList.remove("show"),duration); }

@@ -9,7 +9,6 @@ function appFor(firebaseConfig){
   const existing=getApps().find(app=>app.name==="p708-secure-manager-v5");
   return existing||initializeApp(firebaseConfig,"p708-secure-manager-v5");
 }
-
 export async function deleteScheduleAuthoritatively({firebaseConfig,roomCode,deviceId,weekStart,scheduleId}){
   if(!weekStart)throw new Error("Thiếu tuần cần xóa.");
   const app=appFor(firebaseConfig),auth=getAuth(app),db=getFirestore(app),user=auth.currentUser;
@@ -47,22 +46,3 @@ export async function deleteScheduleAuthoritatively({firebaseConfig,roomCode,dev
   });
 }
 
-export async function restoreScheduleWeek({firebaseConfig,roomCode,deviceId,weekStart}){
-  if(!weekStart)return;
-  const app=appFor(firebaseConfig),auth=getAuth(app),db=getFirestore(app),user=auth.currentUser;
-  if(!user)throw new Error("Bạn cần đăng nhập trước.");
-  const roomRef=doc(db,"rooms",roomCode);
-  await runTransaction(db,async tx=>{
-    const snap=await tx.get(roomRef);
-    if(!snap.exists())throw new Error("Không tìm thấy dữ liệu phòng.");
-    tx.update(
-      roomRef,
-      new FieldPath("payload","_sync","deletedSchedules",weekStart),deleteField(),
-      new FieldPath("deletedSchedules",weekStart),deleteField(),
-      "revision",increment(1),
-      "lastAdminUid",user.uid,
-      "lastDeviceId",String(deviceId||"").slice(0,160),
-      "updatedAt",serverTimestamp()
-    );
-  });
-}

@@ -17,7 +17,7 @@ function memberCleaningPoints(memberId,beforeWeek="9999-99-99"){
       .reduce((z,a)=>z+(state.settings.weights[a.taskId]??3),0),0);
 }
 function historicalPoints(memberId,beforeWeek="9999-99-99"){
-  const adjustment=Math.max(0,Number(state.settings?.cleaningPointAdjustments?.[memberId])||0);
+  const adjustment=P708CleaningFairness.cleaningPointAdjustment(state.settings?.cleaningPointAdjustments?.[memberId]);
   return memberCleaningPoints(memberId,beforeWeek)+adjustment;
 }
 function formatCleaningPoints(value){
@@ -36,18 +36,6 @@ async function resetAllCleaningPoints(){
     action:"RESET_CLEANING_POINTS",
     summary:latestWeek?`Reset điểm trực nhật của tất cả thành viên qua tuần ${latestWeek}`:"Reset điểm cộng trực nhật của tất cả thành viên"
   });
-}
-function previousAssignment(memberId,taskId,beforeWeek){
-  return [...state.schedules]
-    .filter(s=>s.weekStart<beforeWeek)
-    .sort((a,b)=>b.weekStart.localeCompare(a.weekStart))
-    .find(s=>s.assignments.some(a=>a.personId===memberId&&a.taskId===taskId&&!a.cut))?.weekStart||"";
-}
-function wasSameTaskLastWeek(memberId,taskId,beforeWeek){
-  const previous=[...state.schedules]
-    .filter(s=>s.weekStart<beforeWeek)
-    .sort((a,b)=>b.weekStart.localeCompare(a.weekStart))[0];
-  return !!previous?.assignments?.some(a=>a.personId===memberId&&a.taskId===taskId&&!a.cut);
 }
 function addMember(){
   if(!requireAdmin())return;
@@ -108,43 +96,55 @@ async function sendCleaningReminder(){
     summary:`Nhắc ${memberIds.length} thành viên hoàn thành việc trực tuần ${schedule.weekStart}`
   });
 }
-async function createSchedule(){
+let schedulePreview=null;
+
+function createSchedule(){
   if(!requireAdmin())return;
   const week=$("#cleanWeek").value;
-  if(!week)return toast("Chọn tuần bắt đầu");
-  const people=state.members.filter(m=>state.presence[m.id]!==false);
-  if(!people.length)return toast("Không có thành viên có mặt");
-
-  let tasks=[...TASKS];
-  const absent=state.members.length-people.length;
-  if(absent===1)tasks=tasks.filter(t=>t.id!=="rac");
-  const loads=Object.fromEntries(people.map(p=>[p.id,{base:historicalPoints(p.id,week),week:0,count:0}]));
-  const assignments=tasks.slice().sort((a,b)=>b.w-a.w).map(task=>{
-    const ranked=people.map(p=>({
-      p,
-      repeat:wasSameTaskLastWeek(p.id,task.id,week)?1:0,
-      last:previousAssignment(p.id,task.id,week),
-      load:loads[p.id].base+loads[p.id].week,
-      count:loads[p.id].count
-    })).sort((a,b)=>a.repeat-b.repeat||a.load-b.load||a.count-b.count||(a.last||"").localeCompare(b.last||""));
-    const chosen=ranked[0].p;
-    loads[chosen.id].week+=task.w;loads[chosen.id].count++;
-    return {taskId:task.id,task:task.name,personId:chosen.id,personName:chosen.name,completed:false,cut:false};
+  if(!P708BillingCycle.parseDateKey(week))return toast("Chọn tuần bắt đầu");
+  if(state.schedules.some(s=>s.weekStart===week))return toast("Tuần này đã có lịch.");
+  const assignments=P708CleaningFairness.proposeCleaningSchedule({
+    members:state.members,presence:state.presence,tasks:TASKS,schedules:state.schedules,week,
+    weights:state.settings.weights,adjustments:state.settings.cleaningPointAdjustments,resetThrough:cleaningPointsResetThrough()
   });
-  if(absent===1)assignments.push({taskId:"rac",task:"Chà tường",personId:null,personName:"Tạm cắt",completed:false,cut:true});
+  if(!assignments.length)return toast("Không có thành viên có mặt");
+  const present=state.members.filter(m=>state.presence[m.id]!==false);
+  const absent=state.members.filter(m=>state.presence[m.id]===false);
+  schedulePreview={week,assignments,absent,tombstone:clone(state._sync?.deletedSchedules?.[week]||null),actor:authSession.user?.uid};
+  $("#schedulePreviewTitle").textContent=weekRange(week);
+  $("#schedulePreviewFields").innerHTML=assignments.map(a=>{
+    const reason=a.reason.kind==="proposal"
+      ? `${formatCleaningPoints(a.reason.load)} điểm xếp lịch · Lần trực gần nhất: ${a.reason.lastAny||"chưa có"}`
+      : "Được miễn trong tuần này";
+    const options=present.map(m=>`<option value="${esc(m.id)}" ${m.id===a.personId?"selected":""}>${esc(m.name)}</option>`).join("");
+    return `<label class="field schedule-preview-field"><b>${esc(a.task)}</b><select data-preview-task="${esc(a.taskId)}"><option value="">Tạm miễn</option>${options}</select><small>${esc(reason)}</small></label>`;
+  }).join("");
+  openModal("schedulePreviewModal");
+}
 
-  const old=state.schedules.find(s=>s.weekStart===week);
-  if(old&&!confirm("Tuần này đã có lịch. Ghi đè? Mọi trạng thái hoàn thành của tuần này sẽ được tạo lại."))return;
+async function confirmSchedule(){
+  const preview=schedulePreview;
+  if(!requireAdmin()||!preview||preview.actor!==authSession.user?.uid)return;
+  const {week,absent,tombstone}=preview;
+  if(state.schedules.some(s=>s.weekStart===week))return toast("Tuần này vừa có lịch trên thiết bị khác.");
+  const assignments=preview.assignments.map(a=>{
+    const selected=$(`[data-preview-task="${a.taskId}"]`).value;
+    if((a.personId||"")===selected)return a;
+    const member=state.members.find(m=>m.id===selected);
+    return {...a,personId:selected||null,personName:member?.name||"Tạm cắt",cut:!selected,reason:{kind:selected?"fixed":"exempt"}};
+  });
+  if(assignments.some(a=>a.personId&&(!state.members.some(m=>m.id===a.personId)||state.presence[a.personId]===false)))return toast("Danh sách có mặt đã đổi. Hãy tạo đề xuất mới.");
   const t=nowIso(),schedule={
-    id:old?.id||uid(),weekStart:week,createdAt:old?.createdAt||t,updatedAt:t,assignments,
-    absentNames:state.members.filter(m=>state.presence[m.id]===false).map(m=>m.name)
+    id:uid(),weekStart:week,createdAt:t,updatedAt:t,locked:true,assignments,
+    absentNames:absent.map(m=>m.name),absentMemberIds:absent.map(m=>m.id),
+    fairnessPolicy:{longAbsenceMinWeeks:2,longAbsenceCredit:"present_average_load",version:2}
   };
-  const index=state.schedules.findIndex(s=>s.weekStart===week);
-  if(index>=0)state.schedules[index]=schedule;else state.schedules.push(schedule);
+  if(state._sync?.deletedSchedules)delete state._sync.deletedSchedules[week];
+  state.schedules.push(schedule);
   state.schedules.sort((a,b)=>a.weekStart.localeCompare(b.weekStart));
   ui.selectedScheduleId=schedule.id;
-  const ok=await persist("Đã tạo lịch công bằng",{action:"CREATE_SCHEDULE",summary:`Tạo lịch tuần ${week}`});
-  if(ok)await realtimeEngine?.reconcileTaskSubmissions({weekStart:week,assignments:schedule.assignments}).catch(()=>{});
+  schedulePreview=null;closeModal("schedulePreviewModal");
+  await persist("Đã xác nhận lịch trực",{action:"CREATE_SCHEDULE",summary:`Tạo lịch tuần ${week}`,week,tombstone});
 }
 function selectSchedule(scheduleId){
   ui.selectedScheduleId=scheduleId;
@@ -167,6 +167,7 @@ function openManual(){
   if(!requireAdmin())return;
   const s=currentSchedule();
   if(!s)return toast("Hãy tạo lịch trước");
+  if(s.locked)return toast("Lịch đã xác nhận.");
   $("#manualFields").innerHTML=TASKS.map(task=>{
     const a=s.assignments.find(x=>x.taskId===task.id);
     return `<div class="field"><label>${task.emoji} ${esc(task.name)}</label><select data-manual-task="${task.id}"><option value="__CUT__" ${a?.cut?"selected":""}>Tạm cắt</option>${state.members.map(m=>`<option value="${m.id}" ${a?.personId===m.id?"selected":""}>${esc(m.name)}</option>`).join("")}</select></div>`;
@@ -177,6 +178,7 @@ async function saveManual(){
   if(!requireAdmin())return;
   const s=currentSchedule();
   if(!s)return;
+  if(s.locked)return toast("Lịch đã xác nhận.");
   const oldByTask=Object.fromEntries((s.assignments||[]).map(a=>[a.taskId,a]));
   s.assignments=TASKS.map(task=>{
     const value=$(`[data-manual-task="${task.id}"]`)?.value,old=oldByTask[task.id];
@@ -189,7 +191,7 @@ async function saveManual(){
   const ok=await persist("Đã lưu phân công",{action:"UPDATE_SCHEDULE",summary:`Chỉnh phân công tuần ${s.weekStart}`});
   if(ok)await realtimeEngine?.reconcileTaskSubmissions({weekStart:s.weekStart,assignments:s.assignments}).catch(()=>{});
 }
-async function submitTask(index){
+async function submitTask(index,status="submitted"){
   if(!navigator.onLine)return toast("Đang ngoại tuyến · hãy kết nối mạng trước khi báo hoàn thành",5000);
   const s=currentSchedule(),a=s?.assignments?.[index];
   if(!s||!a||a.cut)return;
@@ -198,8 +200,8 @@ async function submitTask(index){
   if(existing?.status==="submitted")return toast("Công việc này đã báo hoàn thành và đang chờ xác nhận");
   if(existing?.status==="approved")return toast("Công việc đã được xác nhận");
   try{
-    await realtimeEngine?.submitTask({scheduleId:s.id,weekStart:s.weekStart,taskId:a.taskId,taskName:a.task,memberId:a.personId});
-    toast("Đã báo hoàn thành, chờ trưởng phòng xác nhận");
+    await realtimeEngine?.submitTask({scheduleId:s.id,weekStart:s.weekStart,taskId:a.taskId,taskName:a.task,memberId:a.personId,status});
+    toast(status==="in_progress"?"Đã bắt đầu công việc":"Đã báo hoàn thành, chờ trưởng phòng xác nhận");
   }catch(e){toast(e?.message||"Không thể báo hoàn thành");}
 }
 async function reviewTask(index,approved){

@@ -4,7 +4,8 @@ import {
   absenceCreditBreakdown,
   historicalFairnessLoad,
   actualCleaningPoints,
-  cleaningPointAdjustment
+  cleaningPointAdjustment,
+  proposeCleaningSchedule
 } from "../src/core/cleaning-fairness.js";
 
 const weights={lavabo:4,san:5,lau:4,quet:3,tham:2,rac:4};
@@ -77,4 +78,15 @@ function week(weekStart,absentIds=[]){
   assert.equal(rows.length,2);
 }
 
-console.log("Cleaning long-absence fairness tests passed.");
+{
+  const options={members,presence:{A:false},tasks:Object.keys(weights).map(id=>({id,name:id,w:weights[id]})),
+    schedules:[week("2026-09-01",["A"]),week("2026-09-08",["A"])],
+    week:"2026-09-15",weights,fixed:{san:"B"},seed:"p708"};
+  const proposal=proposeCleaningSchedule(options);
+  assert.deepEqual(proposeCleaningSchedule({...options,members:[...members].reverse()}),proposal);
+  assert.ok(proposal.every(item=>item.personId!=="A"));
+  assert.equal(proposal.find(item=>item.taskId==="san").personId,"B");
+  assert.equal(proposal.find(item=>item.taskId==="rac").cut,true);
+  assert.equal(proposeCleaningSchedule({...options,presence:Object.fromEntries(members.map(m=>[m.id,false]))}).length,0);
+}
+console.log("Cleaning long-absence fairness and deterministic proposal tests passed.");

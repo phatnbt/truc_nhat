@@ -10,6 +10,8 @@ function renderCleaning(){
   $$('[data-remove-member]').forEach(btn=>btn.addEventListener("click",()=>removeMember(btn.dataset.removeMember)));
 
   const s=currentSchedule(),box=$("#cleanScheduleBox");
+  $("#manualScheduleButton").disabled=!!s?.locked;
+  renderRoomCalendar();
   if(!s){
     box.innerHTML=`<div class="empty" style="margin-top:14px">${isAdmin()?"Chọn tuần rồi tạo lịch công bằng.":"Trưởng phòng chưa tạo lịch."}</div>`;
   }else{
@@ -22,14 +24,16 @@ function renderCleaning(){
         else if(isAdmin()&&sub?.status==="submitted")action=`<div class="task-actions"><button class="btn small green" data-review-approve="${index}" type="button">Xác nhận</button><button class="btn small danger" data-review-reject="${index}" type="button">Làm lại</button></div>`;
         else if(isAdmin())action=`<button class="btn small soft" data-admin-task="${index}" type="button">Đánh dấu xong</button>`;
         else if(mine&&sub?.status==="submitted")action='<span class="badge warning">⏳ Chờ xác nhận</span>';
-        else if(mine)action=`<button class="btn small primary" data-submit-task="${index}" type="button">✓ Tôi đã làm</button>`;
+        else if(mine)action=`<div class="task-actions">${sub?"":`<button class="btn small soft" data-start-task="${index}" type="button">Bắt đầu</button>`}<button class="btn small primary" data-submit-task="${index}" type="button">✓ Tôi đã làm</button></div>`;
         else action='<span class="badge">Chỉ xem</span>';
       }
-      const status=a.cut?"—":a.completed?"Đã xong":sub?.status==="approved"?"Đã duyệt · chưa khớp lịch":sub?.status==="submitted"?"Đã báo hoàn thành":sub?.status==="rejected"?"Cần làm lại":"Chưa xong";
+      const overdue=dateValue(addDays(parseDate(s.weekStart),6))<P708BillingCycle.roomDateKey();
+      const status=a.cut?"Được miễn":a.completed?"Đã xong":sub?.status==="approved"?"Đã duyệt · chưa khớp lịch":sub?.status==="submitted"?"Chờ xác nhận":sub?.status==="rejected"?"Cần làm lại":overdue?"Quá hạn":sub?.status==="in_progress"?"Đang thực hiện":"Chưa thực hiện";
       return `<tr class="${a.completed?"done-row":sub?.status==="submitted"?"submitted-row":""}"><td data-label="Công việc"><b>${TASKS.find(t=>t.id===a.taskId)?.emoji||""} ${esc(a.task)}</b></td><td data-label="Phụ trách">${a.cut?'<span class="unpaid-text">Tạm cắt</span>':esc(a.personName)}</td><td data-label="Trạng thái">${esc(status)}</td><td data-label="Thao tác">${action}</td></tr>`;
     }).join("");
     box.innerHTML=`<div class="schedule-card"><div class="schedule-head"><div><h3>${weekRange(s.weekStart)}</h3><p>${s.absentNames?.length?`Vắng: ${esc(s.absentNames.join(", "))}`:"Tất cả thành viên có mặt"}</p></div><span class="badge ${done===total&&total?"success":""}">${done}/${total} xác nhận</span></div><div class="table-wrap"><table><thead><tr><th>Công việc</th><th>Phụ trách</th><th>Trạng thái</th><th>Thao tác</th></tr></thead><tbody>${rows}</tbody></table></div></div>`;
     $$('[data-submit-task]').forEach(btn=>btn.addEventListener("click",()=>submitTask(Number(btn.dataset.submitTask))));
+    $$('[data-start-task]').forEach(btn=>btn.addEventListener("click",()=>submitTask(Number(btn.dataset.startTask),"in_progress")));
     $$('[data-review-approve]').forEach(btn=>btn.addEventListener("click",()=>reviewTask(Number(btn.dataset.reviewApprove),true)));
     $$('[data-review-reject]').forEach(btn=>btn.addEventListener("click",()=>reviewTask(Number(btn.dataset.reviewReject),false)));
     $$('[data-admin-task]').forEach(btn=>btn.addEventListener("click",()=>adminToggleTask(Number(btn.dataset.adminTask))));

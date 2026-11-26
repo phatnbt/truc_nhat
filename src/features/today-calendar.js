@@ -1,9 +1,34 @@
+function renderRoomCalendar(){
+  const root=$("#roomCalendarList");
+  if(!root)return;
+  const period=P708BillingCycle;
+  const today=period.roomDateKey(),date=period.parseDateKey(today),view=$("#roomCalendarView").value;
+  const monday=period.dateKey(period.addUtcDays(date,-((date.getUTCDay()+6)%7)));
+  const start=view==="today"?today:view==="month"?today.slice(0,7)+"-01":monday;
+  const end=view==="today"?today:view==="month"?today.slice(0,7)+"-31":period.dateKey(period.addUtcDays(period.parseDateKey(monday),6));
+  const rows=[];
+  for(const schedule of state.schedules){
+    const last=period.dateKey(period.addUtcDays(period.parseDateKey(schedule.weekStart),6));
+    if(schedule.weekStart>end||last<start)continue;
+    const tasks=schedule.assignments.filter(a=>!a.cut&&(view!=="personal"||a.personId===myMemberId()));
+    for(const a of tasks)rows.push({date:schedule.weekStart,title:a.task,detail:a.completed?"Đã hoàn thành":a.personName,scheduleId:schedule.id});
+    if(view!=="personal"&&schedule.absentNames?.length)rows.push({date:schedule.weekStart,title:"Vắng mặt",detail:schedule.absentNames.join(", ")});
+  }
+  if(view!=="personal")for(const bill of state.billing.months){
+    if(bill.cycleEnd>=start&&bill.cycleEnd<=end)rows.push({date:bill.cycleEnd,title:"Kết thúc kỳ điện nước",detail:monthLabel(bill.month)});
+  }
+  root.innerHTML=rows.length?rows.sort((a,b)=>a.date.localeCompare(b.date)).map(item=>
+    `<div class="room-presence"><div><b>${esc(item.title)}</b><div>${esc(item.detail)}</div></div>${item.scheduleId?`<button class="btn small" type="button" data-room-calendar-week="${esc(item.scheduleId)}">${esc(item.date)}</button>`:`<span>${esc(item.date)}</span>`}</div>`
+  ).join(""):'<p class="empty">Chưa có sự kiện trong khoảng này.</p>';
+  root.querySelectorAll("[data-room-calendar-week]").forEach(button=>button.onclick=()=>selectSchedule(button.dataset.roomCalendarWeek));
+}
+
 (()=>{
   const TODAY_SCROLL_KEY="P708_TODAY_CALENDAR_SCROLL";
   let lastScrolled="";
 
   const pad=value=>String(value).padStart(2,"0");
-  const localMonth=date=>`${date.getFullYear()}-${pad(date.getMonth()+1)}`;
+  const localMonth=date=>P708BillingCycle.roomDateKey(date).slice(0,7);
 
   const style=document.createElement("style");
   style.dataset.todayCalendar="1";
