@@ -4,6 +4,12 @@
 /* Five visual forms; streak calculation and ownership rules stay unchanged. */
 .p708-pet{position:relative;width:50px;height:56px;display:grid;place-items:center;cursor:pointer;user-select:none;transform-origin:50% 82%;will-change:transform}
 .p708-pet img{position:relative;z-index:2;width:100%;height:100%;object-fit:contain;pointer-events:none;filter:drop-shadow(0 7px 8px rgba(57,63,130,.16))}
+.pet-accessory{position:absolute;z-index:3;top:0;left:0;pointer-events:none}
+.pet-accessory--leaf{width:23px;height:22px;transform:rotate(-15deg);background:linear-gradient(#16613c,#16613c) center bottom/3px 13px no-repeat;filter:drop-shadow(0 1px 2px #133d3970)}
+.pet-accessory--leaf::before,.pet-accessory--leaf::after{content:"";position:absolute;width:12px;height:9px;top:5px;background:#52cf78;border:1px solid #19643d}
+.pet-accessory--leaf::before{left:0;border-radius:9px 1px;transform:rotate(52deg)}
+.pet-accessory--leaf::after{right:0;top:2px;border-radius:1px 9px;transform:rotate(-52deg);background:#a2e85d}
+.pet-accessory--star{font-size:21px;line-height:1;color:#ffd35b;text-shadow:0 1px 3px #653a00}
 .pet-aura{position:absolute;z-index:0;inset:5%;border-radius:50%;background:radial-gradient(circle,rgba(255,255,255,.96),rgba(157,178,255,.24) 52%,transparent 74%);filter:blur(1.5px);animation:pet-aura-pulse 3.6s ease-in-out infinite}
 .pet-shadow{position:absolute;z-index:1;left:18%;right:18%;bottom:1px;height:6px;border-radius:50%;background:rgba(47,58,127,.15);filter:blur(2px)}
 .stage-0 .pet-aura{background:radial-gradient(circle,rgba(255,255,255,.98),rgba(173,169,245,.22) 52%,transparent 74%)}

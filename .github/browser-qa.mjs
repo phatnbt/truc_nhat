@@ -43,6 +43,13 @@ async function login(page,account){
   page.on("pageerror",e=>errors.push(e.message));
   await page.goto(base);
   await expect(page.locator("#googleLoginButton")).toBeVisible({timeout:15000});
+  await page.evaluate(()=>{
+    const gate=document.querySelector("#authGateContent");
+    window.p708SawUnexpectedAccessRequest=false;
+    new MutationObserver(()=>{
+      if(gate.querySelector("#requestDisplayName"))window.p708SawUnexpectedAccessRequest=true;
+    }).observe(gate,{childList:true,subtree:true});
+  });
   await page.evaluate(async ({email,password})=>{
     const {getApp}=await import("https://www.gstatic.com/firebasejs/12.16.0/firebase-app.js");
     const {getAuth,signInWithEmailAndPassword}=await import("https://www.gstatic.com/firebasejs/12.16.0/firebase-auth.js");
@@ -50,6 +57,7 @@ async function login(page,account){
   },{email:account.email,password});
   await expect(page.locator("#authGate")).toBeHidden({timeout:15000});
   await expect(page.locator("#kpiMembers")).toHaveText("2");
+  assert.equal(await page.evaluate(()=>window.p708SawUnexpectedAccessRequest),false,"a pending permission lookup must not show the access-request form");
   return errors;
 }
 function assertBrowserErrors(name,errors){
@@ -96,8 +104,27 @@ async function exercise(engine,name,width){
     const hasTouch=name==="webkit";
     const manager=await browser.newPage({viewport,hasTouch,timezoneId:"America/Los_Angeles"});
     const resident=await browser.newPage({viewport,hasTouch,timezoneId:"Asia/Ho_Chi_Minh"});
+    if(hasTouch){
+      const firestore="https://www.gstatic.com/firebasejs/12.16.0/firebase-firestore.js";
+      await resident.route(firestore,route=>route.fulfill({
+        contentType:"text/javascript",
+        body:`export * from "${firestore}?p708-original";
+          import {onSnapshot as subscribe} from "${firestore}?p708-original";
+          export function onSnapshot(ref,...args){
+            if(ref.path?.includes("/access/")){
+              const index=typeof args[0]==="function"?0:1,receive=args[index];
+              args[index]=snapshot=>setTimeout(()=>receive(snapshot),1000);
+            }
+            return subscribe(ref,...args);
+          }`
+      }));
+    }
     const managerErrors=await login(manager,admin), residentErrors=await login(resident,member);
     await expect(resident.locator("#homeGreeting")).toHaveText("P708 · Bình");
+    assert.ok(await manager.evaluate(async()=>{
+      const first=realtimeEngine.forceSync(),second=realtimeEngine.forceSync();
+      return first===second&&await first;
+    }),"simultaneous sync calls should use the same server read");
     await expect(manager.locator("#homeDate")).toHaveText(await resident.locator("#homeDate").innerText());
     const overflow=await resident.evaluate(()=>document.documentElement.scrollWidth>innerWidth);
     assert.equal(overflow,false,"dashboard fits the viewport");

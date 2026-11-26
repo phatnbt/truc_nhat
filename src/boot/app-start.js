@@ -1,5 +1,6 @@
 async function startCloud(){
   let bootReady=false;
+  let sessionMarkup="";
   const signalBootReady=()=>{if(bootReady)return;bootReady=true;window.dispatchEvent(new Event("p708:boot-ready"));};
   try{localStorage.removeItem(CACHE_KEY);}catch{}
   realtimeEngine=createP708SecureEngine({
@@ -13,6 +14,9 @@ async function startCloud(){
     },
     onStatus:status=>{syncStatus={mode:status.mode||"online",text:status.text||"Đã đồng bộ"};renderSync();},
     onSession:session=>{
+      const nextSession=JSON.stringify(session);
+      if(nextSession===sessionMarkup)return;
+      sessionMarkup=nextSession;
       if(session.status!=="active"||session.user?.uid!==authSession.user?.uid||session.access?.role!==authSession.access?.role){
         state=defaultState();
         confirmedState=clone(state);
@@ -24,16 +28,20 @@ async function startCloud(){
         }
       }
       authSession={...authSession,...session};
+      if(session.status==="active"&&location.hash==="#audit")showPage("audit",{replace:true,scroll:false});
       renderAuthGate();if(session.status!=="checking")signalBootReady();renderAll();
     },
     onAdminData:data=>{
       if(data.requests!==undefined)accessRequests=data.requests;
       if(data.accesses!==undefined)accessAccounts=data.accesses;
       if(data.logs!==undefined)auditLogs=data.logs;
-      renderAll();
+      renderHome();
+      if(data.logs!==undefined&&document.body.dataset.page==="audit")renderAudit();
+      if($("#accessModal").classList.contains("show"))renderAccessModal();
+      renderNotificationCenter();
     },
-    onTaskData:data=>{taskSubmissions=data||[];renderAll();},
-    onSwapData:data=>{taskSwaps=data||[];renderAll();}
+    onTaskData:data=>{taskSubmissions=data||[];renderHome();renderCleaning();renderNotificationCenter();},
+    onSwapData:data=>{taskSwaps=data||[];renderHome();renderCleaning();renderNotificationCenter();}
   });
   try{await realtimeEngine.start();}
   catch(e){
@@ -69,6 +77,7 @@ function bindStaticEvents(){
     }
   });
   $("#accountButton")?.addEventListener("click",()=>{renderAccessModal();openModal("accessModal");});
+  $("#homeSyncButton")?.addEventListener("click",forceSync);
   $("#homeCleaningButton")?.addEventListener("click",()=>{const week=roomScheduleToday();if(week)selectSchedule(week.id);});
   $("#homePendingButton")?.addEventListener("click",()=>{
     if(isAdmin())$(".room-queue")?.scrollIntoView({block:"center"});
@@ -169,6 +178,13 @@ function bindStaticEvents(){
   $("#auditActionFilter")?.addEventListener("change",e=>{auditFilters.action=e.target.value;renderAudit();});
   $("#auditSearch")?.addEventListener("input",e=>{auditFilters.query=e.target.value;renderAudit();});
   $("#clearAuditFiltersButton")?.addEventListener("click",()=>{auditFilters={member:"all",action:"all",query:""};renderAudit();});
+  $("#auditGroups")?.addEventListener("click",event=>{
+    const button=event.target.closest("[data-audit-more]");
+    if(!button)return;
+    const actor=button.dataset.auditMore;
+    auditVisibleCounts.set(actor,(auditVisibleCounts.get(actor)||auditPageSize)+auditPageSize);
+    renderAudit();
+  });
   $("#cleanupAuditButton")?.addEventListener("click",cleanupAudit);
 
   const routeFromLocation=()=>showPage(location.hash.replace("#","")||"home",{replace:true,instant:true,scroll:false});
@@ -176,13 +192,19 @@ function bindStaticEvents(){
   window.addEventListener("popstate",routeFromLocation);
   window.addEventListener("online",()=>forceSync());
   window.addEventListener("offline",()=>{syncStatus={mode:"offline",text:"Mất kết nối · chế độ chỉ đọc"};renderSync();});
-  document.addEventListener("visibilitychange",()=>{if(!document.hidden)realtimeEngine?.forceSync().catch(()=>{});});
+  let hiddenAt=document.hidden?Date.now():0;
+  document.addEventListener("visibilitychange",()=>{
+    if(document.hidden){hiddenAt=Date.now();return;}
+    const away=hiddenAt?Date.now()-hiddenAt:0;
+    hiddenAt=0;
+    if(away>=30000&&navigator.onLine)realtimeEngine?.forceSync().catch(()=>{});
+  });
 }
 
 async function registerPwa(){
   if(!("serviceWorker" in navigator)||location.protocol==="file:")return;
   try{
-    const reg=await navigator.serviceWorker.register("./sw.js?v=20261127-3",{scope:"./",updateViaCache:"none"});
+    const reg=await navigator.serviceWorker.register("./sw.js?v=20261127-4",{scope:"./",updateViaCache:"none"});
     const banner=$("#pwaUpdateBanner");
     const showUpdate=()=>{banner.hidden=!(reg.waiting&&reg.active&&reg.waiting!==reg.active&&navigator.serviceWorker.controller);};
     showUpdate();
@@ -209,6 +231,6 @@ bindNotificationCenter();
 if($("#cleanWeek"))$("#cleanWeek").value=dateValue(nextMonday());
 state.billing.selectedMonth=validMonthKey(ui.selectedMonth)?ui.selectedMonth:state.billing.selectedMonth||todayMonth();
 renderAll();
-showPage(location.hash.replace("#","")||"home",{replace:true,instant:true});
+showPage(location.hash.replace("#","")||"home",{replace:true,instant:true,updateLocation:location.hash!=="#audit"});
 void registerPwa();
 startCloud();

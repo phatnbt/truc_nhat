@@ -117,7 +117,7 @@ export function createP708SecureEngine({firebaseConfig,roomCode,deviceId,onShape
     taskCollection=collection(db,"rooms",roomCode,"taskSubmissions"),
     swapCollection=collection(db,"rooms",roomCode,"swapRequests");
 
-  let user=null,access=null,ownRequest=null,
+  let user=null,access=null,ownRequest=null,accessReady=false,requestReady=false,restoreInFlight=null,
     remoteShape={},optimisticShape={},roomReady=false,remoteRevision=0,
     memberDataByUid=new Map(),accessByUid=new Map(),started=false,memberDataReady=false;
   let authUnsub=null,accessUnsub=null,requestUnsub=null,
@@ -129,13 +129,15 @@ export function createP708SecureEngine({firebaseConfig,roomCode,deviceId,onShape
   const emitSession=(extra={})=>onSession?.({
     user:user?{uid:user.uid,email:user.email||"",displayName:user.displayName||"",photoURL:user.photoURL||""}:null,
     access:clone(access),request:clone(ownRequest),
-    status:!user?"signedOut":access?.active?"active":ownRequest?"pending":"needsAccess",
+    status:!user?"signedOut":!accessReady?"checking":access?.active?"active":!requestReady?"checking":ownRequest?"pending":"needsAccess",
     ...extra
   });
   const emitAdminData=(requests=null,accesses=null,logs=null)=>onAdminData?.({requests:requests??undefined,accesses:accesses??undefined,logs:logs??undefined});
   const rebuild=()=>{
     if(!hasAccess()||!roomReady)return;
-    optimisticShape=overlayMemberData(remoteShape||{},memberDataByUid);
+    const nextShape=overlayMemberData(remoteShape||{},memberDataByUid);
+    if(jsonEqual(optimisticShape,nextShape))return;
+    optimisticShape=nextShape;
     onShape?.(clone(optimisticShape),{role:access?.role||null,memberId:access?.memberId||null});
   };
   const acceptRoomShape=(payload,revision)=>{
@@ -195,7 +197,7 @@ export function createP708SecureEngine({firebaseConfig,roomCode,deviceId,onShape
     stopDataListeners();
     roomUnsub=onSnapshot(roomRef,{includeMetadataChanges:true},snap=>{
       if(snap.metadata.fromCache){
-        emitStatus("offline","Chưa xác nhận dữ liệu với máy chủ");
+        emitStatus(navigator.onLine?"syncing":"offline","Chưa xác nhận dữ liệu với máy chủ");
         return;
       }
       acceptRoomShape(snap.data()?.payload,Number(snap.data()?.revision)||0);
@@ -223,13 +225,19 @@ export function createP708SecureEngine({firebaseConfig,roomCode,deviceId,onShape
   const attachUserListeners=()=>{
     accessUnsub?.();requestUnsub?.();
     accessUnsub=onSnapshot(doc(accessCollection,user.uid),{includeMetadataChanges:true},s=>{
-      if(!s.metadata.fromCache)handleAccessChange(s.exists()?{uid:s.id,...s.data()}:null);
-    },e=>emitSession({error:e}));
-    requestUnsub=onSnapshot(doc(requestCollection,user.uid),s=>{ownRequest=s.exists()?{uid:s.id,...s.data()}:null;emitSession();},e=>emitSession({error:e}));
+      if(s.metadata.fromCache)return;
+      accessReady=true;
+      handleAccessChange(s.exists()?{uid:s.id,...s.data()}:null);
+    },e=>{stopDataListeners();access=null;emitSession({status:"error",error:e});});
+    requestUnsub=onSnapshot(doc(requestCollection,user.uid),{includeMetadataChanges:true},s=>{
+      if(s.metadata.fromCache)return;
+      requestReady=true;ownRequest=s.exists()?{uid:s.id,...s.data()}:null;emitSession();
+    },e=>{if(!hasAccess())emitSession({status:"error",error:e});});
   };
   const clearUserListeners=()=>{
     accessUnsub?.();requestUnsub?.();accessUnsub=requestUnsub=null;
     stopDataListeners();access=null;ownRequest=null;
+    accessReady=false;requestReady=false;restoreInFlight=null;
   };
   const onlineHandler=()=>emitStatus("syncing","Đang kết nối lại…");
   const offlineHandler=()=>emitStatus("offline","Mất kết nối · dữ liệu được giữ trên thiết bị");
@@ -242,15 +250,18 @@ export function createP708SecureEngine({firebaseConfig,roomCode,deviceId,onShape
     window.addEventListener("online",onlineHandler);window.addEventListener("offline",offlineHandler);
   };
   const signInGoogle=async()=>{
-    const external=location.hostname==="phatnbt.github.io";
+    const firstParty=location.hostname===firebaseConfig.authDomain;
     const standalone=window.matchMedia("(display-mode: standalone)").matches||navigator.standalone===true;
-    const openFirebaseHosting=()=>location.assign(new URL(location.hash||"/","https://p708-room-manager.web.app/").href);
-    if(external&&standalone){openFirebaseHosting();return;}
-    if(!external&&standalone&&!useEmulators){await signInWithRedirect(auth,provider);return;}
+    const ios=/iPhone|iPad|iPod/i.test(navigator.userAgent)||(navigator.platform==="MacIntel"&&navigator.maxTouchPoints>1);
+    const openFirebaseHosting=()=>location.assign(new URL(location.hash||"/","https://p708-room-manager.firebaseapp.com/").href);
+    if(!useEmulators&&(ios||standalone)){
+      if(!firstParty){openFirebaseHosting();return;}
+      await signInWithRedirect(auth,provider);return;
+    }
     try{await signInWithPopup(auth,provider);}
     catch(e){
       if(!["auth/popup-blocked","auth/operation-not-supported-in-this-environment"].includes(e?.code))throw e;
-      if(external){openFirebaseHosting();return;}
+      if(!firstParty&&!useEmulators){openFirebaseHosting();return;}
       await signInWithRedirect(auth,provider);
     }
   };
@@ -551,16 +562,21 @@ export function createP708SecureEngine({firebaseConfig,roomCode,deviceId,onShape
     for(;;){const snap=await getDocs(query(auditCollection,where("createdAt","<",cutoff),orderBy("createdAt","asc"),limit(400)));if(snap.empty)break;deletedCount+=await commitDeletes(snap.docs);if(snap.size<400)break;}
     await writeAudit({action:"CLEANUP_AUDIT",summary:`Dọn ${deletedCount} nhật ký cũ hơn ${days} ngày`});return {deletedCount,retentionDays:days,cutoff:new Date(cutoff.toMillis()).toISOString()};
   };
-  const forceSync=async()=>{
-    if(!user||!hasAccess())return false;
+  const forceSync=()=>{
+    if(!user||!hasAccess())return Promise.resolve(false);
+    if(restoreInFlight)return restoreInFlight;
     const actor=user.uid;
-    try{
-      const snap=await getDocFromServer(roomRef);
+    const pending=getDocFromServer(roomRef).then(snap=>{
       if(user?.uid!==actor||!hasAccess())return false;
       acceptRoomShape(snap.data()?.payload,Number(snap.data()?.revision)||0);
+      emitStatus("online","Đã đồng bộ");
       return true;
-    }
-    catch(e){emitStatus("offline","Không thể đồng bộ",{error:e});return false;}
+    }).catch(e=>{
+      if(user?.uid===actor)emitStatus("offline","Không thể đồng bộ",{error:e});
+      return false;
+    }).finally(()=>{if(restoreInFlight===pending)restoreInFlight=null;});
+    restoreInFlight=pending;
+    return pending;
   };
   const flush=forceSync;
   const stop=()=>{authUnsub?.();clearUserListeners();window.removeEventListener("online",onlineHandler);window.removeEventListener("offline",offlineHandler);started=false;};

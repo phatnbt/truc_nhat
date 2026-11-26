@@ -11,7 +11,7 @@
     if(document.querySelector('link[data-cleaning-pet="1"]'))return;
     const link=document.createElement("link");
     link.rel="stylesheet";
-    link.href="./cleaning-pet.css?v=20260921-3";
+    link.href="./cleaning-pet.css?v=20261127-4";
     link.dataset.cleaningPet="1";
     document.head.appendChild(link);
   }
@@ -35,12 +35,19 @@
     return state.members.find(m=>m.id===mine)||null;
   }
 
-  function petFace(stage,memberName,size="float"){
+  function decorationFor(memberId){
+    if(!memberId||memberId!==ownMemberId())return null;
+    return S.petExperience(state.schedules,memberId).rewards.find(item=>item.value===storageGet(`P708_PET_DECOR_${memberId}`))||null;
+  }
+
+  function petFace(stage,memberName,size="float",decoration=null){
     const safe=esc(memberName||"Pet P708");
     const asset=esc(stage.asset||"./icons/pets/cloud-egg.svg");
-    return `<div class="p708-pet stage-${stage.level} pet-${size}" data-pet-touch="1" role="img" aria-label="${esc(stage.name)} của ${safe}">
+    const accessory=decoration?`<span class="pet-accessory pet-accessory--${decoration.value}" aria-hidden="true">${decoration.value==="star"?"★":""}</span>`:"";
+    return `<div class="p708-pet stage-${stage.level} pet-${size}" data-pet-touch="1" role="img" aria-label="${esc(stage.name)} của ${safe}${decoration?` · ${esc(decoration.label)}`:""}">
       <span class="pet-aura"></span>
       <img src="${asset}" alt="" draggable="false">
+      ${accessory}
       <span class="pet-shadow"></span>
     </div>`;
   }
@@ -182,6 +189,7 @@
     },{passive:true});
   }
 
+  let lastFloatingFace="";
   function refreshWidget(){
     ensureStyles();
     document.querySelector("#cleaningPetPanel")?.remove();
@@ -193,7 +201,11 @@
     if(!active)return;
 
     const stats=statsFor(member),stage=S.petStage(stats.current);
-    host.querySelector("#petFloatVisual").innerHTML=petFace(stage,member.name,"float");
+    const face=petFace(stage,member.name,"float",decorationFor(member.id));
+    if(face!==lastFloatingFace){
+      host.querySelector("#petFloatVisual").innerHTML=face;
+      lastFloatingFace=face;
+    }
     host.querySelector("#petFloatFire").textContent=`🔥${stats.current}`;
     host.querySelector("#petMiniOwner").textContent=member.name;
     host.querySelector("#petMiniStatus").textContent=`${stage.name} · 🔥 ${stats.current} streak`;
@@ -235,6 +247,7 @@
 
   globalThis.P708PetWidget={
     refresh:refreshWidget,
+    decorationFor,
     selectMember,
     canCallMember:memberId=>!!ownMemberId()&&memberId===ownMemberId(),
     open:()=>{if(currentMember()){showBubble();animatePet();}},

@@ -15,7 +15,8 @@ const ids=["a","b","c","d"];
 const names=["Tiến Phát","Minh Anh","Gia Bảo","Khánh Linh"];
 const members=Object.fromEntries(ids.map((id,i)=>[id,{id,name:names[i]}]));
 const tasks=["lavabo","san","quet","lau","tham","rac"];
-const assignments=tasks.map((taskId,i)=>({taskId,personId:ids[i%ids.length],personName:names[i%ids.length],completed:i===1,cut:false}));
+const assignments=tasks.map((taskId,i)=>({taskId,personId:i<5?"a":"b",personName:i<5?names[0]:names[1],completed:i<5,cut:false}));
+const logs=Array.from({length:18},(_,index)=>({id:`log-${index}`,actorUid:"visual-admin",actorName:names[0],actorEmail:"admin@example.test",action:"UPDATE_TASK",summary:`Đã cập nhật việc trực ${index+1}`,createdAt:new Date(Date.now()-index*60000).toISOString()}));
 const payload={members,presence:{a:true,b:true,c:true,d:false},schedules:{[weekStart]:{id:"visual-week",weekStart,assignments}},settings:{},billingMonths:{
   [month]:{id:"visual-bill",month,electricity:348000,water:96000,closed:true,people:Object.fromEntries(ids.map((id,i)=>[
     `person:${id}`,{id,memberId:id,name:names[i],days:{"1":true,"2":true},paid:i===1,paidAmount:i===1?111000:0}
@@ -27,7 +28,7 @@ const payload={members,presence:{a:true,b:true,c:true,d:false},schedules:{[weekS
 }};
 const session={status:"active",user:{uid:"visual-admin",displayName:names[0]},access:{active:true,role:"admin",memberId:"a",displayName:"Phát"},adminExists:true};
 const engineFixture=`export function createP708SecureEngine(handlers){return {
-  async start(){handlers.onSession(${JSON.stringify(session)});handlers.onShape(${JSON.stringify(payload)});handlers.onStatus({mode:"online",text:"Đã đồng bộ"});},
+  async start(){handlers.onSession(${JSON.stringify(session)});handlers.onShape(${JSON.stringify(payload)});handlers.onAdminData({logs:${JSON.stringify(logs)}});handlers.onStatus({mode:"online",text:"Đã đồng bộ"});},
   async forceSync(){return true;}, stop(){}
 };}`;
 const base="http://127.0.0.1:5178";
@@ -36,13 +37,8 @@ const fileTypes={js:"text/javascript",html:"text/html",css:"text/css"};
 const historical=new Map();
 await mkdir(out,{recursive:true});
 
-async function checkBillingContrast(page){
-  return page.evaluate(()=>{
-    const selectors=[
-      "#calendarPersonTitle","#calendarPersonHint","#billClosedBadge",".period-copy b",".period-copy small",
-      "#billingPeriodPrev","#billingPeriodCurrent","#billMonth",".person-pick.active b",".person-amount",
-      ".day-cell.stay b",".day-cell.stay small",".day-cell:not(.stay) small",".day-month-tag","#billPersonSummary"
-    ];
+async function checkContrast(page,selectors){
+  return page.evaluate(selectors=>{
     const rgb=value=>value.match(/[\d.]+/g).map(Number);
     const luminance=color=>color.slice(0,3).map(value=>{
       const channel=value/255;
@@ -60,7 +56,7 @@ async function checkBillingContrast(page){
       const ratio=(Math.max(ink,background)+0.05)/(Math.min(ink,background)+0.05);
       return ratio<4.5?[`${selector} contrast ${ratio.toFixed(2)}`]:[];
     });
-  });
+  },selectors);
 }
 
 async function capture(browser,browserName,ref,width){
@@ -87,6 +83,28 @@ async function capture(browser,browserName,ref,width){
     const errors=[];
     for(const view of views){
       await page.evaluate(view=>showPage(view,{instant:true,replace:true}),view);
+      if(ref==="working"&&view==="home"){
+        await page.locator("#petDecoration").selectOption("leaf");
+        const leaf=page.locator("[data-garden-member] .pet-accessory--leaf");
+        const equipped=await leaf.waitFor({state:"visible",timeout:2000}).then(()=>true,()=>false);
+        if(!equipped)errors.push("Mầm xanh must be visible on the pet");
+        if(await page.locator("#floatingPetHost .pet-accessory--leaf").count()!==1)errors.push("Floating pet must wear Mầm xanh");
+        if(width===390)await page.locator("[data-garden-member]").screenshot({path:`${out}/${ref}-${browserName}-390-pet-leaf.png`});
+      }
+      if(ref==="working"&&view==="audit"){
+        if(width===390){
+          await page.reload({waitUntil:"domcontentloaded"});
+          await page.locator("#page-audit.active").waitFor({state:"visible",timeout:15000});
+        }
+        const rows=page.locator(".audit-item");
+        if(await rows.count()!==12)errors.push("audit should show one page of rows per person initially");
+        await page.locator("[data-audit-more]").click();
+        if(await rows.count()!==18)errors.push("audit should reveal older rows");
+        await page.locator("#auditSearch").fill("việc trực 18");
+        if(await rows.count()!==1)errors.push("audit search should match older rows");
+        await page.locator("#clearAuditFiltersButton").click();
+        await page.evaluate(()=>window.scrollTo(0,0));
+      }
       if(view==="billing"){
         await page.evaluate(month=>setBillMonth(month),ref==="working"?activeMonth:month);
         if(ref==="working"){
@@ -116,8 +134,14 @@ async function capture(browser,browserName,ref,width){
         }
         if(ref==="working"&&view==="billing"){
           await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));
-          errors.push(...(await checkBillingContrast(page)).map(error=>`billing ${theme}: ${error}`));
+          const selectors=["#calendarPersonTitle","#calendarPersonHint","#billClosedBadge",".period-copy b",".period-copy small","#billingPeriodPrev","#billingPeriodCurrent","#billMonth",".person-pick.active b",".person-amount",".day-cell.stay b",".day-cell.stay small",".day-cell:not(.stay) small",".day-month-tag","#billPersonSummary"];
+          errors.push(...(await checkContrast(page,selectors)).map(error=>`billing ${theme}: ${error}`));
           if(width===390)await page.locator(".calendar-card").screenshot({path:`${out}/${ref}-${browserName}-${width}-${theme}-calendar.png`});
+        }
+        if(ref==="working"&&view==="audit"){
+          await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));
+          const selectors=[".audit-kpis b",".audit-kpis span",".retention-note",".audit-group summary b",".audit-item b",".audit-item small",".audit-time"];
+          errors.push(...(await checkContrast(page,selectors)).map(error=>`audit ${theme}: ${error}`));
         }
         if([390,1440].includes(width))await page.screenshot({path:`${out}/${ref}-${browserName}-${width}-${theme}-${view}.png`});
       }

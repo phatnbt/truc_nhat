@@ -96,7 +96,7 @@ function showPage(page,options={}){
   });
   const target=page==="home"?`${location.pathname}${location.search}`:`${location.pathname}${location.search}#${page}`;
   const current=`${location.pathname}${location.search}${location.hash}`;
-  if(current!==target){
+  if(options.updateLocation!==false&&current!==target){
     if(options.replace===true)history.replaceState({page},"",target);
     else history.pushState({page},"",target);
   }
@@ -143,6 +143,10 @@ function renderAuthGate(){
   if(authSession.status==="active"){gate.classList.add("hidden");return;}
   gate.classList.remove("hidden");
   if(authSession.status==="loading"||authSession.status==="checking"){box.innerHTML='<h2>Đang kiểm tra quyền…</h2><p>Đang tải dữ liệu phòng và quyền truy cập.</p>';return;}
+  if(authSession.status==="error"){
+    box.innerHTML='<h2>Chưa thể kiểm tra quyền</h2><p>Kiểm tra kết nối rồi thử lại để mở phòng P708.</p><div class="auth-actions"><button class="btn primary" id="retryAccessButton" type="button">Thử lại</button><a class="btn" href="https://p708-room-manager.firebaseapp.com/">Mở trên Firebase</a></div>';
+    $("#retryAccessButton").addEventListener("click",()=>location.reload());return;
+  }
   if(!authSession.user){
     box.innerHTML='<h2>Đăng nhập để vào P708</h2><p>Mỗi tài khoản Google được liên kết với một thành viên trong phòng.</p><div class="auth-actions"><button class="btn primary" id="googleLoginButton" type="button">G · Đăng nhập bằng Google</button></div>';
     $("#googleLoginButton")?.addEventListener("click",secureGoogleLogin);return;

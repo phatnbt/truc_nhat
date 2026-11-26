@@ -162,18 +162,46 @@ function renderBilling(){
   $$('[data-payment]').forEach(btn=>btn.addEventListener("click",()=>togglePayment(btn.dataset.payment)));
 }
 
+const auditDateFormat=new Intl.DateTimeFormat("vi-VN",{timeZone:"Asia/Ho_Chi_Minh",day:"2-digit",month:"2-digit",year:"numeric"});
+const auditClockFormat=new Intl.DateTimeFormat("vi-VN",{timeZone:"Asia/Ho_Chi_Minh",hour:"2-digit",minute:"2-digit",hour12:false});
+const auditPageSize=12;
+const auditVisibleCounts=new Map();
+let previousAuditFilters="";
 function renderAudit(){
-  if(!isAdmin())return;
-  const logs=filteredLogs(),actorMap=new Map();
-  logs.forEach(l=>{const key=auditActorKey(l);if(!actorMap.has(key))actorMap.set(key,{key,name:auditActorName(l),email:l.actorEmail||"",logs:[]});actorMap.get(key).logs.push(l);});
-  const allActors=new Map();auditLogs.forEach(l=>{const key=auditActorKey(l);if(!allActors.has(key))allActors.set(key,auditActorName(l));});
-  const actions=[...new Set(auditLogs.map(l=>l.action||"UPDATE_DATA"))].sort(),memberSelect=$("#auditMemberFilter"),actionSelect=$("#auditActionFilter");
-  if(!memberSelect||!actionSelect)return;
-  memberSelect.innerHTML=`<option value="all">Tất cả</option>${[...allActors].map(([key,name])=>`<option value="${esc(key)}">${esc(name)}</option>`).join("")}`;
-  actionSelect.innerHTML=`<option value="all">Tất cả</option>${actions.map(a=>`<option value="${esc(a)}">${esc(auditActionLabel(a))}</option>`).join("")}`;
-  memberSelect.value=auditFilters.member;actionSelect.value=auditFilters.action;$("#auditSearch").value=auditFilters.query;
-  $("#auditStatTotal").textContent=logs.length;$("#auditStatActors").textContent=actorMap.size;$("#auditStatLatest").textContent=logs[0]?new Date(auditTimeMs(logs[0])).toLocaleDateString("vi-VN"):"—";
-  $("#auditGroups").innerHTML=actorMap.size?[...actorMap.values()].map((actor,index)=>`<details class="audit-group" ${index===0?"open":""}><summary><span class="avatar">${esc(actor.name.charAt(0).toUpperCase())}</span><span><b>${esc(actor.name)}</b><small>${esc(actor.email||"Không hiển thị email")}</small></span><span class="audit-count">${actor.logs.length} log</span></summary><div class="audit-timeline">${actor.logs.map(log=>{const d=new Date(auditTimeMs(log));return `<div class="audit-item"><span class="audit-time">${d.toLocaleDateString("vi-VN")}<br>${d.toLocaleTimeString("vi-VN",{hour:"2-digit",minute:"2-digit"})}</span><span><b>${esc(log.summary||auditActionLabel(log.action))}</b><small>${esc(auditActionLabel(log.action))}</small></span></div>`;}).join("")}</div></details>`).join(""):'<div class="empty">Không có nhật ký phù hợp.</div>';
+  const groups=$("#auditGroups");
+  if(!groups)return;
+  if(!isAdmin()){groups.replaceChildren();auditVisibleCounts.clear();return;}
+  const filterKey=JSON.stringify(auditFilters),filtersChanged=filterKey!==previousAuditFilters;
+  previousAuditFilters=filterKey;
+  if(filtersChanged)auditVisibleCounts.clear();
+  const existing=new Map(Array.from(groups.querySelectorAll(".audit-group"),group=>[group.dataset.auditActor,group.open]));
+  const logs=filteredLogs(),actorMap=new Map(),allActors=new Map();
+  for(const log of logs){
+    const key=auditActorKey(log);
+    if(!actorMap.has(key))actorMap.set(key,{key,name:auditActorName(log),email:log.actorEmail||"",logs:[]});
+    actorMap.get(key).logs.push(log);
+  }
+  for(const log of auditLogs)allActors.set(auditActorKey(log),auditActorName(log));
+  const actions=[...new Set(auditLogs.map(log=>log.action||"UPDATE_DATA"))].sort();
+  const memberSelect=$("#auditMemberFilter"),actionSelect=$("#auditActionFilter");
+  const allOption='<option value="all">Tất cả</option>';
+  memberSelect.innerHTML=allOption+[...allActors].map(([key,name])=>`<option value="${esc(key)}">${esc(name)}</option>`).join("");
+  actionSelect.innerHTML=allOption+actions.map(action=>`<option value="${esc(action)}">${esc(auditActionLabel(action))}</option>`).join("");
+  memberSelect.value=auditFilters.member;actionSelect.value=auditFilters.action;
+  if($("#auditSearch").value!==auditFilters.query)$("#auditSearch").value=auditFilters.query;
+  $("#auditStatTotal").textContent=logs.length;
+  $("#auditStatActors").textContent=actorMap.size;
+  $("#auditStatLatest").textContent=logs[0]?auditDateFormat.format(auditTimeMs(logs[0])):"—";
+  groups.innerHTML=actorMap.size?[...actorMap.values()].map((actor,index)=>{
+    const open=!filtersChanged&&existing.has(actor.key)?existing.get(actor.key):index===0;
+    const visible=auditVisibleCounts.get(actor.key)||auditPageSize;
+    const entries=actor.logs.slice(0,visible).map(log=>{
+      const time=auditTimeMs(log),label=auditActionLabel(log.action);
+      return `<li class="audit-item"><time class="audit-time" datetime="${new Date(time).toISOString()}">${auditDateFormat.format(time)} <span>${auditClockFormat.format(time)}</span></time><div><b>${esc(log.summary||label)}</b><small>${esc(label)}</small></div></li>`;
+    }).join("");
+    const more=actor.logs.length-visible;
+    return `<details class="audit-group" data-audit-actor="${esc(actor.key)}" ${open?"open":""}><summary><span class="avatar" aria-hidden="true">${esc(actor.name.charAt(0).toUpperCase())}</span><span class="audit-actor"><b>${esc(actor.name)}</b>${actor.email?`<small>${esc(actor.email)}</small>`:""}</span><span class="audit-count">${actor.logs.length} mục</span></summary><ol class="audit-timeline">${entries}</ol>${more>0?`<button type="button" class="btn small audit-more" data-audit-more="${esc(actor.key)}">Xem thêm (${more})</button>`:""}</details>`;
+  }).join(""):'<div class="empty">Không tìm thấy hoạt động phù hợp.</div>';
 }
 
 function renderSync(){
@@ -182,5 +210,8 @@ function renderSync(){
 }
 function renderAll(){
   state=normalizeState(state);ui.selectedMonth=state.billing.selectedMonth;
-  renderPermission();renderAccountButton();renderHome();renderCleaning();renderCleaningRules();renderBilling();renderRoomResources();renderAudit();renderAccessModal();renderSync();saveLocal();renderNotificationCenter();
+  renderPermission();renderAccountButton();renderHome();renderCleaning();renderCleaningRules();renderBilling();renderRoomResources();
+  if(document.body.dataset.page==="audit"||!isAdmin())renderAudit();
+  if($("#accessModal").classList.contains("show"))renderAccessModal();
+  renderSync();saveLocal();renderNotificationCenter();
 }

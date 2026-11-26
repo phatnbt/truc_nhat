@@ -7,7 +7,7 @@ const start=fs.readFileSync(new URL("../src/boot/app-start.js",import.meta.url),
 const worker=fs.readFileSync(new URL("../sw.js",import.meta.url),"utf8");
 const app=fs.readFileSync(new URL("../app.js",import.meta.url),"utf8");
 
-const release="20261127-3";
+const release="20261127-4";
 
 assert.ok(index.includes("setTimeout(showRecovery,15000)"),"stalled boots must show recovery");
 assert.ok(index.includes('id="bootRetryButton"'),"recovery should offer an explicit retry");
@@ -42,6 +42,6 @@ assert.ok(loader.includes("await Promise.all(parts.map"),"classic scripts must d
 assert.ok(loader.includes("script.async = false"),"parallel downloads must preserve execution order");
 assert.ok(loader.includes("isFirebaseHosting"),"GitHub Pages must skip the guaranteed Firebase init 404");
 assert.ok(loader.includes("loadedParts"),"startup must show real loading progress");
-assert.ok(loader.includes("authDomain:location.hostname"),"Firebase Hosting uses a same-origin OAuth helper");
+assert.ok(!loader.includes("authDomain:location.hostname"),"Keep the OAuth domain registered by the Firebase project");
 
 console.log("Boot watchdog and stale-cache recovery QA PASSED");

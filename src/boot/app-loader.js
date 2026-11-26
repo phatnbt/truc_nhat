@@ -1,4 +1,4 @@
-import { createP708SecureEngine } from "../core/p708-secure-sync-engine.js?v=20261127-3";
+import { createP708SecureEngine } from "../core/p708-secure-sync-engine.js?v=20261127-4";
 import { createP708AuthoritativeRepair } from "../core/p708-authoritative-repair.js?v=20260913-1";
 import { createP708CanonicalMappingRepair } from "../core/p708-canonical-mapping-repair.js?v=20260913-1";
 import * as P708BillingCycle from "../core/billing-cycle-period.js?v=20261126-1";
@@ -53,11 +53,9 @@ async function loadFirebaseRuntimeConfig(){
   const isFirebaseHosting=["p708-room-manager.web.app","p708-room-manager.firebaseapp.com"].includes(location.hostname);
   if(isFirebaseHosting){
     try{
-      const config=await fetchFirebaseConfig(FIREBASE_RUNTIME_ENDPOINT,{sameOrigin:true});
-      return Object.freeze({...config,authDomain:location.hostname});
+      return await fetchFirebaseConfig(FIREBASE_RUNTIME_ENDPOINT,{sameOrigin:true});
     }catch{
-      const config=await fetchFirebaseConfig("./firebase-config.runtime.json",{sameOrigin:true});
-      return Object.freeze({...config,authDomain:location.hostname});
+      return fetchFirebaseConfig("./firebase-config.runtime.json",{sameOrigin:true});
     }
   }
 
@@ -77,26 +75,26 @@ globalThis.deleteScheduleAuthoritatively = deleteScheduleAuthoritatively;
 
 const parts = [
   "../core/app-core1.js?v=20261126-1",
-  "../core/app-core2.js?v=20261127-3",
-  "../features/app-actions1.js?v=20261127-3",
+  "../core/app-core2.js?v=20261127-4",
+  "../features/app-actions1.js?v=20261127-4",
   "../features/app-actions2.js?v=20261126-1",
   "../features/cleaning-delete-fix.js?v=20261126-1",
-  "../features/app-dashboard.js?v=20261127-3",
-  "../features/app-render.js?v=20261127-3",
-  "../features/cleaning-pet-streak.js?v=20260921-3",
+  "../features/app-dashboard.js?v=20261127-4",
+  "../features/app-render.js?v=20261127-4",
+  "../features/cleaning-pet-streak.js?v=20261127-4",
   "../features/app-integrity-fixes.js?v=20260913-1",
   "../features/inactive-mapping-dedup-fix.js?v=20260913-1",
   "../features/canonical-identity-repair.js?v=20260913-1",
   "../features/billing-membership-exclusion.js?v=20260913-1",
-  "../features/billing-cycle-history.js?v=20261127-3",
+  "../features/billing-cycle-history.js?v=20261127-4",
   "../features/billing-canonical-repair.js?v=20260913-1",
   "../features/home-enhancements.js?v=20260913-1",
-  "../features/home-pet-garden.js?v=20261127-3",
-  "../features/ui-icon-polish.js?v=20261127-3",
+  "../features/home-pet-garden.js?v=20261127-4",
+  "../features/ui-icon-polish.js?v=20261127-4",
   "../features/today-calendar.js?v=20261126-1",
   "../features/room-resources.js?v=20261126-1",
   "../features/notification-enhancements.js?v=20261126-1",
-  "./app-start.js?v=20261127-3",
+  "./app-start.js?v=20261127-4",
   "../features/mobile-install-bridge.js?v=20260913-1",
   "../features/mobile-install-guide.js?v=20260913-1"
 ];
