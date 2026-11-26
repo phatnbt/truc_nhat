@@ -102,7 +102,8 @@ async function exercise(engine,name,width){
       }
     }});
   });
-  const browser=await engine.launch();
+  const channel=name==="chromium"?process.env.P708_QA_CHROMIUM_CHANNEL:undefined;
+  const browser=await engine.launch({channel});
   const activate=target=>name==="webkit"?target.press("Enter"):target.click();
   try{
     const viewport={width,height:820};
@@ -377,7 +378,7 @@ async function exercise(engine,name,width){
     await expect(resident.locator("#homeGreeting")).toHaveText("Phòng P708");
     assertBrowserErrors(name,managerErrors);
     assertBrowserErrors(name,residentErrors);
-    console.log(`P708 browser QA passed: ${name} (${width}px)`);
+    console.log(`P708 browser QA passed: ${channel||name} (${width}px)`);
   } catch(error) {
     for(const context of browser.contexts())for(const page of context.pages()){
       console.error(name,"toast:",await page.locator("#toast").textContent().catch(()=>null),

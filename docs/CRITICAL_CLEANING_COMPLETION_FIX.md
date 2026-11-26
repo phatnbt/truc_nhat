@@ -31,8 +31,9 @@ Tài liệu báo cáo của hai ca là `rooms/P708/taskSubmissions/<tuần>__lav
 
 ## Kiểm thử
 
-- 18 script QA tĩnh đạt, gồm cache recovery, xóa lịch, streak, quyền sở hữu pet, repair và điện nước.
+- 18 script QA tĩnh và bộ Firestore Rules đạt, gồm cache recovery, xóa lịch, streak, quyền sở hữu pet, repair và điện nước.
 - Chromium 1280 px và WebKit 390 px chạy qua luồng trực nhật và các kịch bản điện nước trong Browser QA. WebKit trên Windows có một cảnh báo kết nối đến Emulator; assertions vẫn đạt. WebKit dùng trình duyệt mô phỏng với vùng hiển thị và đầu vào cảm ứng.
+- Mobile boot và mobile auth trên Chromium đạt. Chromium Visual QA đạt ở 7 độ rộng từ 320 đến 1440 px với cả chế độ sáng và tối.
 - Stress test Chromium trên Emulator đạt **106 thao tác thành công** gồm 42 lượt gửi, 6 từ chối, 36 xác nhận và 22 lượt retry. Hai quản trị viên và ba thành viên thao tác trên sáu tuần. Kiểm tra 36 phân công, 36 báo cáo đúng định danh, trạng thái tuần hiện tại, EXP và lỗi Promise của trình duyệt. Một tuần thử riêng dùng để kiểm tra dấu xóa và từ chối gửi lại.
 
 Chạy lại từ thư mục repository với các gói QA và trình duyệt của workflow đã cài.
@@ -41,11 +42,13 @@ Chạy lại từ thư mục repository với các gói QA và trình duyệt c�
 npx firebase-tools emulators:exec --only auth,firestore,hosting --project demo-p708-production-audit "node .github/browser-qa.mjs --critical-stress"
 ```
 
+Đặt biến môi trường `P708_QA_CHROMIUM_CHANNEL` thành `chrome` hoặc `msedge` và truyền thêm đối số `chromium` để dùng trình duyệt desktop đã cài.
+
 ## Hạn chế và audit production
 
 - **BLOCKED · Audit production.** Chưa có quyền đọc được cấp cho lượt kiểm tra này. `.github/production-data-audit.mjs` hiện đọc định danh, ngày ở, điện nước và 20 nhật ký gần nhất. Hai script repair và xóa lịch có ghi dữ liệu. Không chạy chúng. Kết quả Emulator chỉ phản ánh fixture.
 - Khi có quyền read-only, lấy lịch, báo cáo, ánh xạ UID, dấu xóa và nhật ký liên quan; lập thống kê báo cáo thiếu/trùng, báo cáo đã duyệt lệch phân công, ID sai, lịch xuất hiện sau xóa và EXP sai. Kiểm tra nhật ký đánh dấu trực tiếp trước khi kết luận một phân công hoàn thành thiếu báo cáo là bất thường. Chỉ đề xuất sửa từng bản ghi có đủ bằng chứng và cần backup, dry-run, rollback cùng phê duyệt.
-- **NOT TESTED** trên thiết bị iPhone/Android thật, Safari macOS thật, Microsoft Edge và PWA đã cài từ màn hình chính trên điện thoại. Chưa mô phỏng riêng trường hợp load lại giữa lúc write đang pending, hoặc giao dịch đã commit nhưng phản hồi từ máy chủ bị mất. Chưa đo độ trễ production.
+- **NOT TESTED** trên thiết bị iPhone/Android thật, Safari macOS thật và PWA đã cài từ màn hình chính trên điện thoại. Chưa mô phỏng riêng các ca độ trễ cao, timeout lúc đang ghi, load lại giữa lúc write pending, commit xong nhưng mất phản hồi, hoặc thay người phụ trách đúng lúc gửi báo cáo. Chưa đo độ trễ production.
 - Danh sách quản trị hiện vẫn lấy 200 báo cáo gần nhất. Báo cáo lịch sử thiếu scheduleId được giữ khi vẫn có phân công trùng tuần/việc/người, nhưng cần đối chiếu nguồn trước khi dùng để duyệt. Báo cáo của một lịch cũ giữ cùng khóa sẽ cần dọn theo dữ liệu máy chủ trước khi thành viên gửi cho lịch mới.
 
 ## Tệp thay đổi và rollback

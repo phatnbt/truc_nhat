@@ -46,8 +46,9 @@ export async function runCriticalCleaningStress({env,browser,manager,resident,me
 
   const pages={b:resident,c:await browser.newPage({viewport}),d:await browser.newPage({viewport})};
   const secondAdmin=await browser.newPage({viewport});
+  const secondDevice=await browser.newPage({viewport});
   try{
-    const errors=await Promise.all([login(pages.c,c,4),login(pages.d,d,4),login(secondAdmin,delegate,4)]);
+    const errors=await Promise.all([login(pages.c,c,4),login(pages.d,d,4),login(secondAdmin,delegate,4),login(secondDevice,member,4)]);
     const tasks=weeks.flat();
     const sample=weeks[0][0];
 
@@ -74,9 +75,9 @@ export async function runCriticalCleaningStress({env,browser,manager,resident,me
       }
     }
     const firstReports=(await readServer()).reports;
-    for(const task of tasks.slice(0,20)){
-      await submit(pages[task.memberId],task);
-      retries++;
+    for(let index=0;index<10;index++){
+      await Promise.all([resident,secondDevice].map(page=>submit(page,sample)));
+      retries+=2;
     }
     const retriedReports=(await readServer()).reports;
     for(const task of tasks)assert.deepEqual(retriedReports.get(reportId(task)),firstReports.get(reportId(task)));
@@ -98,6 +99,7 @@ export async function runCriticalCleaningStress({env,browser,manager,resident,me
     const concurrentRetry=tasks[0];
     await Promise.all([manager,secondAdmin].map(page=>review(page,concurrentRetry,pending.get(reportId(concurrentRetry)).submittedAt)));
     retries+=2;
+    assert.equal(await manager.evaluate(({weekStart,scheduleId})=>realtimeEngine.reconcileTaskSubmissions({weekStart,scheduleId}),sample),0);
 
     const after=await readServer();
     assert.equal(after.reports.size,before.reports.size+tasks.length);
@@ -143,7 +145,7 @@ export async function runCriticalCleaningStress({env,browser,manager,resident,me
     assert.ok(operations>=100);
     console.log(`Critical cleaning stress PASS: ${operations} operations (${submitted} submissions, ${rejected} rejections, ${approved} approvals, ${retries} retries), ${weeks.length} weeks, ${memberIds.length} assignees, 2 managers, 1 tombstone verified.`);
   }finally{
-    await Promise.all([pages.c,pages.d,secondAdmin].map(page=>page.close()));
+    await Promise.all([pages.c,pages.d,secondAdmin,secondDevice].map(page=>page.close()));
   }
 
   async function readServer(){
