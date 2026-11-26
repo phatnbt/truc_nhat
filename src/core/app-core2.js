@@ -95,7 +95,7 @@ function showPage(page,options={}){
     if(options.replace===true)history.replaceState({page},"",target);
     else history.pushState({page},"",target);
   }
-  if(options.scroll!==false)window.scrollTo({top:0,behavior:options.instant?"auto":"smooth"});
+  if(options.scroll!==false)window.scrollTo({top:0,behavior:"instant"});
   if(page==="audit")renderAudit();
 }
 function openModal(id){ $("#"+id)?.classList.add("show"); }
@@ -130,10 +130,6 @@ function renderAuthGate(){
   if(authSession.status==="pending"){
     box.innerHTML=`<h2>Đang chờ trưởng phòng duyệt</h2>${authUserCard()}<p>Yêu cầu với tên <b>${esc(authSession.request?.displayName||"")}</b> đã được gửi.</p><div class="auth-actions"><button class="btn danger" id="cancelRequestButton" type="button">Hủy yêu cầu</button><button class="btn" id="gateSignOutButton" type="button">Đăng xuất</button></div>`;
     $("#cancelRequestButton")?.addEventListener("click",cancelAccessRequest);$("#gateSignOutButton")?.addEventListener("click",secureSignOut);return;
-  }
-  if(!authSession.adminExists){
-    box.innerHTML=`<h2>Phòng chưa được thiết lập</h2>${authUserCard()}<p>Vui lòng liên hệ người quản lý phòng.</p><div class="auth-actions"><button class="btn" id="gateSignOutButton" type="button">Đăng xuất</button></div>`;
-    $("#gateSignOutButton")?.addEventListener("click",secureSignOut);return;
   }
   box.innerHTML=`<h2>Gửi yêu cầu tham gia phòng</h2>${authUserCard()}<p>Nhập đúng tên đang có trong danh sách phòng để trưởng phòng liên kết tài khoản.</p><div class="field"><label>Tên trong phòng</label><input id="requestDisplayName" maxlength="80" value="${esc(authSession.user.displayName||"")}"></div><div class="auth-actions"><button class="btn primary" id="sendRequestButton" type="button">Gửi yêu cầu</button><button class="btn" id="gateSignOutButton" type="button">Đăng xuất</button></div>`;
   $("#sendRequestButton")?.addEventListener("click",sendAccessRequest);$("#gateSignOutButton")?.addEventListener("click",secureSignOut);

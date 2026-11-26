@@ -1,14 +1,15 @@
-import { createP708SecureEngine } from "../core/p708-secure-sync-engine.js?v=20260929-1";
+import { createP708SecureEngine } from "../core/p708-secure-sync-engine.js?v=20261126-1";
 import { createP708AuthoritativeRepair } from "../core/p708-authoritative-repair.js?v=20260913-1";
 import { createP708CanonicalMappingRepair } from "../core/p708-canonical-mapping-repair.js?v=20260913-1";
-import * as P708BillingCycle from "../core/billing-cycle-period.js?v=20260929-1";
-import * as P708CleaningFairness from "../core/cleaning-fairness.js?v=20260921-2";
-import * as P708CleaningStreak from "../core/cleaning-streak.js?v=20260921-3";
-import { splitVnd } from "../core/expense-split.js";
-import { deleteScheduleAuthoritatively } from "../core/cleaning-schedule-store.js?v=20260913-1";
+import * as P708BillingCycle from "../core/billing-cycle-period.js?v=20261126-1";
+import * as P708CleaningFairness from "../core/cleaning-fairness.js?v=20261126-1";
+import * as P708CleaningStreak from "../core/cleaning-streak.js?v=20261126-1";
+import { splitVnd } from "../core/expense-split.js?v=20261126-1";
+import { deleteScheduleAuthoritatively } from "../core/cleaning-schedule-store.js?v=20261126-1";
 
 const FIREBASE_RUNTIME_ENDPOINT="/__/firebase/init.json";
 const FIREBASE_RUNTIME_FALLBACK="https://p708-room-manager.web.app/firebase-config.runtime.json";
+const IS_LOCAL=["localhost","127.0.0.1","[::1]"].includes(location.hostname);
 
 function validFirebaseConfig(config){
   return !!config
@@ -39,6 +40,10 @@ async function fetchFirebaseConfig(url,{sameOrigin=false}={}){
 async function loadFirebaseRuntimeConfig(){
   const override=globalThis.P708_FIREBASE_CONFIG_OVERRIDE;
   if(validFirebaseConfig(override))return Object.freeze({...override});
+  if(IS_LOCAL)return Object.freeze({
+    projectId:"demo-p708-production-audit",apiKey:"demo-p708-emulator-key",
+    authDomain:"localhost",appId:"demo-p708-app"
+  });
 
   const errors=[],isFirebaseHosting=/\.(?:web\.app|firebaseapp\.com)$/i.test(location.hostname);
   if(isFirebaseHosting){
@@ -70,13 +75,13 @@ globalThis.splitVnd = splitVnd;
 globalThis.deleteScheduleAuthoritatively = deleteScheduleAuthoritatively;
 
 const parts = [
-  "../core/app-core1.js?v=20261029-1",
-  "../core/app-core2.js?v=20260929-1",
-  "../features/app-actions1.js?v=20261029-1",
-  "../features/app-actions2.js?v=20261029-1",
-  "../features/cleaning-delete-fix.js?v=20260913-1",
-  "../features/app-dashboard.js?v=20261029-1",
-  "../features/app-render.js?v=20261015-1",
+  "../core/app-core1.js?v=20261126-1",
+  "../core/app-core2.js?v=20261126-1",
+  "../features/app-actions1.js?v=20261126-1",
+  "../features/app-actions2.js?v=20261126-1",
+  "../features/cleaning-delete-fix.js?v=20261126-1",
+  "../features/app-dashboard.js?v=20261126-1",
+  "../features/app-render.js?v=20261126-1",
   "../features/cleaning-pet-streak.js?v=20260921-3",
   "../features/app-integrity-fixes.js?v=20260913-1",
   "../features/inactive-mapping-dedup-fix.js?v=20260913-1",
@@ -85,12 +90,12 @@ const parts = [
   "../features/billing-cycle-history.js?v=20260929-1",
   "../features/billing-canonical-repair.js?v=20260913-1",
   "../features/home-enhancements.js?v=20260913-1",
-  "../features/home-pet-garden.js?v=20260921-3",
+  "../features/home-pet-garden.js?v=20261126-1",
   "../features/ui-icon-polish.js?v=20261029-1",
-  "../features/today-calendar.js?v=20260913-1",
-  "../features/room-resources.js",
-  "../features/notification-enhancements.js?v=20261029-1",
-  "./app-start.js?v=20261029-2",
+  "../features/today-calendar.js?v=20261126-1",
+  "../features/room-resources.js?v=20261126-1",
+  "../features/notification-enhancements.js?v=20261126-1",
+  "./app-start.js?v=20261126-1",
   "../features/mobile-install-bridge.js?v=20260913-1",
   "../features/mobile-install-guide.js?v=20260913-1"
 ];

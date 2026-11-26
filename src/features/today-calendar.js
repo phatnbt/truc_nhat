@@ -7,28 +7,50 @@ function renderRoomCalendar(){
   const start=view==="today"?today:view==="month"?today.slice(0,7)+"-01":monday;
   const end=view==="today"?today:view==="month"?today.slice(0,7)+"-31":period.dateKey(period.addUtcDays(period.parseDateKey(monday),6));
   const rows=[];
+  let assigned=0,completed=0;
   for(const schedule of state.schedules){
-    const last=period.dateKey(period.addUtcDays(period.parseDateKey(schedule.weekStart),6));
+    const first=period.parseDateKey(schedule.weekStart);
+    if(!first)continue;
+    const last=period.dateKey(period.addUtcDays(first,6));
     if(schedule.weekStart>end||last<start)continue;
     const tasks=schedule.assignments.filter(a=>!a.cut&&(view!=="personal"||a.personId===myMemberId()));
+    assigned+=tasks.length;completed+=tasks.filter(task=>task.completed).length;
     for(const a of tasks)rows.push({date:schedule.weekStart,title:a.task,detail:a.completed?"Đã hoàn thành":a.personName,scheduleId:schedule.id});
     if(view!=="personal"&&schedule.absentNames?.length)rows.push({date:schedule.weekStart,title:"Vắng mặt",detail:schedule.absentNames.join(", ")});
   }
   if(view!=="personal")for(const bill of state.billing.months){
     if(bill.cycleEnd>=start&&bill.cycleEnd<=end)rows.push({date:bill.cycleEnd,title:"Kết thúc kỳ điện nước",detail:monthLabel(bill.month)});
   }
-  root.innerHTML=rows.length?rows.sort((a,b)=>a.date.localeCompare(b.date)).map(item=>
+  if(view!=="personal")for(const event of Object.values(state.settings.roomEvents||{})){
+    if(event.date>=start&&event.date<=end)rows.push({date:event.date,title:event.title,detail:ROOM_EVENT_LABELS[event.kind]});
+  }
+  root.innerHTML=rows.length?`<p class="calendar-progress">${completed}/${assigned} việc đã xác nhận</p>`+rows.sort((a,b)=>a.date.localeCompare(b.date)).map(item=>
     `<div class="room-presence"><div><b>${esc(item.title)}</b><div>${esc(item.detail)}</div></div>${item.scheduleId?`<button class="btn small" type="button" data-room-calendar-week="${esc(item.scheduleId)}">${esc(item.date)}</button>`:`<span>${esc(item.date)}</span>`}</div>`
   ).join(""):'<p class="empty">Chưa có sự kiện trong khoảng này.</p>';
   root.querySelectorAll("[data-room-calendar-week]").forEach(button=>button.onclick=()=>selectSchedule(button.dataset.roomCalendarWeek));
+}
+
+const ROOM_EVENT_LABELS={shared:"Sự kiện phòng",cleanup:"Tổng vệ sinh",payment:"Hạn thanh toán"};
+async function saveRoomCalendarEvent(event){
+  event.preventDefault();
+  if(!requireAdmin())return;
+  const form=event.currentTarget,fields=new FormData(form);
+  const date=fields.get("date"),kind=fields.get("kind"),title=String(fields.get("title")).trim();
+  if(!title||!P708BillingCycle.parseDateKey(date)||!Object.hasOwn(ROOM_EVENT_LABELS,kind))return toast("Kiểm tra nội dung sự kiện.");
+  const button=form.querySelector("button[type=submit]");
+  if(button.disabled)return;
+  button.disabled=true;
+  try{
+    const id=uid();
+    state.settings.roomEvents={...state.settings.roomEvents,[id]:{date,kind,title}};
+    if(await persist("Đã thêm vào lịch phòng",{action:"ADD_ROOM_EVENT",summary:title}))form.reset();
+  }finally{button.disabled=false;}
 }
 
 (()=>{
   const TODAY_SCROLL_KEY="P708_TODAY_CALENDAR_SCROLL";
   let lastScrolled="";
 
-  const pad=value=>String(value).padStart(2,"0");
-  const localMonth=date=>P708BillingCycle.roomDateKey(date).slice(0,7);
 
   const style=document.createElement("style");
   style.dataset.todayCalendar="1";
@@ -82,15 +104,13 @@ function renderRoomCalendar(){
       cell.removeAttribute("title");
     });
 
-    const now=new Date();
-    const month=localMonth(now);
-    if(monthInput.value!==month)return null;
-
-    const cell=calendar.querySelector(`[data-day="${now.getDate()}"]`);
+    const today=P708BillingCycle.roomDateKey();
+    const cell=calendar.querySelector(`[data-date="${today}"],[data-day="${today}"]`)||
+      (monthInput.value===today.slice(0,7)?calendar.querySelector(`[data-day="${Number(today.slice(8))}"]`):null);
     if(!cell)return null;
     cell.classList.add("is-today");
     cell.setAttribute("aria-current","date");
-    cell.setAttribute("title",now.toLocaleDateString("vi-VN"));
+    cell.setAttribute("title",today);
     return cell;
   }
 
@@ -102,12 +122,12 @@ function renderRoomCalendar(){
 
     const month=document.querySelector("#billMonth")?.value||"";
     const person=document.querySelector("#calendarPersonTitle")?.textContent||"";
-    const key=`${month}|${new Date().getDate()}|${person}`;
+    const key=`${month}|${P708BillingCycle.roomDateKey()}|${person}`;
     if(!force&&(lastScrolled===key||sessionStorage.getItem(TODAY_SCROLL_KEY)===key))return;
 
     lastScrolled=key;
     sessionStorage.setItem(TODAY_SCROLL_KEY,key);
-    requestAnimationFrame(()=>setTimeout(()=>cell.scrollIntoView({behavior:"smooth",block:"center",inline:"nearest"}),80));
+    requestAnimationFrame(()=>{if(cell.isConnected&&page.classList.contains("active"))cell.scrollIntoView({behavior:"instant",block:"center",inline:"nearest"});});
   }
 
   const previousRenderBilling=renderBilling;

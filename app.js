@@ -1,4 +1,4 @@
-const BOOT_VERSION = "20261029-2";
+const BOOT_VERSION = "20261126-1";
 
 function setBootProgress(title,detail){
   const box=document.querySelector("#authGateContent");
@@ -40,8 +40,10 @@ function showBootFailure(error){
   window.dispatchEvent(new Event("p708:boot-ready"));
   document.querySelector("#repairBootButton")?.addEventListener("click",async()=>{
     try{
-      if("caches" in window){const keys=await caches.keys();await Promise.all(keys.filter(k=>k.startsWith("p708-manager-")).map(k=>caches.delete(k)));}
-      if("serviceWorker" in navigator){const regs=await navigator.serviceWorker.getRegistrations();await Promise.all(regs.map(r=>r.unregister()));}
+      const scope=new URL("./",location.href).href;
+      const prefix=`p708-manager-${encodeURIComponent(scope)}-`;
+      if("caches" in window){const keys=await caches.keys();await Promise.all(keys.filter(key=>key.startsWith(prefix)).map(key=>caches.delete(key)));}
+      if("serviceWorker" in navigator){const regs=await navigator.serviceWorker.getRegistrations();await Promise.all(regs.filter(reg=>reg.scope===scope).map(reg=>reg.unregister()));}
     }catch(e){console.warn("P708 cache repair",e);}
     location.replace(`${location.pathname}?refresh=${Date.now()}${location.hash||""}`);
   });

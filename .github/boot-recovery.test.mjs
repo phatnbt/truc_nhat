@@ -7,16 +7,16 @@ const start=fs.readFileSync(new URL("../src/boot/app-start.js",import.meta.url),
 const worker=fs.readFileSync(new URL("../sw.js",import.meta.url),"utf8");
 const app=fs.readFileSync(new URL("../app.js",import.meta.url),"utf8");
 
-const release="20261029-2";
+const release="20261126-1";
 
 assert.ok(index.includes(`P708_BOOT_REPAIR_${release.replaceAll("-","_")}`),"boot watchdog marker is required");
 assert.ok(index.includes("setTimeout(showRecovery,10000)"),"a stalled boot must recover instead of hanging forever");
 assert.ok(index.includes("box.dataset.bootProgress"),"watchdog must cover a loader stalled after progress starts");
 assert.ok(index.includes('item.scope===baseUrl'),"recovery must only unregister this app scope");
-assert.ok(index.includes('key.startsWith("p708-manager-")'),"recovery must only clear this app cache family");
+assert.ok(index.includes('key.startsWith(cachePrefix)'),"recovery must only clear this app cache family");
 assert.ok(start.includes('window.dispatchEvent(new Event("p708:boot-ready"))'),"auth startup must cancel the watchdog");
-assert.ok(index.includes(`P708_BOOT_RELEASE_${release}`),"each release must proactively clear stale PWA caches once");
-assert.ok(index.includes("P708_BOOT_PREPARE"),"the app module must wait for stale-cache cleanup");
+assert.ok(start.includes('reg.waiting.postMessage({type:"SKIP_WAITING"})'),"update activation must follow a user action");
+assert.ok(worker.includes("key.startsWith(CACHE_SCOPE)"),"activation must preserve other app caches");
 assert.ok(index.includes(`app.js?v=${release}`),"HTML must load the current app release");
 assert.ok(app.includes(`BOOT_VERSION = "${release}"`),"app loader must use the current release");
 assert.ok(start.includes(`sw.js?v=${release}`),"service worker registration must use the current release");
@@ -30,7 +30,7 @@ const workerContext={
   URL,Request,Response,fetch:async()=>new Response("",{status:200}),
   caches:{open:async()=>({put:async()=>{}}),keys:async()=>[],delete:async()=>true,match:async()=>null},
   clients:{matchAll:async()=>[],openWindow:async()=>{}},
-  self:{location:{href:"https://p708-room-manager.web.app/sw.js",origin:"https://p708-room-manager.web.app"},addEventListener:()=>{},skipWaiting:async()=>{},clients:{claim:async()=>{}}}
+  self:{registration:{scope:"https://p708-room-manager.web.app/"},location:{href:"https://p708-room-manager.web.app/sw.js",origin:"https://p708-room-manager.web.app"},addEventListener:()=>{},skipWaiting:async()=>{},clients:{claim:async()=>{}}}
 };
 vm.runInNewContext(worker,workerContext);
 const jsRequest=new Request("https://p708-room-manager.web.app/app.js");

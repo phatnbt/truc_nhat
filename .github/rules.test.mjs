@@ -33,7 +33,7 @@ const roomPayload={
       ]
     }
   },
-  billingMonths:{},
+  billingMonths:{"2026-08":{closed:true},"2026-09":{closed:false}},
   settings:{weights:{lavabo:4,san:5,quet:3,lau:4,tham:2,rac:4}}
 };
 
@@ -63,6 +63,7 @@ const anon=env.unauthenticatedContext().firestore();
 try{
   await assertSucceeds(getDoc(doc(member1,`rooms/${roomId}`)));
   await assertFails(getDoc(doc(outsider,`rooms/${roomId}`)));
+  await assertFails(getDoc(doc(outsider,`rooms/${roomId}/security/config`)));
   await assertFails(getDoc(doc(anon,`rooms/${roomId}`)));
   await assertFails(setDoc(doc(outsider,"rooms/UNPROVISIONED/security/config"),{
     roomCode:"UNPROVISIONED",adminUid:"outsider",createdAt:serverTimestamp()
@@ -85,6 +86,12 @@ try{
   }));
   await assertFails(setDoc(doc(member1,`rooms/${roomId}/memberData/member1`),{
     memberId:"m2",presence:false,billingMonths:{},updatedBy:"member1",updatedAt:serverTimestamp()
+  }));
+  await assertFails(updateDoc(doc(member1,`rooms/${roomId}/memberData/member1`),{
+    billingMonths:{"2026-08":{days:{"1":true}}},billingPatchMonth:"2026-08",updatedAt:serverTimestamp()
+  }));
+  await assertSucceeds(updateDoc(doc(member1,`rooms/${roomId}/memberData/member1`),{
+    billingMonths:{"2026-09":{days:{"2026-08-29":true}}},billingPatchMonth:"2026-09",updatedAt:serverTimestamp()
   }));
 
   // Exact app flow: submitTask() performs a transaction and reads the deterministic
@@ -116,6 +123,16 @@ try{
     weekStart,taskId:"lau",taskName:"Lau nhà",status:"submitted",
     submittedAt:serverTimestamp(),updatedAt:serverTimestamp()
   }));
+  const sharedTaskRef=doc(member1,`rooms/${roomId}/taskSubmissions/${weekStart}__lau__m1`);
+  const startOnce=()=>runTransaction(member1,async tx=>{
+    if((await tx.get(sharedTaskRef)).exists())throw new Error("Already started");
+    tx.set(sharedTaskRef,{
+      roomCode:roomId,actorUid:"member1",actorName:"Member One",memberId:"m1",scheduleId:"schedule-1",
+      weekStart,taskId:"lau",taskName:"Lau nhà",status:"in_progress",submittedAt:serverTimestamp(),updatedAt:serverTimestamp()
+    });
+  });
+  const concurrent=await Promise.allSettled([startOnce(),startOnce()]);
+  if(concurrent.filter(result=>result.status==="fulfilled").length!==1)throw new Error("Expected exactly one concurrent submission");
 
   // Legacy account can still complete its own assignment using the Google token name.
   await assertSucceeds(setDoc(doc(legacy,`rooms/${roomId}/taskSubmissions/${weekStart}__quet__m3`),{

@@ -16,6 +16,7 @@ function renderCleaning(){
     box.innerHTML=`<div class="empty" style="margin-top:14px">${isAdmin()?"Chọn tuần rồi tạo lịch công bằng.":"Trưởng phòng chưa tạo lịch."}</div>`;
   }else{
     const done=s.assignments.filter(a=>!a.cut&&a.completed).length,total=s.assignments.filter(a=>!a.cut).length;
+    const replacements=isAdmin()&&s===roomScheduleToday()?suggestReplacements(s):{};
     const rows=s.assignments.map((a,index)=>{
       const sub=submissionFor(s,a),mine=a.personId===myMemberId();let action="—";
       if(!a.cut){
@@ -24,20 +25,35 @@ function renderCleaning(){
         else if(isAdmin()&&sub?.status==="submitted")action=`<div class="task-actions"><button class="btn small green" data-review-approve="${index}" type="button">Xác nhận</button><button class="btn small danger" data-review-reject="${index}" type="button">Làm lại</button></div>`;
         else if(isAdmin())action=`<button class="btn small soft" data-admin-task="${index}" type="button">Đánh dấu xong</button>`;
         else if(mine&&sub?.status==="submitted")action='<span class="badge warning">⏳ Chờ xác nhận</span>';
-        else if(mine)action=`<div class="task-actions">${sub?"":`<button class="btn small soft" data-start-task="${index}" type="button">Bắt đầu</button>`}<button class="btn small primary" data-submit-task="${index}" type="button">✓ Tôi đã làm</button></div>`;
+        else if(mine)action=`<div class="task-actions">${sub?"":`<button class="btn small soft" data-start-task="${index}" type="button">Bắt đầu</button><button class="btn small" data-swap-task="${index}" type="button">Đổi việc</button>`}<button class="btn small primary" data-submit-task="${index}" type="button">✓ Tôi đã làm</button></div>`;
         else action='<span class="badge">Chỉ xem</span>';
       }
       const overdue=dateValue(addDays(parseDate(s.weekStart),6))<P708BillingCycle.roomDateKey();
       const status=a.cut?"Được miễn":a.completed?"Đã xong":sub?.status==="approved"?"Đã duyệt · chưa khớp lịch":sub?.status==="submitted"?"Chờ xác nhận":sub?.status==="rejected"?"Cần làm lại":overdue?"Quá hạn":sub?.status==="in_progress"?"Đang thực hiện":"Chưa thực hiện";
-      return `<tr class="${a.completed?"done-row":sub?.status==="submitted"?"submitted-row":""}"><td data-label="Công việc"><b>${TASKS.find(t=>t.id===a.taskId)?.emoji||""} ${esc(a.task)}</b></td><td data-label="Phụ trách">${a.cut?'<span class="unpaid-text">Tạm cắt</span>':esc(a.personName)}</td><td data-label="Trạng thái">${esc(status)}</td><td data-label="Thao tác">${action}</td></tr>`;
+      const suggestion=replacements[a.taskId];
+      return `<tr class="${a.completed?"done-row":sub?.status==="submitted"?"submitted-row":""}"><td data-label="Công việc"><b>${TASKS.find(t=>t.id===a.taskId)?.emoji||""} ${esc(a.task)}</b></td><td data-label="Phụ trách"><div>${a.cut?'<span class="unpaid-text">Tạm cắt</span>':esc(a.personName)}${a.reassigned?" · Đã đổi":""}${suggestion?`<small class="replacement-hint">Đề xuất: ${esc(suggestion)}</small>`:""}</div></td><td data-label="Trạng thái">${esc(status)}</td><td data-label="Thao tác">${action}</td></tr>`;
     }).join("");
     box.innerHTML=`<div class="schedule-card"><div class="schedule-head"><div><h3>${weekRange(s.weekStart)}</h3><p>${s.absentNames?.length?`Vắng: ${esc(s.absentNames.join(", "))}`:"Tất cả thành viên có mặt"}</p></div><span class="badge ${done===total&&total?"success":""}">${done}/${total} xác nhận</span></div><div class="table-wrap"><table><thead><tr><th>Công việc</th><th>Phụ trách</th><th>Trạng thái</th><th>Thao tác</th></tr></thead><tbody>${rows}</tbody></table></div></div>`;
-    $$('[data-submit-task]').forEach(btn=>btn.addEventListener("click",()=>submitTask(Number(btn.dataset.submitTask))));
+    $$('[data-submit-task]').forEach(btn=>btn.addEventListener("click",()=>openChecklist(Number(btn.dataset.submitTask))));
     $$('[data-start-task]').forEach(btn=>btn.addEventListener("click",()=>submitTask(Number(btn.dataset.startTask),"in_progress")));
+    $$('[data-swap-task]').forEach(btn=>btn.addEventListener("click",()=>openTaskSwap(Number(btn.dataset.swapTask))));
     $$('[data-review-approve]').forEach(btn=>btn.addEventListener("click",()=>reviewTask(Number(btn.dataset.reviewApprove),true)));
     $$('[data-review-reject]').forEach(btn=>btn.addEventListener("click",()=>reviewTask(Number(btn.dataset.reviewReject),false)));
     $$('[data-admin-task]').forEach(btn=>btn.addEventListener("click",()=>adminToggleTask(Number(btn.dataset.adminTask))));
   }
+  const swaps=taskSwaps.filter(item=>item.scheduleId===s?.id);
+  $("#taskSwapList").innerHTML=swaps.length?swaps.map(item=>{
+    const name=id=>state.members.find(member=>member.id===id)?.name||"Thành viên";
+    const task=id=>TASKS.find(task=>task.id===id)?.name||"Công việc";
+    const status={pending:"Chờ duyệt",approved:"Đã đổi",rejected:"Đã từ chối"}[item.status];
+    return `<div class="room-presence"><div><b>${esc(name(item.memberId))} · ${esc(task(item.taskId))}</b><div>↔ ${esc(name(item.otherMemberId))} · ${esc(task(item.otherTaskId))}</div><small>${esc(status)}</small></div>${isAdmin()&&item.status==="pending"?`<div class="task-actions"><button class="btn small primary" data-review-swap="${esc(item.id)}" data-approved="true" type="button">Duyệt đổi</button><button class="btn small" data-review-swap="${esc(item.id)}" type="button">Từ chối</button></div>`:""}</div>`;
+  }).join(""):'<p class="empty">Chưa có yêu cầu đổi việc.</p>';
+  $$("[data-review-swap]").forEach(button=>button.addEventListener("click",async()=>{
+    button.disabled=true;
+    try{await realtimeEngine.reviewTaskSwap(button.dataset.reviewSwap,button.dataset.approved==="true");toast("Đã xử lý yêu cầu");}
+    catch(e){toast(e.message);}
+    finally{button.disabled=false;}
+  }));
   $("#cleanHistory").innerHTML=state.schedules.length?[...state.schedules].sort((a,b)=>b.weekStart.localeCompare(a.weekStart)).map(x=>`<button class="history-btn ${x.id===ui.selectedScheduleId?"active":""}" data-schedule-id="${x.id}" type="button">${weekRange(x.weekStart)}</button>`).join(""):'<div class="empty">Chưa có lịch sử.</div>';
   $$('[data-schedule-id]').forEach(btn=>btn.addEventListener("click",()=>selectSchedule(btn.dataset.scheduleId)));
 }

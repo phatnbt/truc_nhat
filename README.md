@@ -31,7 +31,13 @@
 - Logic tính năng và enhancement đặt trong `src/features`.
 - Tài liệu không dùng khi chạy production đặt trong `docs`.
 - Mọi thay đổi vào `main` phải qua workflow `P708 Production QA`.
-- Firebase Hosting và Firestore Rules được deploy tự động khi workflow production chạy thành công.
+- Sau khi QA xanh và được phép phát hành, chạy thủ công workflow Firebase Hosting và Firestore Rules từ `main`. Xem [hướng dẫn triển khai](docs/DEPLOYMENT_GUIDE.md).
+
+## Nâng cấp P708
+
+- [Kiến trúc](docs/ARCHITECTURE.md) và [kiểm tra hệ thống](docs/SYSTEM_AUDIT.md)
+- [Nghiên cứu tham khảo](docs/REFERENCE_RESEARCH.md) và [kế hoạch nâng cấp](docs/UPGRADE_PLAN.md)
+- [Kiểm thử](docs/TEST_REPORT.md), [chuyển phiên bản](docs/MIGRATION_GUIDE.md) và [changelog](CHANGELOG.md)
 
 ## Bảo mật cấu hình Firebase
 

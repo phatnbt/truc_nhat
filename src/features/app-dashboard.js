@@ -40,9 +40,12 @@ function renderHome(){
   const submitted=validSubmissions.filter(s=>s.status==="submitted").length;
 
   $("#homeDate").textContent=new Intl.DateTimeFormat("vi-VN",{dateStyle:"full",timeZone:"Asia/Ho_Chi_Minh"}).format(new Date());
-  const displayName=myMember()?.name||authSession.access?.displayName;
+  const displayName=authSession.access?.displayName||myMember()?.name;
   $("#homeGreeting").textContent=displayName?`P708 · ${displayName}`:"Phòng P708";
   $("#homePresence").innerHTML=state.members.length?state.members.map(member=>`<div class="room-presence"><b>${esc(member.name)}</b><span>${state.presence[member.id]===false?"Vắng":"Có mặt"}</span></div>`).join(""):'<p class="empty">Chưa có thành viên.</p>';
+  const activity=isAdmin()?auditLogs.slice(0,4).map(item=>({label:item.summary,at:auditTimeMs(item)})):
+    validSubmissions.filter(item=>item.memberId===myId&&item.status==="approved").slice(0,4).map(item=>({label:`Đã xác nhận: ${item.taskName}`,at:item.updatedAt?.toMillis?.()||0}));
+  $("#homeActivity").innerHTML=activity.length?activity.map(item=>`<div class="room-presence"><b>${esc(item.label)}</b><span>${item.at?P708BillingCycle.roomDateKey(item.at):""}</span></div>`).join(""):'<p class="empty">Chưa có hoạt động.</p>';
   $("#kpiMembers").textContent=state.members.length;
   $("#kpiPresent").textContent=`${present} có mặt · ${state.members.length-present} vắng`;
   $("#kpiTasks").textContent=`${taskDone}/${taskTotal}`;

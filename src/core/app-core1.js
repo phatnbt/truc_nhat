@@ -132,11 +132,12 @@ function saveLocal(){ storageSet(UI_KEY,JSON.stringify({selectedMonth:ui.selecte
 let state=defaultState();
 let confirmedState=clone(state);
 let ui=loadUi();
-let authSession={status:"loading",user:null,access:null,request:null,adminExists:false};
+let authSession={status:"loading",user:null,access:null,request:null};
 let accessRequests=[];
 let accessAccounts=[];
 let auditLogs=[];
 let taskSubmissions=[];
+let taskSwaps=[];
 let auditFilters={member:"all",action:"all",query:""};
 let realtimeEngine=null;
 let syncStatus={mode:"loading",text:"Đang kết nối…"};

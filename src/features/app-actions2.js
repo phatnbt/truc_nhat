@@ -119,29 +119,70 @@ function presetStay(mode){
   p.updatedAt=nowIso();b.updatedAt=nowIso();
   persist("Đã cập nhật nhanh ngày ở",{action:"PRESET_BILL_DAYS",summary:`${p.name}: cập nhật nhanh ngày ở ${monthLabel(b.month)}`,targetMemberId:p.memberId||null});
 }
-function toggleBillClosed(){
-  if(!requireAdmin())return;const b=currentBill();if(!b)return toast("Chưa có dữ liệu tháng");
-  if(!b.closed){
-    const c=billCalc(b);if(!c.totalDays)return toast("Chưa có ngày ở để chốt");
-    if((b.electricity+b.water)<=0&&!confirm("Hóa đơn đang bằng 0 đ. Vẫn chốt sổ?"))return;
-    if(!confirm("Chốt sổ và khóa chỉnh sửa ngày ở/hóa đơn?"))return;b.closed=true;
-  }else{
-    if(b.people.some(person=>Number(person.paidAmount)>0))return toast("Kỳ đã có thanh toán. Đối soát trước khi mở khóa.");
-    if(!confirm("Mở khóa tháng để chỉnh sửa?"))return;b.closed=false;
-  }
-  b.updatedAt=nowIso();persist(b.closed?"Đã chốt sổ":"Đã mở khóa sổ",{action:b.closed?"CLOSE_BILL":"OPEN_BILL",month:b.month,summary:`${b.closed?"Chốt sổ":"Mở khóa"} ${monthLabel(b.month)}`});
+let billDecision=null;
+
+function openBillDecision(action,bill,person,due=0){
+  billDecision={action,month:bill.month,personId:person?.id,uid:authSession.user?.uid,expectedPaid:Number(person?.paidAmount)||0,due};
+  $("#billingDecisionForm").reset();
+  const payment=action==="RECORD_PAYMENT",amount=$("#billingDecisionAmount");
+  $("#billingDecisionAmountField").hidden=!payment;
+  amount.disabled=!payment;
+  if(payment){amount.max=String(due);amount.value=String(billDecision.expectedPaid||due);}
+  $("#billingDecisionTitle").textContent=payment?"Ghi nhận thanh toán":action==="CLOSE_BILL"?"Chốt sổ điện nước":"Mở khóa kỳ điện nước";
+  $("#billingDecisionDetail").textContent=payment?`${person.name} · Phải đóng ${money(due)}`:
+    `${monthLabel(bill.month)} · ${money((bill.electricity||0)+(bill.water||0))}`;
+  openModal("billingDecisionModal");
 }
+
+function toggleBillClosed(){
+  if(!requireAdmin())return;
+  const bill=currentBill();
+  if(!bill)return toast("Chưa có dữ liệu tháng");
+  if(bill.closed&&bill.people.some(person=>Number(person.paidAmount)>0))return toast("Kỳ đã có thanh toán. Đối soát trước khi mở khóa.");
+  if(!bill.closed&&!billCalc(bill).totalDays)return toast("Chưa có ngày ở để chốt");
+  openBillDecision(bill.closed?"OPEN_BILL":"CLOSE_BILL",bill);
+}
+
 function togglePayment(personId){
-  if(!requireAdmin())return;const b=currentBill(),p=b?.people?.find(x=>x.id===personId);if(!b||!p)return;if(!b.closed)return toast("Hãy chốt sổ trước khi ghi nhận thanh toán");
-  const c=billCalc(b),due=c.due[p.id]||0;if(due<=0)return toast("Người này không có khoản phải thu");
-  const expectedPaid=Number(p.paidAmount||0);
-  const value=prompt(`Tổng đã thu của ${p.name} (VND, từ 0 đến ${due})`,String(expectedPaid===0?due:expectedPaid));
-  if(value===null)return;
-  const amount=Number(value.trim());
-  if(!/^\d+$/.test(value.trim())||!Number.isSafeInteger(amount)||amount<0||amount>due)return toast("Nhập số nguyên VND trong giới hạn khoản phải thu");
-  if(amount===expectedPaid)return;
-  p.paid=amount===due;p.paidAt=amount?nowIso():null;p.paidAmount=amount;p.paidBy=amount?authSession.user?.uid||null:null;p.updatedAt=nowIso();b.updatedAt=nowIso();
-  persist(`Đã ghi nhận ${money(amount)} của ${p.name}`,{action:"RECORD_PAYMENT",month:b.month,personId:p.id,expectedPaid,summary:`${p.name}: đã thu ${money(amount)} / ${money(due)}`,targetMemberId:p.memberId||null});
+  if(!requireAdmin())return;
+  const bill=currentBill(),person=bill?.people?.find(item=>item.id===personId);
+  if(!person)return;
+  if(!bill.closed)return toast("Hãy chốt sổ trước khi ghi nhận thanh toán");
+  const due=billCalc(bill).due[personId]||0;
+  if(due<=0)return toast("Người này không có khoản phải thu");
+  openBillDecision("RECORD_PAYMENT",bill,person,due);
+}
+
+async function confirmBillingDecision(event){
+  event.preventDefault();
+  const draft=billDecision,bill=currentBill(),form=event.currentTarget;
+  if(!requireAdmin()||!draft||draft.uid!==authSession.user?.uid||draft.month!==bill?.month)return;
+  const button=form.querySelector("button[type=submit]");
+  if(button.disabled)return;
+  const {action,month,personId,expectedPaid,due}=draft;
+  let message,summary,targetMemberId=null;
+  const editedAt=nowIso();
+  if(action==="RECORD_PAYMENT"){
+    const person=bill.people.find(item=>item.id===personId),amount=Number($("#billingDecisionAmount").value);
+    if(!person||!bill.closed||billCalc(bill).due[personId]!==due||(Number(person.paidAmount)||0)!==expectedPaid)return toast("Hóa đơn vừa thay đổi. Hãy mở lại thao tác.");
+    if(!Number.isSafeInteger(amount)||amount<0||amount>due)return toast("Nhập số nguyên VND trong giới hạn khoản phải thu.");
+    if(amount===expectedPaid){closeModal("billingDecisionModal");billDecision=null;return;}
+    person.paid=amount===due;person.paidAmount=amount;person.paidAt=amount?editedAt:null;
+    person.paidBy=amount?authSession.user.uid:null;person.updatedAt=editedAt;targetMemberId=person.memberId;
+    message=`Đã ghi nhận ${money(amount)} của ${person.name}`;
+    summary=`${person.name}: đã thu ${money(amount)} / ${money(due)}`;
+  }else{
+    bill.closed=action==="CLOSE_BILL";
+    message=bill.closed?"Đã chốt sổ":"Đã mở khóa sổ";
+    summary=`${message} ${monthLabel(month)}`;
+  }
+  bill.updatedAt=editedAt;
+  button.disabled=true;
+  try{
+    if(await persist(message,{action,month,personId,expectedPaid,summary,targetMemberId})){
+      billDecision=null;closeModal("billingDecisionModal");
+    }
+  }finally{button.disabled=false;}
 }
 function billingText(){
   const c=billCalc();

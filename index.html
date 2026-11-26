@@ -11,8 +11,8 @@
   <link rel="manifest" href="./manifest.webmanifest">
   <link rel="icon" type="image/png" sizes="32x32" href="./icons/icon-32.png">
   <link rel="apple-touch-icon" sizes="192x192" href="./icons/icon-192.png">
-  <link rel="stylesheet" href="./styles.css?v=20260819-6">
-  <link rel="stylesheet" href="./landing-ui.css?v=20260819-6">
+  <link rel="stylesheet" href="./styles.css?v=20261126-1">
+  <link rel="stylesheet" href="./landing-ui.css?v=20261126-1">
   <title>Quản lý phòng P708</title>
 </head>
 <body>
@@ -72,6 +72,10 @@
             <h2>Thành viên</h2>
             <div id="homePresence"></div>
           </section>
+          <section>
+            <h2>Hoạt động gần đây</h2>
+            <div id="homeActivity"></div>
+          </section>
         </section>
 
       </div>
@@ -97,6 +101,7 @@
               <div class="schedule-controls"><div class="field"><label>Tuần bắt đầu</label><input id="cleanWeek" type="date"></div><button class="btn primary admin-only" id="createScheduleButton" type="button">✨ Tạo lịch công bằng</button></div>
               <div class="button-row admin-only"><button class="btn soft" id="manualScheduleButton" type="button">Chỉnh phân công</button><button class="btn danger" id="deleteScheduleButton" type="button">Xóa tuần</button></div>
               <div id="cleanScheduleBox"></div>
+              <details class="history-details"><summary>Yêu cầu đổi việc</summary><div id="taskSwapList" class="card-body"></div></details>
               <details class="history-details">
                 <summary>Lịch phòng</summary>
                 <div class="card-body">
@@ -107,6 +112,15 @@
                     </select>
                   </label>
                   <div id="roomCalendarList"></div>
+                  <details class="history-details admin-only">
+                    <summary>Thêm sự kiện</summary>
+                    <form id="roomEventForm" class="card-body">
+                      <label class="field">Ngày<input type="date" name="date" required></label>
+                      <label class="field">Loại sự kiện<select name="kind"><option value="shared">Sự kiện phòng</option><option value="cleanup">Tổng vệ sinh</option><option value="payment">Hạn thanh toán</option></select></label>
+                      <label class="field">Tên<input name="title" maxlength="100" required></label>
+                      <button class="btn primary" type="submit">Thêm vào lịch</button>
+                    </form>
+                  </details>
                 </div>
               </details>
               <details class="history-details"><summary>Lịch sử các tuần</summary><div class="history-list" id="cleanHistory"></div></details>
@@ -236,6 +250,16 @@
       <div class="modal-actions"><button class="btn" data-close="schedulePreviewModal" type="button">Hủy</button><button class="btn primary" id="confirmScheduleButton" type="button">Xác nhận và khóa</button></div>
     </div>
   </div>
+  <div class="modal" id="billingDecisionModal" role="dialog" aria-modal="true" aria-labelledby="billingDecisionTitle">
+    <form class="modal-card" id="billingDecisionForm">
+      <div class="card-head"><h3 id="billingDecisionTitle"></h3><button class="icon-btn" data-close="billingDecisionModal" type="button" aria-label="Đóng">✕</button></div>
+      <div class="modal-body">
+        <p id="billingDecisionDetail"></p>
+        <label class="field" id="billingDecisionAmountField" hidden>Tổng đã thu (VND)<input type="number" id="billingDecisionAmount" min="0" step="1" required></label>
+      </div>
+      <div class="modal-actions"><button class="btn" data-close="billingDecisionModal" type="button">Hủy</button><button id="billingDecisionSave" class="btn primary" type="submit">Xác nhận</button></div>
+    </form>
+  </div>
   <div class="modal" id="noticeModal" role="dialog" aria-modal="true" aria-labelledby="noticeTitle">
     <div class="modal-card">
       <div class="card-head"><h3 id="noticeTitle">Thông báo</h3><button class="icon-btn" type="button" data-close="noticeModal" aria-label="Đóng">✕</button></div>
@@ -252,27 +276,41 @@
       <div class="modal-actions"><button class="btn" id="noticeMarkAll" type="button">Đánh dấu đã đọc tất cả</button></div>
     </div>
   </div>
+  <div class="modal" id="swapTaskModal" role="dialog" aria-modal="true" aria-labelledby="swapTaskTitle">
+    <div class="modal-card">
+      <div class="card-head"><h3 id="swapTaskTitle"></h3><button class="icon-btn" data-close="swapTaskModal" type="button" aria-label="Đóng">✕</button></div>
+      <label class="modal-body field">Việc muốn đổi<select id="swapTaskOther"></select></label>
+      <div class="modal-actions"><button class="btn" data-close="swapTaskModal" type="button">Hủy</button><button id="sendSwapButton" class="btn primary" type="button">Gửi yêu cầu</button></div>
+    </div>
+  </div>
+  <div class="modal" id="taskChecklistModal" role="dialog" aria-modal="true" aria-labelledby="checklistTitle">
+    <form class="modal-card" id="taskChecklistForm">
+      <div class="card-head"><h3 id="checklistTitle"></h3><button class="icon-btn" data-close="taskChecklistModal" type="button" aria-label="Đóng">✕</button></div>
+      <div class="modal-body notice-options">
+        <label><input type="checkbox" name="check" value="task" required> <span id="checklistTaskLabel"></span></label>
+        <label><input type="checkbox" name="check" value="finish" required> Kiểm tra khu vực và cất dụng cụ</label>
+      </div>
+      <div class="modal-actions"><button class="btn" data-close="taskChecklistModal" type="button">Hủy</button><button class="btn primary" type="submit">Gửi xác nhận</button></div>
+    </form>
+  </div>
   <div class="modal" id="cleaningRulesModal" role="dialog" aria-modal="true" aria-labelledby="cleaningRulesTitle"><div class="modal-card cleaning-rules-modal-card"><div class="card-head"><div><p class="eyebrow">TRỰC NHẬT CÔNG BẰNG</p><h3 id="cleaningRulesTitle">Luật tính điểm</h3><p>Điểm thể hiện khối lượng công việc để cân bằng lịch các tuần sau.</p></div><button class="icon-btn" data-close="cleaningRulesModal" type="button" aria-label="Đóng luật tính điểm">✕</button></div><div class="modal-body"><div class="cleaning-rule-list" id="cleaningRulesTaskList"></div><div class="cleaning-rule-note"><b>Điểm được tính thế nào?</b><ul><li>Mỗi việc đã phân công và không bị “Tạm cắt” được cộng theo bảng trên.</li><li>Điểm dùng để cân bằng khối lượng, không phải điểm thưởng hoặc phạt.</li><li>Hệ thống ưu tiên người có tổng khối lượng thấp hơn và hạn chế lặp lại cùng việc ở hai tuần liên tiếp.</li><li>Nếu vắng từ 2 tuần liên tiếp, hệ thống chỉ cộng khối lượng quy đổi khi xếp lịch; số này không hiển thị thành điểm thực tế.</li><li>Reset điểm sẽ đưa điểm đang tính về 0 nhưng vẫn giữ lịch sử phân công.</li></ul></div></div><div class="modal-actions"><button class="btn primary" data-close="cleaningRulesModal" type="button">Đã hiểu</button></div></div></div>
   <div class="modal" id="accessModal"><div class="modal-card access-modal-card"><div class="card-head"><div><h3>Tài khoản & phân quyền</h3><p>Bản Free có thể xóa dữ liệu và quyền của tài khoản khỏi P708; Firebase Authentication của người khác được quản lý trong Firebase Console.</p></div><button class="icon-btn" data-close="accessModal" type="button">✕</button></div><div id="accessModalBody"></div><div class="modal-actions"><button class="btn" id="signOutButton" type="button">Đăng xuất</button><button class="btn primary" data-close="accessModal" type="button">Đóng</button></div></div></div>
 
   <div class="toast" id="toast"></div>
+  <div id="pwaUpdateBanner" class="pwa-update" hidden>
+    <span>Có bản cập nhật</span><button id="pwaUpdateButton" class="btn small primary" type="button">Cập nhật</button>
+  </div>
   <script>
     (()=>{
-      const release="20261029-2",repairKey="P708_BOOT_REPAIR_20261029_2",releaseKey="P708_BOOT_RELEASE_20261029-2",baseUrl=new URL("./",location.href).href;
+      const repairKey="P708_BOOT_REPAIR_20261126_1",baseUrl=new URL("./",location.href).href;
+      const cachePrefix=`p708-manager-${encodeURIComponent(baseUrl)}-`;
       let timer=null;
       const clearAppShell=async()=>{
-        try{if("caches" in window){const keys=await caches.keys();await Promise.all(keys.filter(key=>key.startsWith("p708-manager-")).map(key=>caches.delete(key)));}}catch{}
+        try{if("caches" in window){const keys=await caches.keys();await Promise.all(keys.filter(key=>key.startsWith(cachePrefix)).map(key=>caches.delete(key)));}}catch{}
         try{if("serviceWorker" in navigator){const registrations=await navigator.serviceWorker.getRegistrations();await Promise.all(registrations.filter(item=>item.scope===baseUrl).map(item=>item.unregister()));}}catch{}
       };
       const wasRepaired=()=>{try{return sessionStorage.getItem(repairKey)==="1";}catch{return false;}};
       const markRepaired=()=>{try{sessionStorage.setItem(repairKey,"1");}catch{}};
-      const prepareRelease=async()=>{
-        let prepared=false;try{prepared=localStorage.getItem(releaseKey)==="1";}catch{}
-        if(prepared)return;
-        await clearAppShell();
-        try{localStorage.setItem(releaseKey,"1");}catch{}
-      };
-      globalThis.P708_BOOT_PREPARE=prepareRelease();
       const reload=async()=>{await clearAppShell();location.replace(`${location.pathname}?boot-repair=${Date.now()}${location.hash||""}`);};
       const showRecovery=()=>{
         const box=document.querySelector("#authGateContent");if(!box||(!box.textContent.includes("Đang khởi động")&&!box.dataset.bootProgress))return;
@@ -284,10 +322,6 @@
       window.addEventListener("p708:boot-ready",()=>{clearTimeout(timer);try{sessionStorage.removeItem(repairKey);}catch{}},{once:true});
     })();
   </script>
-  <script>
-    Promise.resolve(globalThis.P708_BOOT_PREPARE).catch(()=>{}).finally(()=>{
-      const script=document.createElement("script");script.type="module";script.src="./app.js?v=20261029-2";document.body.appendChild(script);
-    });
-  </script>
+  <script type="module" src="./app.js?v=20261126-1"></script>
 </body>
 </html>

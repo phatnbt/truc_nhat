@@ -4,7 +4,7 @@ on:
   pull_request:
     branches: [main]
   push:
-    branches: [main, "fix/**"]
+    branches: [main, "fix/**", "upgrade/**"]
 
 permissions:
   contents: read
@@ -73,6 +73,9 @@ jobs:
       - name: Cleaning long-absence fairness regression tests
         run: node .github/cleaning-fairness.test.mjs
 
+      - name: Cleaning task icon regression tests
+        run: node .github/cleaning-task-icons.test.mjs
+
       - name: Cleaning mini pet streak regression tests
         run: node .github/cleaning-streak.test.mjs
 
@@ -89,7 +92,13 @@ jobs:
           java-version: "21"
 
       - name: Install Firestore rules test tooling
-        run: npm install --no-save --package-lock=false --ignore-scripts --no-audit --no-fund firebase firebase-tools @firebase/rules-unit-testing
+        run: npm install --no-save --package-lock=false --ignore-scripts --no-audit --no-fund firebase firebase-tools @firebase/rules-unit-testing @playwright/test
 
       - name: Firestore security integration tests
         run: npx firebase-tools emulators:exec --only firestore --project demo-p708-production-audit "node .github/rules.test.mjs"
+
+      - name: Install browser engines
+        run: npx playwright install --with-deps chromium firefox webkit
+
+      - name: Browser QA with local Auth, Firestore and Hosting
+        run: npx firebase-tools emulators:exec --only auth,firestore,hosting --project demo-p708-production-audit "node .github/browser-qa.mjs"

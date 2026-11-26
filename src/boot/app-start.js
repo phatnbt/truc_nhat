@@ -16,9 +16,12 @@ async function startCloud(){
       if(session.status!=="active"||session.user?.uid!==authSession.user?.uid||session.access?.role!==authSession.access?.role){
         state=defaultState();
         confirmedState=clone(state);
-        accessRequests=[];accessAccounts=[];auditLogs=[];taskSubmissions=[];
+        accessRequests=[];accessAccounts=[];auditLogs=[];taskSubmissions=[];taskSwaps=[];
         ui.selectedScheduleId=null;ui.activeBillPersonId=null;
         $$(".modal.show").forEach(modal=>closeModal(modal.id));
+        for(const form of [$("#stockForm"),$("#expenseForm"),$("#roomEventForm"),$("#taskChecklistForm")]){
+          form.reset();delete form.dataset.expenseId;
+        }
       }
       authSession={...authSession,...session};
       renderAuthGate();signalBootReady();renderAll();
@@ -29,7 +32,8 @@ async function startCloud(){
       if(data.logs!==undefined)auditLogs=data.logs;
       renderAll();
     },
-    onTaskData:data=>{taskSubmissions=data||[];renderAll();}
+    onTaskData:data=>{taskSubmissions=data||[];renderAll();},
+    onSwapData:data=>{taskSwaps=data||[];renderAll();}
   });
   try{await realtimeEngine.start();}
   catch(e){
@@ -64,7 +68,10 @@ function bindStaticEvents(){
   $("#resetCleaningPointsButton")?.addEventListener("click",resetAllCleaningPoints);
   $("#createScheduleButton")?.addEventListener("click",createSchedule);
   $("#confirmScheduleButton")?.addEventListener("click",confirmSchedule);
+  $("#sendSwapButton")?.addEventListener("click",sendTaskSwap);
+  $("#taskChecklistForm")?.addEventListener("submit",confirmChecklist);
   $("#roomCalendarView")?.addEventListener("change",renderRoomCalendar);
+  $("#roomEventForm")?.addEventListener("submit",saveRoomCalendarEvent);
   $("#deleteScheduleButton")?.addEventListener("click",deleteSchedule);
   $("#manualScheduleButton")?.addEventListener("click",openManual);
   $("#saveManualScheduleButton")?.addEventListener("click",saveManual);
@@ -89,6 +96,7 @@ function bindStaticEvents(){
   $("#markAwayButton")?.addEventListener("click",()=>applyStayRange(false));
   $$('[data-stay-preset]').forEach(btn=>btn.addEventListener("click",()=>presetStay(btn.dataset.stayPreset)));
   $("#billCloseButton")?.addEventListener("click",toggleBillClosed);
+  $("#billingDecisionForm")?.addEventListener("submit",confirmBillingDecision);
   $("#copyBillingButton")?.addEventListener("click",()=>copyText(billingText(),"Đã copy bảng tiền"));
   $("#downloadBillingCsvButton")?.addEventListener("click",downloadBillingCsv);
 
@@ -109,8 +117,24 @@ function bindStaticEvents(){
 async function registerPwa(){
   if(!("serviceWorker" in navigator)||location.protocol==="file:")return;
   try{
-    const reg=await navigator.serviceWorker.register("./sw.js?v=20261029-2",{scope:"./"});
-    setTimeout(()=>reg.update().catch(()=>{}),1500);
+    const reg=await navigator.serviceWorker.register("./sw.js?v=20261126-1",{scope:"./",updateViaCache:"none"});
+    const banner=$("#pwaUpdateBanner");
+    const showUpdate=()=>{banner.hidden=!(reg.waiting&&reg.active&&reg.waiting!==reg.active&&navigator.serviceWorker.controller);};
+    showUpdate();
+    reg.addEventListener("updatefound",()=>{
+      reg.installing?.addEventListener("statechange",showUpdate);
+    });
+    navigator.serviceWorker.addEventListener("controllerchange",showUpdate);
+    $("#pwaUpdateButton").addEventListener("click",()=>{
+      const drafts=$$('#stockForm input,#expenseForm input,#roomEventForm input')
+        .some(input=>input.name!=="threshold"&&input.name!==""&&input.value!==input.defaultValue);
+      if($(".modal.show")||drafts){
+        return toast("Lưu hoặc hủy phần đang nhập rồi cập nhật.");
+      }
+      if(!reg.waiting){location.reload();return;}
+      navigator.serviceWorker.addEventListener("controllerchange",()=>location.reload(),{once:true});
+      reg.waiting.postMessage({type:"SKIP_WAITING"});
+    });
   }catch(e){console.warn("PWA",e);}
 }
 
@@ -121,5 +145,5 @@ if($("#cleanWeek"))$("#cleanWeek").value=dateValue(nextMonday());
 state.billing.selectedMonth=validMonthKey(ui.selectedMonth)?ui.selectedMonth:state.billing.selectedMonth||todayMonth();
 renderAll();
 showPage(location.hash.replace("#","")||"home",{replace:true,instant:true});
-registerPwa();
+void registerPwa();
 startCloud();

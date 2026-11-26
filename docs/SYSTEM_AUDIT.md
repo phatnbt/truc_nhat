@@ -2,6 +2,8 @@
 
 Baseline `f99b4f0`. Phạm vi là source, cấu hình, workflow và kiểm thử trên checkout riêng. Dữ liệu thật không được truy cập.
 
+Graphify quét 65 tệp mã ở baseline, cho ra 630 nút và 997 cạnh. Các tuyến nhân quả chính đi qua `app-core1.js` (state), `app-core2.js` (tuần tự hóa), `app-actions1.js` (thao tác trực) và `p708-secure-sync-engine.js` (giao dịch/realtime). Chạy `graphify . --code-only` tại baseline để tái tạo bản đồ. Rules, workflow và tệp cấu hình được rà soát riêng vì đồ thị code không đủ để kết luận về quyền hoặc triển khai.
+
 | Mức | Phát hiện | Khu vực |
 | --- | --- | --- |
 | Critical | Người dùng đăng nhập có thể tự tạo cấu hình trưởng phòng khi config vắng. Cần cấp quyền ban đầu qua kênh quản trị. | `firestore-secure.rules`, auth gate, sync engine |

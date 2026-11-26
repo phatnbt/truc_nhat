@@ -113,12 +113,18 @@
 .room-presence{display:flex;justify-content:space-between;gap:12px;padding:10px 0;border-bottom:1px solid var(--line)}
 .room-presence b{overflow-wrap:anywhere}
 .room-presence span{white-space:nowrap;color:var(--muted)}
+.room-overview .nav-notify{display:inline-flex;align-items:center;gap:6px}
+.room-dashboard .home-pet-garden .pet-garden-card{border-radius:8px}
 :root[data-theme="dark"]{color-scheme:dark;--bg:#121513;--card:#1d231f;--text:#edf3ef;--muted:#acbcb1;--line:#38453c;--blue-soft:#233746;--blue-dark:#9dc8f9;--green-soft:#153829;--amber-soft:#3c2b19;--red-soft:#402823;--purple-soft:#30263c}
 [data-theme="dark"] body,[data-theme="dark"] .auth-gate{background:var(--bg)}
 [data-theme="dark"] :is(.card,.topbar,.btn:not(.primary,.green,.danger,.soft),.icon-btn,.modal-card,.auth-card,.auth-user,.account-fab,.mobile-nav,.action-item,.empty,input,select,.member-row,.history-details,.history-btn:not(.active),.schedule-head,.access-row,.audit-group,.audit-group summary,th,.table-wrap tr:not(.done-row,.submitted-row)){background:var(--card);color:var(--text)}
 [data-theme="dark"] .btn.primary{background:#23568e;border-color:#3273bc}
 [data-theme="dark"] .unpaid-text{color:#ffaaa4}
 [data-theme="dark"] .paid-text{color:#8ee2b3}
+[data-theme="dark"] :is(.account-fab,.room-overview .nav-notify){background:var(--card)!important;border-color:var(--line)!important;color:var(--text)}
+[data-theme="dark"] :is(.pet-garden-heading-simple h2,.utility-preview-head strong,.garden-owner-name){color:var(--text)}
+[data-theme="dark"] :is(.pet-garden-heading-simple p,.garden-streak-line,.utility-preview-head small,.utility-legend,.utility-label){color:var(--muted)}
+[data-theme="dark"] .home-pet-garden .pet-garden-card{background:var(--card);border-color:var(--line);color:var(--text);box-shadow:none}
 @media(max-width:640px){
   .room-dashboard .home-shell{padding-top:calc(58px + env(safe-area-inset-top))}
   .room-overview h1{font-size:1.5rem}

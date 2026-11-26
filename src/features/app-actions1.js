@@ -98,6 +98,16 @@ async function sendCleaningReminder(){
 }
 let schedulePreview=null;
 
+function suggestReplacements(schedule){
+  const needing=schedule.assignments.filter(a=>!a.cut&&!a.completed&&a.personId&&state.presence[a.personId]===false);
+  if(!needing.length)return {};
+  const fixed=Object.fromEntries(schedule.assignments.filter(a=>!needing.includes(a)).map(a=>[a.taskId,a.cut?null:a.personId]));
+  const proposal=P708CleaningFairness.proposeCleaningSchedule({
+    members:state.members,presence:state.presence,tasks:TASKS,schedules:state.schedules,week:schedule.weekStart,
+    weights:state.settings.weights,adjustments:state.settings.cleaningPointAdjustments,resetThrough:cleaningPointsResetThrough(),fixed
+  });
+  return Object.fromEntries(needing.map(a=>[a.taskId,proposal.find(item=>item.taskId===a.taskId&&!item.cut)?.personName||""]));
+}
 function createSchedule(){
   if(!requireAdmin())return;
   const week=$("#cleanWeek").value;
@@ -135,7 +145,7 @@ async function confirmSchedule(){
   });
   if(assignments.some(a=>a.personId&&(!state.members.some(m=>m.id===a.personId)||state.presence[a.personId]===false)))return toast("Danh sách có mặt đã đổi. Hãy tạo đề xuất mới.");
   const t=nowIso(),schedule={
-    id:uid(),weekStart:week,createdAt:t,updatedAt:t,locked:true,assignments,
+    id:uid(),weekStart:week,createdAt:t,updatedAt:t,locked:true,checklistVersion:1,assignments,
     absentNames:absent.map(m=>m.name),absentMemberIds:absent.map(m=>m.id),
     fairnessPolicy:{longAbsenceMinWeeks:2,longAbsenceCredit:"present_average_load",version:2}
   };
@@ -191,7 +201,32 @@ async function saveManual(){
   const ok=await persist("Đã lưu phân công",{action:"UPDATE_SCHEDULE",summary:`Chỉnh phân công tuần ${s.weekStart}`});
   if(ok)await realtimeEngine?.reconcileTaskSubmissions({weekStart:s.weekStart,assignments:s.assignments}).catch(()=>{});
 }
-async function submitTask(index,status="submitted"){
+const CHECK_ITEMS={
+  lavabo:"Rửa lavabo và bồn cầu",san:"Chà sàn và làm sạch miệng cống",quet:"Quét sạch góc phòng và lối đi",
+  lau:"Lau sàn phòng và ban công",tham:"Giặt sạch thảm",rac:"Chà các vết bẩn trên tường"
+};
+let checklistDraft=null;
+function openChecklist(index){
+  const schedule=currentSchedule(),assignment=schedule?.assignments[index];
+  if(!assignment||assignment.personId!==myMemberId())return;
+  checklistDraft={scheduleId:schedule.id,taskId:assignment.taskId,actor:authSession.user?.uid};
+  $("#checklistTitle").textContent=assignment.task;
+  $("#checklistTaskLabel").textContent=CHECK_ITEMS[assignment.taskId]||assignment.task;
+  $("#taskChecklistForm").reset();
+  openModal("taskChecklistModal");
+}
+async function confirmChecklist(event){
+  event.preventDefault();
+  const draft=checklistDraft,schedule=currentSchedule();
+  if(!draft||draft.actor!==authSession.user?.uid||schedule?.id!==draft.scheduleId)return;
+  const index=schedule.assignments.findIndex(item=>item.taskId===draft.taskId);
+  const checks=new FormData(event.currentTarget).getAll("check");
+  if(index<0||checks.length!==2)return;
+  if(await submitTask(index,"submitted",checks)){
+    checklistDraft=null;closeModal("taskChecklistModal");
+  }
+}
+async function submitTask(index,status="submitted",checks=[]){
   if(!navigator.onLine)return toast("Đang ngoại tuyến · hãy kết nối mạng trước khi báo hoàn thành",5000);
   const s=currentSchedule(),a=s?.assignments?.[index];
   if(!s||!a||a.cut)return;
@@ -200,9 +235,34 @@ async function submitTask(index,status="submitted"){
   if(existing?.status==="submitted")return toast("Công việc này đã báo hoàn thành và đang chờ xác nhận");
   if(existing?.status==="approved")return toast("Công việc đã được xác nhận");
   try{
-    await realtimeEngine?.submitTask({scheduleId:s.id,weekStart:s.weekStart,taskId:a.taskId,taskName:a.task,memberId:a.personId,status});
+    await realtimeEngine?.submitTask({scheduleId:s.id,weekStart:s.weekStart,taskId:a.taskId,taskName:a.task,memberId:a.personId,status,checks});
     toast(status==="in_progress"?"Đã bắt đầu công việc":"Đã báo hoàn thành, chờ trưởng phòng xác nhận");
+    return true;
   }catch(e){toast(e?.message||"Không thể báo hoàn thành");}
+}
+let swapDraft=null;
+function openTaskSwap(index){
+  const schedule=currentSchedule(),own=schedule?.assignments[index],memberId=myMemberId();
+  if(!own||!memberId||own.personId!==memberId||own.cut||own.completed)return;
+  const candidates=schedule.assignments.filter(a=>!a.cut&&!a.completed&&a.personId&&a.personId!==memberId&&state.presence[a.personId]!==false);
+  if(!candidates.length)return toast("Không có việc phù hợp để đổi.");
+  swapDraft={scheduleId:schedule.id,weekStart:schedule.weekStart,taskId:own.taskId,actor:authSession.user.uid};
+  $("#swapTaskTitle").textContent=`Đổi việc: ${own.task}`;
+  $("#swapTaskOther").replaceChildren(...candidates.map(a=>new Option(`${a.task} · ${a.personName}`,a.taskId)));
+  $("#swapTaskOther").value=candidates[0].taskId;
+  openModal("swapTaskModal");
+}
+async function sendTaskSwap(){
+  const selected=swapDraft,otherTaskId=$("#swapTaskOther").value;
+  if(!selected||authSession.user?.uid!==selected.actor)return;
+  const other=state.schedules.find(s=>s.id===selected.scheduleId)?.assignments.find(a=>a.taskId===otherTaskId);
+  if(!other?.personId)return toast("Lịch đã thay đổi.");
+  $("#sendSwapButton").disabled=true;
+  try{
+    await realtimeEngine.requestTaskSwap({...selected,otherTaskId,otherMemberId:other.personId});
+    closeModal("swapTaskModal");swapDraft=null;toast("Đã gửi yêu cầu đổi việc");
+  }catch(e){toast(e.code==="permission-denied"?"Yêu cầu đã tồn tại hoặc phân công đã thay đổi.":e.message);}
+  finally{$("#sendSwapButton").disabled=false;}
 }
 async function reviewTask(index,approved){
   if(!requireAdmin())return;

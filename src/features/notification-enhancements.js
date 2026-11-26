@@ -1,4 +1,4 @@
-const NOTICE_TYPES={schedule:"Lịch trực",reminder:"Nhắc việc trực",review:"Duyệt công việc",billing:"Điện nước",stock:"Vật dụng"};
+const NOTICE_TYPES={schedule:"Lịch trực",reminder:"Nhắc việc trực",review:"Duyệt công việc",swap:"Đổi việc",billing:"Điện nước",stock:"Vật dụng"};
 const noticeInFlight=new Set();
 
 function noticeStorageKey(){
@@ -36,6 +36,11 @@ function roomNotices(){
     });
   }
   const bill=[...state.billing.months].filter(b=>b.closed).sort((a,b)=>b.month.localeCompare(a.month))[0];
+  for(const swap of taskSwaps.slice(0,20)){
+    if((isAdmin()&&swap.status==="pending")||(swap.memberId===memberId&&swap.status!=="pending")){
+      result.push({id:`swap:${swap.id}:${swap.status}`,type:"swap",title:{pending:"Yêu cầu đổi việc",approved:"Đổi việc đã được duyệt",rejected:"Đổi việc bị từ chối"}[swap.status],body:weekRange(swap.weekStart),page:"cleaning",scheduleId:swap.scheduleId});
+    }
+  }
   if(bill&&memberId){
     const calc=billCalc(bill),person=calc.people.find(p=>p.memberId===memberId);
     const remaining=person?Math.max(0,(calc.due[person.id]||0)-(Number(person.paidAmount)||0)):0;
