@@ -125,14 +125,23 @@ function toggleBillClosed(){
     const c=billCalc(b);if(!c.totalDays)return toast("Chưa có ngày ở để chốt");
     if((b.electricity+b.water)<=0&&!confirm("Hóa đơn đang bằng 0 đ. Vẫn chốt sổ?"))return;
     if(!confirm("Chốt sổ và khóa chỉnh sửa ngày ở/hóa đơn?"))return;b.closed=true;
-  }else{if(!confirm("Mở khóa tháng để chỉnh sửa?"))return;b.closed=false;}
-  b.updatedAt=nowIso();persist(b.closed?"Đã chốt sổ":"Đã mở khóa sổ",{action:b.closed?"CLOSE_BILL":"OPEN_BILL",summary:`${b.closed?"Chốt sổ":"Mở khóa"} ${monthLabel(b.month)}`});
+  }else{
+    if(b.people.some(person=>Number(person.paidAmount)>0))return toast("Kỳ đã có thanh toán. Đối soát trước khi mở khóa.");
+    if(!confirm("Mở khóa tháng để chỉnh sửa?"))return;b.closed=false;
+  }
+  b.updatedAt=nowIso();persist(b.closed?"Đã chốt sổ":"Đã mở khóa sổ",{action:b.closed?"CLOSE_BILL":"OPEN_BILL",month:b.month,summary:`${b.closed?"Chốt sổ":"Mở khóa"} ${monthLabel(b.month)}`});
 }
 function togglePayment(personId){
   if(!requireAdmin())return;const b=currentBill(),p=b?.people?.find(x=>x.id===personId);if(!b||!p)return;if(!b.closed)return toast("Hãy chốt sổ trước khi ghi nhận thanh toán");
   const c=billCalc(b),due=c.due[p.id]||0;if(due<=0)return toast("Người này không có khoản phải thu");
-  const wasPaid=isBillPaid(p,due);p.paid=!wasPaid;p.paidAt=p.paid?nowIso():null;p.paidAmount=p.paid?due:0;p.paidBy=p.paid?authSession.user?.uid||"admin":null;p.updatedAt=nowIso();b.updatedAt=nowIso();
-  persist(p.paid?`Đã ghi nhận ${p.name} đã đóng tiền`:`Đã chuyển ${p.name} về chưa đóng`,{action:p.paid?"MARK_BILL_PAID":"MARK_BILL_UNPAID",summary:`${p.name}: ${p.paid?"Đã đóng":"Chưa đóng"} ${money(due)}`,targetMemberId:p.memberId||null});
+  const expectedPaid=Number(p.paidAmount||0);
+  const value=prompt(`Tổng đã thu của ${p.name} (VND, từ 0 đến ${due})`,String(expectedPaid===0?due:expectedPaid));
+  if(value===null)return;
+  const amount=Number(value.trim());
+  if(!/^\d+$/.test(value.trim())||!Number.isSafeInteger(amount)||amount<0||amount>due)return toast("Nhập số nguyên VND trong giới hạn khoản phải thu");
+  if(amount===expectedPaid)return;
+  p.paid=amount===due;p.paidAt=amount?nowIso():null;p.paidAmount=amount;p.paidBy=amount?authSession.user?.uid||null:null;p.updatedAt=nowIso();b.updatedAt=nowIso();
+  persist(`Đã ghi nhận ${money(amount)} của ${p.name}`,{action:"RECORD_PAYMENT",month:b.month,personId:p.id,expectedPaid,summary:`${p.name}: đã thu ${money(amount)} / ${money(due)}`,targetMemberId:p.memberId||null});
 }
 function billingText(){
   const c=billCalc();
@@ -147,7 +156,10 @@ function downloadBillingCsv(){
     const due=c.due[p.id]||0,state=billPaymentState(p,due),collected=state==="paid"?due:Math.min(Math.max(0,Number(p.paidAmount)||0),due);
     return [p.name,stayCount(p,c.b),c.electric[p.id],c.water[p.id],due,state==="none"?"Không phát sinh":state==="paid"?"Đã đóng":"Chưa đóng",collected];
   }),["TỔNG",c.totalDays,c.b.electricity,c.b.water,c.b.electricity+c.b.water,"",c.people.reduce((s,p)=>{const due=c.due[p.id]||0;return s+(billPaymentState(p,due)==="paid"?due:Math.min(Math.max(0,Number(p.paidAmount)||0),due));},0)]];
-  const csv="\ufeff"+rows.map(r=>r.map(v=>`"${String(v).replaceAll('"','""')}"`).join(",")).join("\n");
+  const csv="\ufeff"+rows.map(r=>r.map(v=>{
+    const value=String(v),safe=typeof v==="string"&&/^[\s=+@-]/.test(value)?"'"+value:value;
+    return `"${safe.replaceAll('"','""')}"`;
+  }).join(",")).join("\n");
   const a=document.createElement("a"),url=URL.createObjectURL(new Blob([csv],{type:"text/csv;charset=utf-8"}));a.href=url;a.download=`dien-nuoc-${c.b.month}.csv`;a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);toast("Đã tải CSV");
 }
 

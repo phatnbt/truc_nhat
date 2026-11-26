@@ -58,6 +58,8 @@ function paymentLabel(person,due){
 }
 function paymentMarkup(person,due){
   const status=billPaymentState(person,due);
+  const partial=Math.min(due,Number(person.paidAmount)||0);
+  if(status==="unpaid"&&partial>0)return `<span>Đã thu ${money(partial)} · Còn ${money(due-partial)}</span>`;
   if(status==="none")return '<span class="badge">— Không phát sinh</span>';
   return status==="paid"?'<span class="paid-text">✅ Đã đóng</span>':'<span class="unpaid-text">🔴 Chưa đóng</span>';
 }
@@ -134,5 +136,5 @@ function renderSync(){
 }
 function renderAll(){
   state=normalizeState(state);ui.selectedMonth=state.billing.selectedMonth;
-  renderPermission();renderAccountButton();renderHome();renderCleaning();renderCleaningRules();renderBilling();renderAudit();renderAccessModal();renderSync();saveLocal();scheduleReminderNotifications();
+  renderPermission();renderAccountButton();renderHome();renderCleaning();renderCleaningRules();renderBilling();renderRoomResources();renderAudit();renderAccessModal();renderSync();saveLocal();scheduleReminderNotifications();
 }

@@ -45,6 +45,7 @@
         <div class="room-shortcuts" aria-label="Thao tác nhanh">
           <button class="btn primary" data-go="cleaning" type="button">Lịch trực</button>
           <button class="btn" data-go="billing" type="button">Điện nước</button>
+          <button class="btn" data-go="resources" type="button">Vật dụng</button>
           <button class="btn admin-only" data-go="audit" type="button">Nhật ký</button>
         </div>
         <section class="dashboard-kpis bento-kpis" aria-label="Tổng quan phòng">
@@ -154,6 +155,57 @@
       </div>
     </section>
 
+    <section class="page" id="page-resources" data-page="resources">
+      <div class="shell">
+        <header class="topbar">
+          <div class="brand"><button class="icon-btn" data-go="home" type="button" aria-label="Trang chủ">←</button><h1>Vật dụng và chi chung</h1></div>
+        </header>
+        <div class="two-col">
+          <section class="card">
+            <div class="card-head"><h2>Vật dụng</h2></div>
+            <div class="card-body">
+              <div id="stockList"></div>
+              <h3>Cần mua</h3><p id="shoppingList"></p>
+              <details class="history-details admin-only">
+                <summary>Thêm hoặc sửa vật dụng</summary>
+                <form id="stockForm" class="card-body" autocomplete="off">
+                  <input name="id" type="hidden">
+                  <label class="field">Vật dụng<input name="name" maxlength="80" required></label>
+                  <label class="field">Đơn vị<input name="unit" maxlength="20" required></label>
+                  <label class="field">Tồn kho<input name="quantity" type="number" min="0" step="1" required></label>
+                  <label class="field">Ngưỡng cần mua<input name="threshold" type="number" min="0" step="1" required value="1"></label>
+                  <label class="field">Tình trạng<input name="condition" maxlength="80"></label>
+                  <button class="btn primary" type="submit">Lưu vật dụng</button>
+                </form>
+              </details>
+            </div>
+          </section>
+          <section class="card">
+            <div class="card-head"><h2>Chi chung</h2></div>
+            <div class="card-body">
+              <div id="roomExpenses"></div>
+              <details class="history-details admin-only">
+                <summary>Ghi khoản chi</summary>
+                <form id="expenseForm" class="card-body" autocomplete="off">
+                  <label class="field">Khoản chi<input name="name" maxlength="80" required></label>
+                  <label class="field">Số tiền (VND)<input name="amount" type="number" min="1" max="1000000000" step="1" required></label>
+                  <label class="field">Người ứng tiền<select id="expensePayer" name="payer" required></select></label>
+                  <label class="field">Cách chia<select id="expenseMode" name="mode">
+                    <option value="equal">Chia đều</option><option value="ratio">Theo tỷ lệ</option>
+                    <option value="days">Theo ngày ở kỳ đang chọn</option><option value="custom">Số tiền tùy chỉnh</option>
+                  </select></label>
+                  <div id="expenseShares" hidden></div>
+                  <label class="field">Vật dụng đã mua<select id="expenseStock" name="stock"></select></label>
+                  <div id="purchaseQuantityField" hidden><label class="field">Số lượng mua<input name="purchaseQuantity" type="number" min="1" step="1"></label></div>
+                  <button class="btn primary" type="submit">Lưu khoản chi</button>
+                </form>
+              </details>
+            </div>
+          </section>
+        </div>
+      </div>
+    </section>
+
     <section class="page" id="page-audit" data-page="audit">
       <div class="shell">
         <header class="topbar">
@@ -172,7 +224,7 @@
     </section>
   </main>
 
-  <nav class="mobile-nav"><button data-go="home" type="button">🏠<span>Trang chủ</span></button><button data-go="cleaning" type="button">🧹<span>Trực nhật</span></button><button data-go="billing" type="button">⚡<span>Điện nước</span></button></nav>
+  <nav class="mobile-nav"><button data-go="home" type="button">🏠<span>Trang chủ</span></button><button data-go="cleaning" type="button">🧹<span>Trực nhật</span></button><button data-go="billing" type="button">⚡<span>Điện nước</span></button><button data-go="resources" type="button">▣<span>Vật dụng</span></button></nav>
 
   <div class="modal" id="billingPeriodModal"><div class="modal-card billing-period-modal-card"><div class="card-head"><div><h3 id="billingPeriodEditorTitle">Chỉnh kỳ điện nước</h3><p id="billingPeriodEditorCurrent">Chọn ngày bắt đầu và kết thúc của kỳ.</p></div><button class="icon-btn" data-close="billingPeriodModal" type="button">✕</button></div><div class="modal-body"><div class="period-editor-grid"><div class="field"><label>Ngày bắt đầu</label><input id="billingPeriodStart" type="date"></div><div class="field"><label>Ngày kết thúc</label><input id="billingPeriodEnd" type="date"></div></div><div class="period-editor-note" id="billingPeriodEditorWarning">Tiền điện nước sẽ tự tính lại theo số ngày ở trong kỳ.</div><div class="period-editor-safety"><b>Dữ liệu được bảo vệ</b><span>Các ngày ở nằm ngoài khoảng mới vẫn được lưu, nhưng sẽ không được tính tiền. Nếu kỳ đã có thanh toán, hãy hủy thanh toán trước; sau đó mở khóa kỳ rồi mới chỉnh.</span></div></div><div class="modal-actions period-editor-actions"><button class="btn soft" id="resetBillingPeriodButton" type="button">Khôi phục 29–28</button><button class="btn" data-close="billingPeriodModal" type="button">Hủy</button><button class="btn primary" id="saveBillingPeriodButton" type="button">Lưu kỳ</button></div></div></div>
   <div class="modal" id="memberModal"><div class="modal-card"><div class="card-head"><div><h3>Thêm người/khách</h3><p>Người này chỉ xuất hiện trong hóa đơn tháng.</p></div><button class="icon-btn" data-close="memberModal" type="button">✕</button></div><div class="modal-body"><div class="field"><label>Tên người</label><input id="billNewPersonName" placeholder="Ví dụ: Khách A"></div></div><div class="modal-actions"><button class="btn" data-close="memberModal" type="button">Hủy</button><button class="btn primary" id="confirmAddBillingPersonButton" type="button">Thêm</button></div></div></div>

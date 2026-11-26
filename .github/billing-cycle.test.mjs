@@ -1,4 +1,13 @@
 import assert from "node:assert/strict";
+import {splitVnd} from "../src/core/expense-split.js";
+
+const expenseMembers=[{id:"member-c",value:1},{id:"member-a",value:1},{id:"member-b",value:1}];
+assert.deepEqual(splitVnd(100,expenseMembers,"equal"),{"member-a":34,"member-b":33,"member-c":33});
+assert.deepEqual(splitVnd(5,[{id:"a",value:1},{id:"b",value:2}],"ratio"),{a:2,b:3});
+assert.deepEqual(splitVnd(5,[{id:"a",value:0},{id:"b",value:4}],"days"),{a:0,b:5});
+assert.deepEqual(splitVnd(5,[{id:"a",value:3},{id:"b",value:2}],"custom"),{a:3,b:2});
+assert.throws(()=>splitVnd(6,[{id:"a",value:5}],"custom"));
+assert.throws(()=>splitVnd(3,[{id:"a",value:0}],"days"));
 import fs from "node:fs";
 import {
   BILLING_CYCLE_CUTOVER_MONTH,

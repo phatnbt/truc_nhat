@@ -64,6 +64,8 @@ function overlayMemberData(adminShape,memberDataByUid){
     if(!memberId||!output.members?.[memberId])continue;
     if(typeof data.presence==="boolean")output.presence[memberId]=data.presence;
     for(const [month,monthData] of Object.entries(data.billingMonths||{})){
+      const bill=output.billingMonths[month];
+      if(bill?.closed&&bill.closedDaysVersion===1)continue;
       const entry=memberPersonEntry(output,memberId,month);
       if(!entry)continue;
       output.billingMonths[month].people[entry[0]].days=clone(monthData?.days||{});
@@ -294,7 +296,41 @@ export function createP708SecureEngine({firebaseConfig,roomCode,deviceId,onShape
       const result=await runTransaction(db,async tx=>{
         const roomSnap=await tx.get(roomRef),memberSnaps=[];
         for(const change of memberChanges)memberSnaps.push(await tx.get(doc(memberDataCollection,change.mappedUid)));
+        const closeMonth=audit.action==="CLOSE_BILL"?audit.month:null;
+        const closeMemberDocs=new Map();
+        if(closeMonth){
+          for(const [uid,data] of memberDataByUid){
+            if(!memberPersonEntry(previous,data.memberId,closeMonth))continue;
+            const snap=await tx.get(doc(memberDataCollection,uid));
+            if(snap.exists())closeMemberDocs.set(uid,snap.data());
+          }
+        }
         const serverPayload=roomSnap.exists()?clone(roomSnap.data()?.payload)||{}:{},mergedShape=applyJsonOperations(serverPayload,roomOperations),mergedMembers=[];
+        if(roomOperations.some(op=>op.path[0]==="resources")&&!jsonEqual(serverPayload.resources,previous.resources)){
+          throw new Error("Sổ vật dụng và chi chung vừa thay đổi. Hãy thử lại sau khi đồng bộ.");
+        }
+        if(audit.action==="RECORD_PAYMENT"){
+          const serverBill=serverPayload.billingMonths?.[audit.month];
+          const person=serverBill?.people?.[`person:${audit.personId}`];
+          if(!serverBill?.closed||!person||Number(person.paidAmount||0)!==audit.expectedPaid){
+            throw new Error("Khoản thanh toán vừa thay đổi. Hãy kiểm tra số dư và thử lại.");
+          }
+        }
+        if(closeMonth){
+          const activeBill=serverPayload.billingMonths?.[closeMonth];
+          const candidate=mergedShape.billingMonths?.[closeMonth];
+          if(!activeBill||activeBill.closed||!candidate)throw new Error("Kỳ điện nước vừa thay đổi.");
+          const materialized=overlayMemberData(serverPayload,closeMemberDocs).billingMonths[closeMonth];
+          if(!jsonEqual(materialized,previous.billingMonths?.[closeMonth]))throw new Error("Ngày ở hoặc hóa đơn vừa thay đổi. Hãy kiểm tra trước khi chốt lại.");
+          candidate.people=materialized.people;
+          candidate.closedDaysVersion=1;
+        }
+        if(audit.action==="OPEN_BILL"&&audit.month){
+          const bill=serverPayload.billingMonths?.[audit.month];
+          if(!bill?.closed||Object.values(bill.people||{}).some(person=>Number(person.paidAmount)>0)){
+            throw new Error("Kỳ vừa thay đổi hoặc đã ghi nhận thanh toán.");
+          }
+        }
         const deletedSchedules=serverPayload._sync?.deletedSchedules||{};
         const creating=audit.action==="CREATE_SCHEDULE"&&audit.week;
         if(creating){
@@ -340,6 +376,15 @@ export function createP708SecureEngine({firebaseConfig,roomCode,deviceId,onShape
     const previousOwn=extractMemberData(optimisticShape,memberId,memberDataByUid.get(user.uid)),desiredOwn=extractMemberData(desired,memberId,memberDataByUid.get(user.uid)),ownOperations=diffJson(previousOwn,desiredOwn),ownRef=doc(memberDataCollection,user.uid);
     const mergedOwn=await runTransaction(db,async tx=>{
       const snap=await tx.get(ownRef),current=snap.exists()?clone(snap.data())||{}:{memberId},merged=applyJsonOperations(current,ownOperations);merged.memberId=memberId;
+      if(ownOperations.some(op=>op.path[0]==="billingMonths")){
+        const room=await tx.get(roomRef);
+        for(const month of new Set([...Object.keys(current.billingMonths||{}),...Object.keys(merged.billingMonths||{})])){
+          if(room.data()?.payload?.billingMonths?.[month]?.closed
+            && !jsonEqual(current.billingMonths?.[month],merged.billingMonths?.[month])){
+            throw new Error("Kỳ điện nước đã được chốt.");
+          }
+        }
+      }
       tx.set(ownRef,{...merged,updatedBy:user.uid,updatedAt:serverTimestamp()});return merged;
     });
     if(user?.uid!==actor||!hasAccess())return true;

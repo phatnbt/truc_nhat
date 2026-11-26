@@ -19,6 +19,7 @@ function toSyncShape(source=state){
     members:Object.fromEntries(s.members.map(m=>[m.id,clone(m)])),
     presence:clone(s.presence),
     schedules:Object.fromEntries(s.schedules.map(x=>[x.weekStart,clone(x)])),
+    ...(s.resources?{resources:clone(s.resources)}:{}),
     billingMonths:Object.fromEntries(s.billing.months.map(b=>[
       b.month,
       {...clone(b),people:Object.fromEntries((b.people||[]).map(p=>[`person:${p.id}`,clone(p)]))}
@@ -33,6 +34,7 @@ function fromSyncShape(shape){
     members:Object.values(shape?.members||{}).map(clone),
     presence:clone(shape?.presence||{}),
     schedules:Object.values(shape?.schedules||{}).map(clone),
+    ...(shape?.resources?{resources:clone(shape.resources)}:{}),
     billing:{selectedMonth:ui.selectedMonth||state.billing?.selectedMonth||todayMonth(),months},
     settings:{...defaultState().settings,...clone(shape?.settings||{})},
     updatedAt:nowIso()
@@ -81,7 +83,7 @@ async function forceSync(){
   toast(ok?"Đã đồng bộ dữ liệu":"Không thể kết nối máy chủ");
 }
 
-const VALID_PAGES=new Set(["home","cleaning","billing","audit"]);
+const VALID_PAGES=new Set(["home","cleaning","billing","resources","audit"]);
 function showPage(page,options={}){
   page=VALID_PAGES.has(page)?page:"home";
   if(page==="audit"&&!isAdmin())page="home";

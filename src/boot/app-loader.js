@@ -4,6 +4,7 @@ import { createP708CanonicalMappingRepair } from "../core/p708-canonical-mapping
 import * as P708BillingCycle from "../core/billing-cycle-period.js?v=20260929-1";
 import * as P708CleaningFairness from "../core/cleaning-fairness.js?v=20260921-2";
 import * as P708CleaningStreak from "../core/cleaning-streak.js?v=20260921-3";
+import { splitVnd } from "../core/expense-split.js";
 import { deleteScheduleAuthoritatively } from "../core/cleaning-schedule-store.js?v=20260913-1";
 
 const FIREBASE_RUNTIME_ENDPOINT="/__/firebase/init.json";
@@ -65,6 +66,7 @@ globalThis.createP708CanonicalMappingRepair = createP708CanonicalMappingRepair;
 globalThis.P708BillingCycle = P708BillingCycle;
 globalThis.P708CleaningFairness = P708CleaningFairness;
 globalThis.P708CleaningStreak = P708CleaningStreak;
+globalThis.splitVnd = splitVnd;
 globalThis.deleteScheduleAuthoritatively = deleteScheduleAuthoritatively;
 
 const parts = [
@@ -86,6 +88,7 @@ const parts = [
   "../features/home-pet-garden.js?v=20260921-3",
   "../features/ui-icon-polish.js?v=20261029-1",
   "../features/today-calendar.js?v=20260913-1",
+  "../features/room-resources.js",
   "./app-start.js?v=20261029-2",
   "../features/notification-enhancements.js?v=20261029-1",
   "../features/mobile-install-bridge.js?v=20260913-1",

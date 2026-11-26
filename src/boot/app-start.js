@@ -153,6 +153,7 @@ async function registerPwa(){
 }
 
 bindStaticEvents();
+bindRoomResources();
 if($("#cleanWeek"))$("#cleanWeek").value=dateValue(nextMonday());
 state.billing.selectedMonth=validMonthKey(ui.selectedMonth)?ui.selectedMonth:state.billing.selectedMonth||todayMonth();
 renderAll();
