@@ -56,7 +56,7 @@ function renderCleaning(){
       const suggestion=replacements[a.taskId];
       const task=TASKS.find(t=>t.id===a.taskId);
       const weight=P708CleaningFairness.effectiveTaskWeight(a.taskId,state.settings.weights,task?.w);
-      return `<tr data-task-key="${esc(cleaningTaskKey(a,index))}" class="${mine?"own-task ":""}${a.completed?"done-row":sub?.status==="submitted"?"submitted-row":""}"><td data-label="Công việc"><div><b>${task?.emoji||""} ${esc(a.task)}</b>${a.cut?"":`<small class="task-weight">${formatCleaningPoints(weight)} điểm${mine?" · Việc của bạn":""}</small>`}</div></td><td data-label="Phụ trách"><div class="task-assignee">${a.cut?'<span class="unpaid-text">Tạm cắt</span>':`<span class="task-initial" aria-hidden="true">${esc((a.personName||"?").trim().split(/\\s+/).at(-1)?.charAt(0)||"?")}</span>${esc(a.personName)}`}${a.reassigned?" · Đã đổi":""}${suggestion?`<small class="replacement-hint">Đề xuất: ${esc(suggestion)}</small>`:""}</div></td><td data-label="Trạng thái">${esc(status)}</td><td data-label="Thao tác">${action}</td></tr>`;
+      return `<tr data-task-key="${esc(cleaningTaskKey(a,index))}" class="${mine?"own-task ":""}${a.completed?"done-row":sub?.status==="submitted"?"submitted-row":""}"><td data-label="Công việc"><div><b>${task?.emoji||""} ${esc(a.task)}</b>${a.cut?"":`<small class="task-weight">${formatCleaningPoints(weight)} điểm${mine?" · Việc của bạn":""}</small>`}</div></td><td data-label="Phụ trách"><div class="task-assignee">${a.cut?'<span class="unpaid-text">Tạm cắt</span>':`<span class="task-initial" aria-hidden="true">${esc((a.personName||"?").trim().split(/\\s+/).pop()?.charAt(0)||"?")}</span>${esc(a.personName)}`}${a.reassigned?" · Đã đổi":""}${suggestion?`<small class="replacement-hint">Đề xuất: ${esc(suggestion)}</small>`:""}</div></td><td data-label="Trạng thái">${esc(status)}</td><td data-label="Thao tác">${action}</td></tr>`;
     }).join("");
     const mine=s.assignments.filter(a=>!a.cut&&a.personId===myMemberId());
     const heading=`<div class="schedule-head"><div><h3>${weekRange(s.weekStart)}</h3><p>${s.absentNames?.length?`Vắng: ${esc(s.absentNames.join(", "))}`:"Tất cả thành viên có mặt"}</p>${mine.length?`<p>Việc của bạn: ${mine.filter(a=>a.completed).length}/${mine.length}</p>`:""}</div><span class="badge ${done===total&&total?"success":""}">${done}/${total} xác nhận</span></div>`;
@@ -82,6 +82,8 @@ function renderCleaning(){
     finally{button.disabled=false;}
   }));
   renderCleaningHistory();
+  runOptionalFeature("pet-cleaning",globalThis.P708PetWidget?.decorateMemberRows);
+  runOptionalFeature("pet-widget",globalThis.P708PetWidget?.refresh);
 }
 
 function renderCleaningHistory(){
@@ -216,5 +218,6 @@ function renderAll(){
   renderPermission();renderAccountButton();renderHome();renderCleaning();renderCleaningRules();renderBilling();renderRoomResources();
   if(document.body.dataset.page==="audit"||!isAdmin())renderAudit();
   if($("#accessModal").classList.contains("show"))renderAccessModal();
-  renderSync();saveLocal();renderNotificationCenter();
+  renderSync();saveLocal();renderOptionalNotifications();
+  runOptionalFeature("install-guide",globalThis.P708RefreshInstallGuide);
 }

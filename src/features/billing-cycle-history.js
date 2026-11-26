@@ -45,7 +45,7 @@
       const day=Number(legacyKey);if(!Number.isInteger(day)||day<1||day>31)continue;
       const targetMonth=day>=28?Period.shiftMonth(bill.month,-1):bill.month;
       const candidate=`${targetMonth}-${String(day).padStart(2,"0")}`;
-      if(allowedSet.has(candidate)&&!Object.hasOwn(raw,candidate))output[candidate]=true;
+      if(allowedSet.has(candidate)&&!Object.prototype.hasOwnProperty.call(raw,candidate))output[candidate]=true;
     }
     return output;
   }

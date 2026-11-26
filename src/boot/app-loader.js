@@ -1,149 +1,179 @@
-import { createP708SecureEngine } from "../core/p708-secure-sync-engine.js?v=20261127-11";
-import * as P708MobileAuth from "../core/mobile-auth-policy.js?v=20261127-11";
-import { createP708AuthoritativeRepair } from "../core/p708-authoritative-repair.js?v=20261127-11";
-import { createP708CanonicalMappingRepair } from "../core/p708-canonical-mapping-repair.js?v=20261127-11";
-import * as P708BillingCycle from "../core/billing-cycle-period.js?v=20261127-11";
-import * as P708CleaningFairness from "../core/cleaning-fairness.js?v=20261127-11";
-import * as P708CleaningStreak from "../core/cleaning-streak.js?v=20261127-11";
-import { splitVnd } from "../core/expense-split.js?v=20261127-11";
-import { deleteScheduleAuthoritatively } from "../core/cleaning-schedule-store.js?v=20261127-11";
-
 const FIREBASE_RUNTIME_ENDPOINT="/__/firebase/init.json";
 const FIREBASE_RUNTIME_FALLBACK="https://p708-room-manager.web.app/firebase-config.runtime.json";
 const IS_LOCAL=["localhost","127.0.0.1","[::1]"].includes(location.hostname);
-const LOADER_RELEASE="20261127-11";
-if(globalThis.P708_RELEASE!==LOADER_RELEASE)throw new Error("release-mismatch");
-globalThis.P708Debug?.("loader",LOADER_RELEASE);
+const LOADER_RELEASE="20261127-13";
+const boot=globalThis.P708Boot;
 
+const coreParts=[
+  "../core/app-core1.js",
+  "../core/app-core2.js",
+  "../features/app-actions1.js",
+  "../features/app-actions2.js",
+  "../features/cleaning-delete-fix.js",
+  "../features/app-dashboard.js",
+  "../features/app-render.js",
+  "../features/app-integrity-fixes.js",
+  "../features/inactive-mapping-dedup-fix.js",
+  "../features/canonical-identity-repair.js",
+  "../features/billing-membership-exclusion.js",
+  "../features/billing-cycle-history.js",
+  "../features/billing-canonical-repair.js",
+  "../features/today-calendar.js",
+  "../features/room-resources.js",
+  "./app-start.js"
+];
+const optionalParts=[
+  "../features/cleaning-pet-streak.js",
+  "../features/home-enhancements.js",
+  "../features/home-pet-garden.js",
+  "../features/ui-icon-polish.js",
+  "../features/notification-enhancements.js",
+  "../features/mobile-install-bridge.js",
+  "../features/mobile-install-guide.js"
+];
+
+function bootError(bootCode){return Object.assign(new Error(bootCode),{bootCode});}
 function validFirebaseConfig(config){
-  return !!config
-    && typeof config==="object"
-    && typeof config.apiKey==="string"
-    && config.apiKey.length>10
-    && typeof config.authDomain==="string"
-    && config.authDomain.length>3
-    && typeof config.projectId==="string"
-    && config.projectId.length>2
-    && typeof config.appId==="string"
-    && config.appId.length>5;
+  return !!config&&typeof config==="object"
+    &&typeof config.apiKey==="string"&&config.apiKey.length>10
+    &&typeof config.authDomain==="string"&&config.authDomain.length>3
+    &&typeof config.projectId==="string"&&config.projectId.length>2
+    &&typeof config.appId==="string"&&config.appId.length>5;
 }
 
 async function fetchFirebaseConfig(url,{sameOrigin=false}={}){
-  const controller=new AbortController();
-  const timeout=setTimeout(()=>controller.abort(),6000);
+  const controller=typeof AbortController==="function"?new AbortController():null;
+  const timeout=controller?setTimeout(()=>controller.abort(),6000):null;
   try{
-    const response=await fetch(url,{
-      cache:"no-store",
-      signal:controller.signal,
-      credentials:sameOrigin?"same-origin":"omit",
-      mode:sameOrigin?"same-origin":"cors",
-      headers:{Accept:"application/json"}
-    });
-    if(!response.ok)throw new Error(`${response.status}`);
+    const response=await fetch(url,{cache:"no-store",signal:controller?.signal,
+      credentials:sameOrigin?"same-origin":"omit",mode:sameOrigin?"same-origin":"cors",headers:{Accept:"application/json"}});
+    if(!response.ok)throw bootError("config-http");
+    if(!response.headers.get("content-type")?.includes("json"))throw bootError("config-mime");
     const config=await response.json();
-    if(!validFirebaseConfig(config))throw new Error("invalid-config");
+    if(!validFirebaseConfig(config))throw bootError("config-invalid");
+    if(config.projectId!=="p708-room-manager")throw bootError("config-project");
     return Object.freeze({...config});
-  }finally{clearTimeout(timeout);}
+  }finally{if(timeout)clearTimeout(timeout);}
 }
 
 async function loadFirebaseRuntimeConfig(){
   const override=globalThis.P708_FIREBASE_CONFIG_OVERRIDE;
   if(validFirebaseConfig(override))return Object.freeze({...override});
   if(IS_LOCAL)return Object.freeze({
-    projectId:"demo-p708-production-audit",apiKey:"demo-p708-emulator-key",
-    authDomain:"localhost",appId:"demo-p708-app"
+    projectId:"demo-p708-production-audit",apiKey:"demo-p708-emulator-key",authDomain:"localhost",appId:"demo-p708-app"
   });
-
   const isFirebaseHosting=["p708-room-manager.web.app","p708-room-manager.firebaseapp.com"].includes(location.hostname);
   if(isFirebaseHosting){
-    try{
-      return await fetchFirebaseConfig(FIREBASE_RUNTIME_ENDPOINT,{sameOrigin:true});
-    }catch{
-      return fetchFirebaseConfig("./firebase-config.runtime.json",{sameOrigin:true});
-    }
+    try{return await fetchFirebaseConfig(FIREBASE_RUNTIME_ENDPOINT,{sameOrigin:true});}
+    catch{return fetchFirebaseConfig("./firebase-config.runtime.json",{sameOrigin:true});}
   }
-
   return fetchFirebaseConfig(FIREBASE_RUNTIME_FALLBACK);
 }
 
-if(/^p708-room-manager--[^.]+\.web\.app$/.test(location.hostname)){
-  const gate=document.querySelector("#authGateContent");
-  gate.replaceChildren(Object.assign(document.createElement("h2"),{textContent:"Bản kiểm tra P708"}),
-    Object.assign(document.createElement("p"),{textContent:"Hosting xem trước chỉ dùng để kiểm tra phiên bản và tài nguyên."}));
-  globalThis.P708Debug?.("firebase","preview-disabled");
-  window.dispatchEvent(new Event("p708:boot-ready"));
-  navigator.serviceWorker?.register(new URL("../../sw.js",import.meta.url),{updateViaCache:"none"})
-    .catch(()=>globalThis.P708Debug?.("registration","failed"));
-}else{
-globalThis.P708SetBootProgress?.("Đang kết nối dữ liệu…","Đang xác nhận cấu hình an toàn của phòng P708.");
-globalThis.P708Debug?.("firebase","config-loading");
-globalThis.P708_FIREBASE_CONFIG=await loadFirebaseRuntimeConfig();
-globalThis.P708Debug?.("firebase","config-ready");
-globalThis.createP708SecureEngine = createP708SecureEngine;
-globalThis.P708MobileAuth=P708MobileAuth;
-let externalWrites=0;
-const trackExternal=operation=>async(...args)=>{
-  externalWrites++;
-  try{return await operation(...args);}
-  finally{externalWrites--;}
-};
-globalThis.P708HasExternalWrites=()=>externalWrites>0;
-globalThis.createP708AuthoritativeRepair = options=>{
-  const service=createP708AuthoritativeRepair(options);
-  return {...service,commit:trackExternal(service.commit)};
-};
-globalThis.createP708CanonicalMappingRepair = options=>{
-  const service=createP708CanonicalMappingRepair(options);
-  return {...service,repair:trackExternal(service.repair)};
-};
-globalThis.P708BillingCycle = P708BillingCycle;
-globalThis.P708CleaningFairness = P708CleaningFairness;
-globalThis.P708CleaningStreak = P708CleaningStreak;
-globalThis.splitVnd = splitVnd;
-globalThis.deleteScheduleAuthoritatively = trackExternal(deleteScheduleAuthoritatively);
+async function loadDependencies(){
+  const [engine,auth,repair,mapping,billing,fairness,streak,expense,schedules]=await Promise.all([
+    import("../core/p708-secure-sync-engine.js?v=20261127-13"),
+    import("../core/mobile-auth-policy.js?v=20261127-13"),
+    import("../core/p708-authoritative-repair.js?v=20261127-13"),
+    import("../core/p708-canonical-mapping-repair.js?v=20261127-13"),
+    import("../core/billing-cycle-period.js?v=20261127-13"),
+    import("../core/cleaning-fairness.js?v=20261127-13"),
+    import("../core/cleaning-streak.js?v=20261127-13"),
+    import("../core/expense-split.js?v=20261127-13"),
+    import("../core/cleaning-schedule-store.js?v=20261127-13")
+  ]);
+  let externalWrites=0;
+  const trackExternal=operation=>async(...args)=>{
+    externalWrites++;
+    try{return await operation(...args);}
+    finally{externalWrites--;}
+  };
+  Object.assign(globalThis,{
+    createP708SecureEngine:engine.createP708SecureEngine,P708MobileAuth:auth,
+    P708HasExternalWrites:()=>externalWrites>0,
+    createP708AuthoritativeRepair(options){
+      const service=repair.createP708AuthoritativeRepair(options);
+      return {...service,commit:trackExternal(service.commit)};
+    },
+    createP708CanonicalMappingRepair(options){
+      const service=mapping.createP708CanonicalMappingRepair(options);
+      return {...service,repair:trackExternal(service.repair)};
+    },
+    P708BillingCycle:billing,P708CleaningFairness:fairness,P708CleaningStreak:streak,
+    splitVnd:expense.splitVnd,deleteScheduleAuthoritatively:trackExternal(schedules.deleteScheduleAuthoritatively)
+  });
+}
 
-const parts = [
-  "../core/app-core1.js?v=20261127-11",
-  "../core/app-core2.js?v=20261127-11",
-  "../features/app-actions1.js?v=20261127-11",
-  "../features/app-actions2.js?v=20261127-11",
-  "../features/cleaning-delete-fix.js?v=20261127-11",
-  "../features/app-dashboard.js?v=20261127-11",
-  "../features/app-render.js?v=20261127-11",
-  "../features/cleaning-pet-streak.js?v=20261127-11",
-  "../features/app-integrity-fixes.js?v=20261127-11",
-  "../features/inactive-mapping-dedup-fix.js?v=20261127-11",
-  "../features/canonical-identity-repair.js?v=20261127-11",
-  "../features/billing-membership-exclusion.js?v=20261127-11",
-  "../features/billing-cycle-history.js?v=20261127-11",
-  "../features/billing-canonical-repair.js?v=20261127-11",
-  "../features/home-enhancements.js?v=20261127-11",
-  "../features/home-pet-garden.js?v=20261127-11",
-  "../features/ui-icon-polish.js?v=20261127-11",
-  "../features/today-calendar.js?v=20261127-11",
-  "../features/room-resources.js?v=20261127-11",
-  "../features/notification-enhancements.js?v=20261127-11",
-  "./app-start.js?v=20261127-11",
-  "../features/mobile-install-bridge.js?v=20261127-11",
-  "../features/mobile-install-guide.js?v=20261127-11"
-];
+async function loadParts(parts,{optional=false}={}){
+  const urls=parts.map(path=>new URL(`${path}?v=${LOADER_RELEASE}`,import.meta.url).href);
+  let loadedParts=0;
+  const crashed=new Set();
+  const onError=event=>{if(urls.includes(event.filename))crashed.add(event.filename);};
+  window.addEventListener("error",onError);
+  try{
+    const results=await Promise.all(urls.map(url=>new Promise(resolve=>{
+      const script=document.createElement("script");
+      script.src=url;
+      // Classic dependencies download in parallel and execute in insertion order.
+      script.async = false;
+      const timeout=setTimeout(()=>finish(false),optional?6000:12000);
+      function finish(ok){
+        clearTimeout(timeout);
+        script.onload=script.onerror=null;
+        if(!ok)script.remove();
+        resolve(ok);
+      }
+      script.onload=()=>{
+        const ok=!crashed.has(url);
+        if(ok&&!optional){
+          loadedParts++;
+          globalThis.P708SetBootProgress?.("Đang nạp giao diện…",`Đã tải ${loadedParts}/${urls.length} thành phần.`);
+        }
+        finish(ok);
+      };
+      script.onerror=()=>finish(false);
+      document.head.appendChild(script);
+    })));
+    return results.every(Boolean);
+  }finally{window.removeEventListener("error",onError);}
+}
 
-let loadedParts=0;
-globalThis.P708SetBootProgress?.("Đang nạp giao diện…",`Đã tải 0/${parts.length} thành phần.`);
-  const partUrls=parts.map(src=>new URL(src,import.meta.url).href);
-let partCrashed=false;
-const watchPartErrors=event=>{if(partUrls.includes(event.filename))partCrashed=true;};
-window.addEventListener("error",watchPartErrors);
-try{await Promise.all(partUrls.map(src=>new Promise((resolve, reject) => {
-    const script = document.createElement("script");
-    script.src = src;
-    // Dynamic classic scripts with async=false download concurrently but execute
-    // in insertion order, preserving the existing dependency chain.
-    script.async = false;
-    script.onload = ()=>{loadedParts++;globalThis.P708SetBootProgress?.("Đang nạp giao diện…",`Đã tải ${loadedParts}/${parts.length} thành phần.`);resolve();};
-    script.onerror = () => reject(new Error(`Không thể tải ${src}`));
-    document.head.appendChild(script);
-  })));}finally{window.removeEventListener("error",watchPartErrors);}
-  if(partCrashed||typeof globalThis.P708StartApplication!=="function")throw new Error("Classic startup component failed");
-  globalThis.P708StartApplication();
+export async function startApplication(){
+  if(globalThis.P708_RELEASE!==LOADER_RELEASE)throw bootError("release-mismatch");
+  globalThis.P708Debug?.("loader",LOADER_RELEASE);
+  if(/^p708-room-manager--[^.]+\.web\.app$/.test(location.hostname)){
+    const gate=document.querySelector("#authGateContent");
+    gate.innerHTML='<h2>Bản kiểm tra P708</h2><p><a href="./ios-diagnostics.html">Kiểm tra thiết bị</a></p>';
+    globalThis.P708Debug?.("firebase","preview-disabled");
+    boot?.mark("APP_READY","INFO","preview-shell");
+    window.dispatchEvent(new Event("p708:boot-ready"));
+    try{
+      void navigator.serviceWorker?.register(new URL("../../sw.js",import.meta.url),{updateViaCache:"none"})
+        .catch(()=>globalThis.P708Debug?.("registration","failed"));
+    }catch{globalThis.P708Debug?.("registration","failed");}
+    return;
+  }
+
+  boot?.mark("CONFIG_FETCHED","START");
+  globalThis.P708SetBootProgress?.("Đang kết nối dữ liệu…","Đang lấy cấu hình phòng P708.");
+  globalThis.P708Debug?.("firebase","config-loading");
+  try{globalThis.P708_FIREBASE_CONFIG=await loadFirebaseRuntimeConfig();}
+  catch(error){throw bootError(error?.bootCode||"config-fetch");}
+  boot?.mark("CONFIG_FETCHED");
+  globalThis.P708Debug?.("firebase","config-ready");
+
+  boot?.mark("FIREBASE_READY","START");
+  try{await loadDependencies();}
+  catch{throw bootError("sdk-dependencies");}
+  boot?.mark("CORE_READY","START");
+  globalThis.P708SetBootProgress?.("Đang nạp giao diện…","Đang chuẩn bị lịch trực và điện nước.");
+  if(!await loadParts(coreParts)||typeof globalThis.P708StartApplication!=="function")throw bootError("core-script");
+  boot?.mark("CORE_READY");
+  try{await globalThis.P708StartApplication();}
+  catch{throw bootError("core-start");}
+
+  boot?.mark("FEATURES_READY","INFO","optional-loading");
+  const ok=await loadParts(optionalParts,{optional:true});
+  globalThis.P708FinishOptionalFeatures();
+  boot?.mark("FEATURES_READY","INFO",ok?"optional-ready":"optional-unavailable");
 }

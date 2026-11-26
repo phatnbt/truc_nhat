@@ -74,7 +74,7 @@
     body.innerHTML=isIOS?iosGuide():androidGuide();
     body.querySelector("#copyInstallLink")?.addEventListener("click",copyLink);
     body.querySelector("#nativeInstallButton")?.addEventListener("click",installAndroid);
-    body.querySelector("#finishInstallGuide")?.addEventListener("click",()=>{localStorage.setItem(seenKey,"1");closeModal();});
+    body.querySelector("#finishInstallGuide")?.addEventListener("click",()=>{storageSet(seenKey,"1");closeModal();});
     modal.classList.add("show");
   }
 
@@ -92,16 +92,11 @@
     card.querySelector("#mobileInstallHelp")?.addEventListener("click",openGuide);
     card.querySelector("#mobileInstallNow")?.addEventListener("click",installAndroid);
 
-    if(localStorage.getItem(seenKey)!=="1"&&document.querySelector("#page-home")?.classList.contains("active")){
-      localStorage.setItem(seenKey,"1");
+    if(storageGet(seenKey)!=="1"&&document.querySelector("#page-home")?.classList.contains("active")&&storageSet(seenKey,"1"))
       setTimeout(openGuide,650);
-    }
   }
 
-  const previousRenderAll=globalThis.renderAll;
-  if(typeof previousRenderAll==="function"){
-    globalThis.renderAll=function(...args){const result=previousRenderAll(...args);setTimeout(refreshCard,0);return result;};
-  }
+  globalThis.P708RefreshInstallGuide=refreshCard;
 
   window.addEventListener("p708installpromptready",refreshCard);
   window.addEventListener("p708appinstalled",()=>{card?.classList.remove("show");closeModal();toast?.("P708 đã được cài trên thiết bị");});

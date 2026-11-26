@@ -78,7 +78,5 @@
     });
   }
 
-  const baseRenderHomeGarden=renderHome;
-  renderHome=function(){baseRenderHomeGarden();renderGarden();};
   globalThis.renderHomePetGarden=renderGarden;
 })();

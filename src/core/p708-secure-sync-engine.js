@@ -10,8 +10,8 @@ import {
   doc, collection, query, where, orderBy, limit, onSnapshot, runTransaction, serverTimestamp, FieldPath,
   setDoc, deleteDoc, getDoc, getDocFromServer, getDocs, writeBatch, Timestamp, increment
 } from "https://www.gstatic.com/firebasejs/12.16.0/firebase-firestore.js";
-import { assertBillingPeriodUpdate, periodDateKeys, daysInMonthKey } from "./billing-cycle-period.js?v=20261127-11";
-import {authEnvironment,signInMethod,sessionStorageAvailable} from "./mobile-auth-policy.js?v=20261127-11";
+import { assertBillingPeriodUpdate, periodDateKeys, daysInMonthKey } from "./billing-cycle-period.js?v=20261127-13";
+import {authEnvironment,signInMethod,sessionStorageAvailable} from "./mobile-auth-policy.js?v=20261127-13";
 
 const clone=value=>value==null?value:JSON.parse(JSON.stringify(value));
 const isObject=value=>value!==null&&typeof value==="object"&&!Array.isArray(value);

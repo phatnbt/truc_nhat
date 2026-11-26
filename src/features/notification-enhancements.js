@@ -112,7 +112,10 @@ function bindNotificationCenter(){
   $("#noticeLocal").addEventListener("change",async event=>{
     const key=noticeStorageKey();
     let enabled=event.target.checked;
-    if(enabled)enabled=await Notification.requestPermission()==="granted";
+    if(enabled){
+      try{enabled=typeof globalThis.Notification?.requestPermission==="function"&&await Notification.requestPermission()==="granted";}
+      catch{enabled=false;}
+    }
     if(key!==noticeStorageKey())return;
     if(event.target.checked&&!enabled)toast("Trình duyệt chưa cấp quyền thông báo.");
     saveNoticePreferences(key,{...noticePreferences(key),local:enabled});

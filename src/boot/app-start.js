@@ -1,5 +1,17 @@
+const unavailableFeatures=new Set();
+function runOptionalFeature(name,callback){
+  if(unavailableFeatures.has(name)||typeof callback!=="function")return;
+  try{return callback();}
+  catch{
+    unavailableFeatures.add(name);
+    globalThis.P708Boot?.mark("FEATURES_READY","INFO",`${name}-error`);
+  }
+}
+function renderOptionalNotifications(){runOptionalFeature("notifications",globalThis.renderNotificationCenter);}
+
 async function startCloud(){
   let bootReady=false;
+  let dataReady=false;
   let sessionMarkup="";
   const signalBootReady=()=>{if(bootReady)return;bootReady=true;window.dispatchEvent(new Event("p708:boot-ready"));};
   realtimeEngine=createP708SecureEngine({
@@ -27,8 +39,19 @@ async function startCloud(){
         }
       }
       authSession=session;
+      if(session.status!=="restoring"&&!bootReady)globalThis.P708Boot?.mark("AUTH_READY");
+      if(session.status==="active"&&!dataReady){
+        dataReady=true;
+        globalThis.P708Boot?.mark("ACCESS_VERIFIED");
+        globalThis.P708Boot?.mark("DATA_READY");
+      }
       if(session.status==="active"&&location.hash==="#audit")showPage("audit",{replace:true,scroll:false});
-      renderAuthGate();if(session.status!=="restoring")signalBootReady();renderAll();
+      renderAuthGate();renderAll();
+      if(session.status!=="restoring"&&!bootReady)signalBootReady();
+      if(session.status==="active"||session.status==="signedOut"){
+        globalThis.P708Boot?.mark("UI_RENDERED");
+        globalThis.P708Boot?.mark("APP_READY");
+      }
     },
     onAdminData:data=>{
       if(data.requests!==undefined)accessRequests=data.requests;
@@ -37,13 +60,16 @@ async function startCloud(){
       renderHome();
       if(data.logs!==undefined&&document.body.dataset.page==="audit")renderAudit();
       if($("#accessModal").classList.contains("show"))renderAccessModal();
-      renderNotificationCenter();
+      renderOptionalNotifications();
     },
-    onTaskData:data=>{taskSubmissions=data||[];renderHome();renderCleaning();renderNotificationCenter();},
-    onSwapData:data=>{taskSwaps=data||[];renderHome();renderCleaning();renderNotificationCenter();}
+    onTaskData:data=>{taskSubmissions=data||[];renderHome();renderCleaning();renderOptionalNotifications();},
+    onSwapData:data=>{taskSwaps=data||[];renderHome();renderCleaning();renderOptionalNotifications();}
   });
+  globalThis.P708Boot?.mark("FIREBASE_READY");
+  globalThis.P708Boot?.mark("AUTH_READY","START");
   try{await realtimeEngine.start();}
   catch(e){
+    globalThis.P708Boot?.mark("AUTH_READY","FAIL","auth-init");
     authSession={...authSession,status:"error"};syncStatus={mode:"offline",text:"Không thể kết nối"};
     renderAuthGate();renderSync();signalBootReady();
   }
@@ -64,14 +90,14 @@ function bindStaticEvents(){
   $$('[data-close]').forEach(btn=>btn.addEventListener("click",()=>closeModal(btn.dataset.close)));
   $$(".modal").forEach(modal=>modal.addEventListener("click",e=>{if(e.target===modal)closeModal(modal.id);}));
   document.addEventListener("keydown",event=>{
-    const modal=$$(".modal.show").at(-1);
+    const modals=$$(".modal.show"),modal=modals[modals.length-1];
     if(!modal)return;
     if(event.key==="Escape"){event.preventDefault();closeModal(modal.id);return;}
     if(event.key!=="Tab")return;
     const focusable=[...modal.querySelectorAll("button:not(:disabled),input:not(:disabled),select:not(:disabled),a[href],summary")].filter(el=>el.getClientRects().length);
     if(!focusable.length)return;
-    const next=event.shiftKey?focusable.at(-1):focusable[0];
-    if(!modal.contains(document.activeElement)||document.activeElement===(event.shiftKey?focusable[0]:focusable.at(-1))){
+    const last=focusable[focusable.length-1],next=event.shiftKey?last:focusable[0];
+    if(!modal.contains(document.activeElement)||document.activeElement===(event.shiftKey?focusable[0]:last)){
       event.preventDefault();next.focus();
     }
   });
@@ -83,7 +109,7 @@ function bindStaticEvents(){
     else{showPage("cleaning");$("#cleanFilter").value="mine";renderCleaning();}
   });
   $("#signOutButton")?.addEventListener("click",secureSignOut);
-  $("#refreshReminderButton")?.addEventListener("click",()=>{renderHome();renderNotificationCenter();toast("Đã làm mới nhắc việc");});
+  $("#refreshReminderButton")?.addEventListener("click",()=>{renderHome();renderOptionalNotifications();toast("Đã làm mới nhắc việc");});
   $("#cleaningRulesButton")?.addEventListener("click",()=>{renderCleaningRules();openModal("cleaningRulesModal");});
   $("#sendCleaningReminderButton")?.addEventListener("click",sendCleaningReminder);
 
@@ -132,7 +158,7 @@ function bindStaticEvents(){
     const button=event.target.closest("button");
     if(!button||button.disabled)return;
     for(const [key,action] of Object.entries(cleaningActions)){
-      if(!Object.hasOwn(button.dataset,key))continue;
+      if(!Object.prototype.hasOwnProperty.call(button.dataset,key))continue;
       const index=Number(button.dataset[key]),schedule=currentSchedule(),assignment=schedule?.assignments[index];
       if(!assignment||schedule.id!==cleaningScheduleBox.dataset.scheduleId||button.closest("tr")?.dataset.taskKey!==cleaningTaskKey(assignment,index)){
         toast("Phân công vừa thay đổi. Hãy kiểm tra lại lịch trực.");
@@ -250,14 +276,26 @@ async function registerPwa(){
   }catch(e){globalThis.P708Debug?.("registration","failed");}
 }
 
-globalThis.P708StartApplication=()=>{
+globalThis.P708StartApplication=async()=>{
+  const storageReady=storageSet("p708-boot-probe","1")&&storageGet("p708-boot-probe")==="1";
+  if(storageReady){try{localStorage.removeItem("p708-boot-probe");}catch{}}
+  globalThis.P708Boot?.mark("STORAGE_READY",storageReady?"PASS":"INFO",storageReady?undefined:"local-storage-unavailable");
   bindStaticEvents();
   bindRoomResources();
-  bindNotificationCenter();
+  $("#notificationButton").disabled=true;
   if($("#cleanWeek"))$("#cleanWeek").value=dateValue(nextMonday());
   state.billing.selectedMonth=validMonthKey(ui.selectedMonth)?ui.selectedMonth:state.billing.selectedMonth||todayMonth();
   renderAll();
+  globalThis.P708Boot?.mark("UI_RENDERED");
   showPage(location.hash.replace("#","")||"home",{replace:true,instant:true,updateLocation:location.hash!=="#audit"});
   void registerPwa();
-  void startCloud().catch(()=>globalThis.P708ShowBootRecovery?.("cloud-start"));
+  await startCloud();
+};
+globalThis.P708FinishOptionalFeatures=()=>{
+  runOptionalFeature("notifications",()=>{
+    if(typeof globalThis.bindNotificationCenter!=="function")return;
+    bindNotificationCenter();
+    $("#notificationButton").disabled=false;
+  });
+  renderAll();
 };

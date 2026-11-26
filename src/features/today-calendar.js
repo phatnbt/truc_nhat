@@ -36,7 +36,7 @@ async function saveRoomCalendarEvent(event){
   if(!requireAdmin())return;
   const form=event.currentTarget,fields=new FormData(form);
   const date=fields.get("date"),kind=fields.get("kind"),title=String(fields.get("title")).trim();
-  if(!title||!P708BillingCycle.parseDateKey(date)||!Object.hasOwn(ROOM_EVENT_LABELS,kind))return toast("Kiểm tra nội dung sự kiện.");
+  if(!title||!P708BillingCycle.parseDateKey(date)||!Object.prototype.hasOwnProperty.call(ROOM_EVENT_LABELS,kind))return toast("Kiểm tra nội dung sự kiện.");
   const button=form.querySelector("button[type=submit]");
   if(button.disabled)return;
   button.disabled=true;
@@ -123,10 +123,12 @@ async function saveRoomCalendarEvent(event){
     const month=document.querySelector("#billMonth")?.value||"";
     const person=document.querySelector("#calendarPersonTitle")?.textContent||"";
     const key=`${month}|${P708BillingCycle.roomDateKey()}|${person}`;
-    if(!force&&(lastScrolled===key||sessionStorage.getItem(TODAY_SCROLL_KEY)===key))return;
+    let saved;
+    try{saved=sessionStorage.getItem(TODAY_SCROLL_KEY);}catch{}
+    if(!force&&(lastScrolled===key||saved===key))return;
 
     lastScrolled=key;
-    sessionStorage.setItem(TODAY_SCROLL_KEY,key);
+    try{sessionStorage.setItem(TODAY_SCROLL_KEY,key);}catch{}
     requestAnimationFrame(()=>{if(cell.isConnected&&page.classList.contains("active"))cell.scrollIntoView({behavior:"instant",block:"center",inline:"nearest"});});
   }
 

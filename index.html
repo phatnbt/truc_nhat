@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="vi">
+<html lang="vi" data-p708-release="20261127-13">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
@@ -11,9 +11,9 @@
   <link rel="manifest" href="./manifest.webmanifest">
   <link rel="icon" type="image/png" sizes="32x32" href="./icons/icon-32.png">
   <link rel="apple-touch-icon" sizes="192x192" href="./icons/icon-192.png">
-  <link rel="stylesheet" href="./styles.css?v=20261127-11">
-  <link rel="stylesheet" href="./landing-ui.css?v=20261127-11">
-  <link rel="stylesheet" href="./billing-cycle.css?v=20261127-11">
+  <link rel="stylesheet" href="./styles.css?v=20261127-13">
+  <link rel="stylesheet" href="./landing-ui.css?v=20261127-13">
+  <link rel="stylesheet" href="./billing-cycle.css?v=20261127-13">
   <title>Quản lý phòng P708</title>
 </head>
 <body>
@@ -40,7 +40,10 @@
   <div class="auth-gate" id="authGate">
     <div class="auth-card">
       <img class="auth-logo" src="./icons/icon-192.png" alt="" width="56" height="56">
-      <div id="authGateContent" aria-live="polite"><h2>Đang khởi động…</h2><p>Đang kết nối phòng P708.</p></div>
+      <div id="authGateContent" aria-live="polite"><h2>Đang khởi động…</h2><p>Đang kết nối phòng P708.</p>
+        <p><a href="./ios-diagnostics.html">Kiểm tra thiết bị</a></p>
+        <noscript>Cần bật JavaScript để mở P708.</noscript>
+      </div>
       <noscript><p>Bật JavaScript trong trình duyệt để mở P708.</p></noscript>
     </div>
   </div>
@@ -335,28 +338,66 @@
     <span id="pwaDebugCopyStatus" role="status"></span>
     <pre id="pwaDebugOutput" tabindex="0"></pre>
   </details>
-  <script src="./src/boot/pwa-diagnostics.js?v=20261127-11"></script>
   <script>
-    (()=>{
-      const reload=()=>{
-        const next=new URL(location.href);
-        next.searchParams.set("refresh",Date.now());
-        location.replace(next.href);
-      };
-      const showRecovery=(reason="boot-timeout")=>{
-        const box=document.querySelector("#authGateContent");
+    (function(){
+      var started=Date.now(),phase="HTML_READY",trace=[],ready=false;
+      var release=document.documentElement.getAttribute("data-p708-release");
+      var stages=/^(HTML_READY|SCRIPT_START|COMPAT_CHECK|CONFIG_FETCHED|FIREBASE_READY|CORE_READY|STORAGE_READY|AUTH_READY|ACCESS_VERIFIED|DATA_READY|UI_RENDERED|FEATURES_READY|APP_READY)$/;
+      function mark(stage,status,code){
+        if(!stages.test(stage))return;
+        var now=Date.now();
+        var entry={build:release,stage:stage,at:new Date(now).toISOString(),durationMs:now-started,status:status||"PASS"};
+        if(code&&/^[a-z0-9-]{1,45}$/.test(code))entry.code=code;
+        trace.push(entry);
+        if(trace.length>30)trace.shift();
+        if(status!=="INFO")phase=stage;
+      }
+      function copyTrace(){
+        var text=JSON.stringify({release:release,trace:trace},null,2);
+        function select(){
+          var output=document.getElementById("bootTraceText");
+          output.hidden=false;output.value=text;output.focus();output.select();
+        }
+        if(navigator.clipboard&&navigator.clipboard.writeText)navigator.clipboard.writeText(text).then(function(){
+          document.getElementById("bootTraceStatus").textContent="Đã sao chép.";
+        },select);
+        else select();
+      }
+      function showRecovery(reason){
+        if(ready)return;
+        var code=/^[a-z0-9-]{1,45}$/.test(reason||"")?reason:"boot-timeout";
+        mark(phase,"FAIL",code);
+        var box=document.getElementById("authGateContent");
         if(!box)return;
-        globalThis.P708Debug?.("runtimeError",reason);
-        delete box.dataset.bootProgress;
-        document.querySelector("#authGate").classList.remove("hidden");
-        box.innerHTML='<h2>Chưa thể mở P708</h2><p>Kiểm tra mạng, rồi thử tải lại ứng dụng.</p><div class="auth-actions"><button class="btn primary" id="bootRetryButton" type="button">Thử lại</button><a class="btn" href="https://p708-room-manager.firebaseapp.com/">Mở P708 trên Firebase</a></div>';
-        document.querySelector("#bootRetryButton").addEventListener("click",event=>{event.currentTarget.disabled=true;reload();});
-      };
-      const timer=setTimeout(showRecovery,15000);
-      globalThis.P708ShowBootRecovery=(reason="boot-failed")=>{clearTimeout(timer);showRecovery(reason);};
-      window.addEventListener("p708:boot-ready",()=>clearTimeout(timer),{once:true});
+        if(window.P708Debug)window.P708Debug("runtimeError",code);
+        box.removeAttribute("data-boot-progress");
+        document.getElementById("authGate").classList.remove("hidden");
+        box.innerHTML='<h2>Chưa thể mở P708</h2><p id="bootFailureDetail"></p><div class="auth-actions"><button class="btn primary" id="bootRetryButton" type="button">Thử lại</button><a class="btn" href="./ios-diagnostics.html">Kiểm tra thiết bị</a><button class="btn" id="bootTraceCopy" type="button">Sao chép báo cáo</button></div><p id="bootTraceStatus" role="status"></p><textarea id="bootTraceText" aria-label="Báo cáo khởi động" readonly hidden></textarea>';
+        document.getElementById("bootFailureDetail").textContent="Bản "+release+" · "+phase+" · "+code;
+        document.getElementById("bootTraceCopy").addEventListener("click",copyTrace);
+        document.getElementById("bootRetryButton").addEventListener("click",function(){
+          this.disabled=true;
+          if(typeof URL!=="function"){location.reload();return;}
+          var next=new URL(location.href);
+          next.searchParams.set("refresh",Date.now());
+          location.replace(next.href);
+        });
+      }
+      window.P708Boot={mark:mark,report:function(){return trace.slice();}};
+      mark("HTML_READY");
+      var timer=setTimeout(showRecovery,15000);
+      window.P708ShowBootRecovery=function(reason){clearTimeout(timer);showRecovery(reason||"boot-failed");};
+      window.addEventListener("p708:boot-ready",function(){ready=true;clearTimeout(timer);});
+      window.addEventListener("error",function(event){
+        if(ready)return;
+        var target=event.target;
+        if(target&&target.id==="p708AppScript"){window.P708ShowBootRecovery("app-script-load");return;}
+        if(event.error)mark(phase,"INFO","runtime-error");
+      },true);
+      window.addEventListener("unhandledrejection",function(){if(!ready)mark(phase,"INFO","unhandled-rejection");});
     })();
   </script>
-  <script type="module" src="./app.js?v=20261127-11"></script>
+  <script defer src="./src/boot/pwa-diagnostics.js?v=20261127-13"></script>
+  <script id="p708AppScript" type="module" src="./app.js?v=20261127-13"></script>
 </body>
 </html>

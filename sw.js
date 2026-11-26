@@ -1,5 +1,5 @@
 const CACHE_SCOPE=`p708-manager-${encodeURIComponent(self.registration.scope)}-`;
-const APP_RELEASE="20261127-11";
+const APP_RELEASE="20261127-13";
 const RELEASE_CACHE_SCOPE=CACHE_SCOPE+"runtime-fallback-";
 const CACHE_NAME=RELEASE_CACHE_SCOPE+APP_RELEASE;
 const isRelease=value=>/^\d{8}-\d+$/.test(value||"");

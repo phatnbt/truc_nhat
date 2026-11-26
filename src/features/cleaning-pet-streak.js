@@ -11,7 +11,7 @@
     if(document.querySelector('link[data-cleaning-pet="1"]'))return;
     const link=document.createElement("link");
     link.rel="stylesheet";
-    link.href="./cleaning-pet.css?v=20261127-11";
+    link.href="./cleaning-pet.css?v=20261127-13";
     link.dataset.cleaningPet="1";
     document.head.appendChild(link);
   }
@@ -237,16 +237,9 @@
     return true;
   }
 
-  const baseRenderCleaning=renderCleaning;
-  renderCleaning=function(){baseRenderCleaning();decorateMemberRows();refreshWidget();};
-
-  if(typeof renderHome==="function"){
-    const baseRenderHomePet=renderHome;
-    renderHome=function(){baseRenderHomePet();refreshWidget();};
-  }
-
   globalThis.P708PetWidget={
     refresh:refreshWidget,
+    decorateMemberRows,
     decorationFor,
     selectMember,
     canCallMember:memberId=>!!ownMemberId()&&memberId===ownMemberId(),
