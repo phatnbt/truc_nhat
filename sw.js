@@ -42,16 +42,21 @@ async function verifyAsset(request,url,response,release=APP_RELEASE){
 }
 async function precacheAppShell(){
   await verifyLiveRelease();
-  const entries=await Promise.all([...shell.values()].map(async url=>{
-    const request=new Request(url.href,{cache:"reload"});
-    const response=await fetch(request);
-    await verifyAsset(request,url,response);
-    if(url.pathname===indexUrl.pathname&&!await validHtmlRelease(response))throw new Error("Incompatible P708 shell");
-    return [request,response];
-  }));
-  await verifyLiveRelease();
+  const existed=await caches.has(CACHE_NAME);
   const cache=await caches.open(CACHE_NAME);
-  await Promise.all(entries.map(([request,response])=>cache.put(request,response)));
+  try{
+    await Promise.all([...shell.values()].map(async url=>{
+      const request=new Request(url.href,{cache:"reload"});
+      const response=await fetch(request);
+      await verifyAsset(request,url,response);
+      if(url.pathname===indexUrl.pathname&&!await validHtmlRelease(response))throw new Error("Incompatible P708 shell");
+      await cache.put(request,response);
+    }));
+    await verifyLiveRelease();
+  }catch(error){
+    if(!existed)await caches.delete(CACHE_NAME).catch(()=>{});
+    throw error;
+  }
 }
 self.addEventListener("install",event=>event.waitUntil(precacheAppShell()));
 self.addEventListener("activate",event=>event.waitUntil((async()=>{
