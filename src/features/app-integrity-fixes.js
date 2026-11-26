@@ -3,21 +3,6 @@
 // detect duplicate member identities, and repair safe duplicate/mapping cases before
 // they become silent billing/realtime errors.
 
-const baseSaveLocal=saveLocal;
-saveLocal=function(){
-  const mayCacheRoom=authSession?.status==="active"||authSession?.status==="loading"||authSession?.status==="checking";
-  if(mayCacheRoom){
-    storageSet(CACHE_KEY,JSON.stringify(state));
-  }else{
-    try{
-      localStorage.removeItem(CACHE_KEY);
-      localStorage.removeItem("cleaning_shared_apps_script_v2");
-      localStorage.removeItem("cleaning_shared_apps_script_v1");
-    }catch{}
-  }
-  storageSet(UI_KEY,JSON.stringify(ui));
-};
-
 function memberNameKey(value){
   return String(value||"")
     .normalize("NFKC")

@@ -2,7 +2,9 @@ async function startCloud(){
   let bootReady=false;
   let sessionMarkup="";
   const signalBootReady=()=>{if(bootReady)return;bootReady=true;window.dispatchEvent(new Event("p708:boot-ready"));};
-  try{localStorage.removeItem(CACHE_KEY);}catch{}
+  try{
+    for(const key of [CACHE_KEY,"cleaning_shared_apps_script_v2","cleaning_shared_apps_script_v1"])localStorage.removeItem(key);
+  }catch{}
   realtimeEngine=createP708SecureEngine({
     firebaseConfig:FIREBASE_CONFIG,roomCode:ROOM_CODE,deviceId:DEVICE_ID,
     onShape:(shape)=>{
@@ -17,7 +19,7 @@ async function startCloud(){
       const nextSession=JSON.stringify(session);
       if(nextSession===sessionMarkup)return;
       sessionMarkup=nextSession;
-      if(session.status!=="active"||session.user?.uid!==authSession.user?.uid||session.access?.role!==authSession.access?.role){
+      if(session.user?.uid!==authSession.user?.uid||session.access?.role!==authSession.access?.role||session.access?.memberId!==authSession.access?.memberId){
         state=defaultState();
         confirmedState=clone(state);
         accessRequests=[];accessAccounts=[];auditLogs=[];taskSubmissions=[];taskSwaps=[];
@@ -27,9 +29,9 @@ async function startCloud(){
           form.reset();delete form.dataset.expenseId;
         }
       }
-      authSession={...authSession,...session};
+      authSession=session;
       if(session.status==="active"&&location.hash==="#audit")showPage("audit",{replace:true,scroll:false});
-      renderAuthGate();if(session.status!=="checking")signalBootReady();renderAll();
+      renderAuthGate();if(session.status!=="restoring")signalBootReady();renderAll();
     },
     onAdminData:data=>{
       if(data.requests!==undefined)accessRequests=data.requests;
@@ -45,8 +47,8 @@ async function startCloud(){
   });
   try{await realtimeEngine.start();}
   catch(e){
-    authSession={...authSession,status:"error"};syncStatus={mode:"offline",text:e?.message||"Không thể kết nối"};
-    renderAuthGate();renderSync();toast(e?.message||"Không thể khởi động ứng dụng",6000);signalBootReady();
+    authSession={...authSession,status:"error"};syncStatus={mode:"offline",text:"Không thể kết nối"};
+    renderAuthGate();renderSync();signalBootReady();
   }
 }
 
@@ -204,7 +206,7 @@ function bindStaticEvents(){
 async function registerPwa(){
   if(!("serviceWorker" in navigator)||location.protocol==="file:")return;
   try{
-    const reg=await navigator.serviceWorker.register("./sw.js?v=20261127-4",{scope:"./",updateViaCache:"none"});
+    const reg=await navigator.serviceWorker.register("./sw.js?v=20261127-6",{scope:"./",updateViaCache:"none"});
     const banner=$("#pwaUpdateBanner");
     const showUpdate=()=>{banner.hidden=!(reg.waiting&&reg.active&&reg.waiting!==reg.active&&navigator.serviceWorker.controller);};
     showUpdate();
@@ -215,6 +217,7 @@ async function registerPwa(){
     $("#pwaUpdateButton").addEventListener("click",()=>{
       const drafts=$$('#stockForm input,#expenseForm input,#roomEventForm input')
         .some(input=>input.name!=="threshold"&&input.name!==""&&input.value!==input.defaultValue);
+      if(["restoring","signingIn","checking","loadingRoom"].includes(authSession.status))return toast("Đợi đăng nhập hoàn tất rồi cập nhật.");
       if($(".modal.show")||drafts){
         return toast("Lưu hoặc hủy phần đang nhập rồi cập nhật.");
       }

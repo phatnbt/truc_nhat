@@ -140,16 +140,46 @@ function authUserCard(){
 }
 function renderAuthGate(){
   const gate=$("#authGate"),box=$("#authGateContent");if(!gate||!box)return;renderAccountButton();
-  if(authSession.status==="active"){gate.classList.add("hidden");return;}
+  delete box.dataset.bootProgress;
+  const {status,offline}=authSession;
+  document.querySelectorAll("body > main,body > .app-toolbar,body > .mobile-nav").forEach(element=>element.inert=status!=="active");
+  if(status==="active"){gate.classList.add("hidden");return;}
   gate.classList.remove("hidden");
-  if(authSession.status==="loading"||authSession.status==="checking"){box.innerHTML='<h2>Đang kiểm tra quyền…</h2><p>Đang tải dữ liệu phòng và quyền truy cập.</p>';return;}
-  if(authSession.status==="error"){
-    box.innerHTML='<h2>Chưa thể kiểm tra quyền</h2><p>Kiểm tra kết nối rồi thử lại để mở phòng P708.</p><div class="auth-actions"><button class="btn primary" id="retryAccessButton" type="button">Thử lại</button><a class="btn" href="https://p708-room-manager.firebaseapp.com/">Mở trên Firebase</a></div>';
-    $("#retryAccessButton").addEventListener("click",()=>location.reload());return;
+  if(status==="loading"||status==="restoring"){box.innerHTML='<h2>Đang khôi phục phiên…</h2><p>Đang kiểm tra phiên trên thiết bị này.</p>';return;}
+  if(["checking","loadingRoom","error","denied"].includes(status)){
+    const title=status==="denied"?"Chưa được phép vào phòng":offline?"Đang ngoại tuyến":status==="error"
+      ?authSession.roomError?"Chưa tải được dữ liệu phòng":"Chưa thể kiểm tra quyền"
+      :status==="checking"?"Đang kiểm tra quyền…":"Đang tải dữ liệu phòng…";
+    const hint=status==="denied"?"Tài khoản đã bị khóa hoặc chưa liên kết đúng với thành viên. Hãy liên hệ trưởng phòng."
+      :offline?"Hãy kết nối lại mạng. Phiên đăng nhập trên thiết bị vẫn được giữ."
+      :authSession.roomError==="invalid-member"?"Trưởng phòng cần kiểm tra liên kết của tài khoản với danh sách thành viên."
+      :status==="error"?"Hãy kiểm tra kết nối rồi thử lại.":"Phiên Google đã được nhận. Đang chờ máy chủ P708.";
+    box.innerHTML=`<h2>${title}</h2><p>${hint}</p><div class="auth-actions">${status==="error"||offline?'<button class="btn primary" id="retryAccessButton" type="button">Thử lại</button>':""}${authSession.user?'<button class="btn" id="gateSignOutButton" type="button">Đăng xuất</button>':""}</div>`;
+    $("#retryAccessButton")?.addEventListener("click",()=>authSession.user?realtimeEngine?.retryAccess():location.reload());
+    $("#gateSignOutButton")?.addEventListener("click",secureSignOut);return;
   }
   if(!authSession.user){
-    box.innerHTML='<h2>Đăng nhập để vào P708</h2><p>Mỗi tài khoản Google được liên kết với một thành viên trong phòng.</p><div class="auth-actions"><button class="btn primary" id="googleLoginButton" type="button">G · Đăng nhập bằng Google</button></div>';
-    $("#googleLoginButton")?.addEventListener("click",secureGoogleLogin);return;
+    const {embedded,standalone,mobile}=realtimeEngine?.environment?.()||{};
+    const destination=P708MobileAuth.authDestination(location.hash);
+    const error=authSession.authError?P708MobileAuth.authErrorMessage(authSession.authError):offline?"Hãy kết nối mạng để đăng nhập.":"";
+    const hint=embedded?"Mở menu ⋯ của ứng dụng, chọn mở bằng Safari hoặc Chrome. Bạn cũng có thể sao chép link rồi dán vào trình duyệt."
+      :standalone?"Nếu Google mở trong Safari hoặc Chrome, phiên trong trình duyệt có thể khác với phiên của ứng dụng đã cài.":mobile?"Dùng Safari hoặc Chrome để hoàn tất đăng nhập.":"";
+    box.innerHTML=`<h2>${embedded?"Mở P708 bằng trình duyệt":"Đăng nhập để vào P708"}</h2>
+      ${hint?`<p>${hint}</p>`:""}${error?`<p class="auth-feedback" role="alert">${esc(error)}</p>`:""}
+      <div class="auth-actions">${embedded?"":`<button class="btn primary" id="googleLoginButton" type="button" ${status==="signingIn"||offline?"disabled":""}>${status==="signingIn"?"Đang mở Google…":"G · Đăng nhập bằng Google"}</button>`}
+      ${embedded||mobile||standalone||error?'<button class="btn" id="copyAuthLink" type="button">Sao chép link P708</button>':""}</div>
+      <div id="authCopyStatus" role="status"></div>`;
+    $("#googleLoginButton")?.addEventListener("click",secureGoogleLogin);
+    $("#copyAuthLink")?.addEventListener("click",async()=>{
+      const feedback=$("#authCopyStatus");
+      try{await navigator.clipboard.writeText(destination);feedback.textContent="Đã sao chép link.";}
+      catch{
+        const link=document.createElement("input");
+        link.readOnly=true;link.value=destination;link.setAttribute("aria-label","Link P708 để sao chép");
+        feedback.replaceChildren(document.createTextNode("Giữ và sao chép link dưới đây."),link);
+        link.focus();link.select();
+      }
+    });return;
   }
   if(authSession.status==="pending"){
     box.innerHTML=`<h2>Đang chờ trưởng phòng duyệt</h2>${authUserCard()}<p>Yêu cầu với tên <b>${esc(authSession.request?.displayName||"")}</b> đã được gửi.</p><div class="auth-actions"><button class="btn danger" id="cancelRequestButton" type="button">Hủy yêu cầu</button><button class="btn" id="gateSignOutButton" type="button">Đăng xuất</button></div>`;
@@ -177,7 +207,7 @@ function renderAccessModal(){
   $$('[data-delete-account]').forEach(btn=>btn.addEventListener("click",()=>removeAccountFromRoom(btn.dataset.deleteAccount)));
 }
 
-async function secureGoogleLogin(){try{await realtimeEngine?.signInGoogle();}catch(e){toast(e?.message||"Không thể đăng nhập Google");}}
+async function secureGoogleLogin(){try{await realtimeEngine?.signInGoogle();}catch(e){toast(P708MobileAuth.authErrorMessage(e?.code));}}
 async function secureSignOut(){try{closeModal("accessModal");await realtimeEngine?.signOut();}catch(e){toast(e?.message||"Không thể đăng xuất");}}
 async function sendAccessRequest(){try{await realtimeEngine?.requestAccess($("#requestDisplayName")?.value?.trim());toast("Đã gửi yêu cầu");}catch(e){toast(e?.message||"Không thể gửi yêu cầu");}}
 async function cancelAccessRequest(){try{await realtimeEngine?.cancelAccessRequest();toast("Đã hủy yêu cầu");}catch(e){toast(e?.message||"Không thể hủy");}}

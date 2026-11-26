@@ -1,4 +1,5 @@
-import { createP708SecureEngine } from "../core/p708-secure-sync-engine.js?v=20261127-4";
+import { createP708SecureEngine } from "../core/p708-secure-sync-engine.js?v=20261127-6";
+import * as P708MobileAuth from "../core/mobile-auth-policy.js?v=20261127-6";
 import { createP708AuthoritativeRepair } from "../core/p708-authoritative-repair.js?v=20260913-1";
 import { createP708CanonicalMappingRepair } from "../core/p708-canonical-mapping-repair.js?v=20260913-1";
 import * as P708BillingCycle from "../core/billing-cycle-period.js?v=20261126-1";
@@ -65,6 +66,7 @@ async function loadFirebaseRuntimeConfig(){
 globalThis.P708SetBootProgress?.("Đang kết nối dữ liệu…","Đang xác nhận cấu hình an toàn của phòng P708.");
 globalThis.P708_FIREBASE_CONFIG=await loadFirebaseRuntimeConfig();
 globalThis.createP708SecureEngine = createP708SecureEngine;
+globalThis.P708MobileAuth=P708MobileAuth;
 globalThis.createP708AuthoritativeRepair = createP708AuthoritativeRepair;
 globalThis.createP708CanonicalMappingRepair = createP708CanonicalMappingRepair;
 globalThis.P708BillingCycle = P708BillingCycle;
@@ -75,26 +77,26 @@ globalThis.deleteScheduleAuthoritatively = deleteScheduleAuthoritatively;
 
 const parts = [
   "../core/app-core1.js?v=20261126-1",
-  "../core/app-core2.js?v=20261127-4",
-  "../features/app-actions1.js?v=20261127-4",
+  "../core/app-core2.js?v=20261127-6",
+  "../features/app-actions1.js?v=20261127-6",
   "../features/app-actions2.js?v=20261126-1",
   "../features/cleaning-delete-fix.js?v=20261126-1",
-  "../features/app-dashboard.js?v=20261127-4",
-  "../features/app-render.js?v=20261127-4",
-  "../features/cleaning-pet-streak.js?v=20261127-4",
-  "../features/app-integrity-fixes.js?v=20260913-1",
+  "../features/app-dashboard.js?v=20261127-6",
+  "../features/app-render.js?v=20261127-6",
+  "../features/cleaning-pet-streak.js?v=20261127-6",
+  "../features/app-integrity-fixes.js?v=20261127-6",
   "../features/inactive-mapping-dedup-fix.js?v=20260913-1",
   "../features/canonical-identity-repair.js?v=20260913-1",
   "../features/billing-membership-exclusion.js?v=20260913-1",
-  "../features/billing-cycle-history.js?v=20261127-4",
+  "../features/billing-cycle-history.js?v=20261127-6",
   "../features/billing-canonical-repair.js?v=20260913-1",
   "../features/home-enhancements.js?v=20260913-1",
-  "../features/home-pet-garden.js?v=20261127-4",
-  "../features/ui-icon-polish.js?v=20261127-4",
+  "../features/home-pet-garden.js?v=20261127-6",
+  "../features/ui-icon-polish.js?v=20261127-6",
   "../features/today-calendar.js?v=20261126-1",
   "../features/room-resources.js?v=20261126-1",
   "../features/notification-enhancements.js?v=20261126-1",
-  "./app-start.js?v=20261127-4",
+  "./app-start.js?v=20261127-6",
   "../features/mobile-install-bridge.js?v=20260913-1",
   "../features/mobile-install-guide.js?v=20260913-1"
 ];

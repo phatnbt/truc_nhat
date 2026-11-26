@@ -1,6 +1,7 @@
 import { initializeApp, getApps, getApp } from "https://www.gstatic.com/firebasejs/12.16.0/firebase-app.js";
 import {
-  getAuth, GoogleAuthProvider, browserLocalPersistence, setPersistence,
+  initializeAuth, getAuth, GoogleAuthProvider, browserLocalPersistence, indexedDBLocalPersistence,
+  browserSessionPersistence, inMemoryPersistence, browserPopupRedirectResolver,
   onAuthStateChanged, signInWithPopup, signInWithRedirect, getRedirectResult,
   signOut as firebaseSignOut, connectAuthEmulator
 } from "https://www.gstatic.com/firebasejs/12.16.0/firebase-auth.js";
@@ -10,6 +11,7 @@ import {
   setDoc, deleteDoc, getDoc, getDocFromServer, getDocs, writeBatch, Timestamp, increment
 } from "https://www.gstatic.com/firebasejs/12.16.0/firebase-firestore.js";
 import { assertBillingPeriodUpdate } from "./billing-cycle-period.js?v=20261126-1";
+import {authEnvironment,authDestination} from "./mobile-auth-policy.js?v=20261127-6";
 
 const clone=value=>value==null?value:JSON.parse(JSON.stringify(value));
 const isObject=value=>value!==null&&typeof value==="object"&&!Array.isArray(value);
@@ -103,7 +105,10 @@ export function createP708SecureEngine({firebaseConfig,roomCode,deviceId,onShape
   let db;
   try{db=initializeFirestore(app,{localCache:memoryLocalCache()});}
   catch{db=getFirestore(app);}
-  const auth=getAuth(app),provider=new GoogleAuthProvider();
+  const auth=appExists?getAuth(app):initializeAuth(app,{
+    persistence:[browserLocalPersistence,indexedDBLocalPersistence,browserSessionPersistence,inMemoryPersistence],
+    popupRedirectResolver:browserPopupRedirectResolver
+  }),provider=new GoogleAuthProvider();
   if(useEmulators&&!appExists){
     connectAuthEmulator(auth,"http://127.0.0.1:9099",{disableWarnings:true});
     connectFirestoreEmulator(db,"127.0.0.1",8080);
@@ -125,16 +130,39 @@ export function createP708SecureEngine({firebaseConfig,roomCode,deviceId,onShape
     auditUnsub=null,taskUnsub=null,swapUnsub=null;
   const isAdmin=()=>access?.active&&access?.role==="admin";
   const hasAccess=()=>!!access?.active;
+  let authRestoring=true,signingIn=false,authError="",roomError="",accessError="",denied=false,waitingTimer,waitingFor="",generation=0,dataGeneration=0;
   const emitStatus=(mode,text,extra={})=>onStatus?.({mode,text,online:navigator.onLine,...extra});
-  const emitSession=(extra={})=>onSession?.({
-    user:user?{uid:user.uid,email:user.email||"",displayName:user.displayName||"",photoURL:user.photoURL||""}:null,
-    access:clone(access),request:clone(ownRequest),
-    status:!user?"signedOut":!accessReady?"checking":access?.active?"active":!requestReady?"checking":ownRequest?"pending":"needsAccess",
-    ...extra
-  });
+  const sessionStatus=()=>{
+    if(authRestoring)return "restoring";
+    if(!user)return signingIn?"signingIn":"signedOut";
+    if(denied)return "denied";
+    if(accessError||roomError)return "error";
+    if(!accessReady||(!hasAccess()&&!requestReady))return "checking";
+    if(!hasAccess())return ownRequest?"pending":"needsAccess";
+    if(!roomReady||!memberDataReady)return "loadingRoom";
+    return "active";
+  };
+  const emitSession=()=>{
+    const status=sessionStatus();
+    const waiting=status==="checking"||status==="loadingRoom"?status:"";
+    if(waitingFor!==waiting){
+      clearTimeout(waitingTimer);
+      waitingFor=waiting;
+      if(waiting)waitingTimer=setTimeout(()=>{
+        if(sessionStatus()!==waiting)return;
+        if(waiting==="checking")accessError="slow";
+        else roomError="slow";
+        emitSession();
+      },12000);
+    }
+    onSession?.({
+      user:user?{uid:user.uid,email:user.email||"",displayName:user.displayName||"",photoURL:user.photoURL||""}:null,
+      access:clone(access),request:clone(ownRequest),status,authError,roomError,accessError,offline:!navigator.onLine
+    });
+  };
   const emitAdminData=(requests=null,accesses=null,logs=null)=>onAdminData?.({requests:requests??undefined,accesses:accesses??undefined,logs:logs??undefined});
   const rebuild=()=>{
-    if(!hasAccess()||!roomReady)return;
+    if(!hasAccess()||!roomReady||!memberDataReady)return;
     const nextShape=overlayMemberData(remoteShape||{},memberDataByUid);
     if(jsonEqual(optimisticShape,nextShape))return;
     optimisticShape=nextShape;
@@ -172,97 +200,152 @@ export function createP708SecureEngine({firebaseConfig,roomCode,deviceId,onShape
   };
 
   const stopDataListeners=()=>{
+    dataGeneration++;
     roomUnsub?.();memberDataUnsub?.();adminAccessUnsub?.();adminRequestsUnsub?.();auditUnsub?.();taskUnsub?.();swapUnsub?.();
     roomUnsub=memberDataUnsub=adminAccessUnsub=adminRequestsUnsub=auditUnsub=taskUnsub=swapUnsub=null;
     memberDataByUid=new Map();accessByUid=new Map();memberDataReady=false;
     remoteShape={};optimisticShape={};roomReady=false;remoteRevision=0;
   };
+  const dataListener=callback=>{
+    const epoch=dataGeneration;
+    return value=>{if(epoch===dataGeneration)callback(value);};
+  };
   const startAdminListeners=()=>{
     adminAccessUnsub?.();adminRequestsUnsub?.();auditUnsub?.();
-    adminAccessUnsub=onSnapshot(accessCollection,snap=>{
+    adminAccessUnsub=onSnapshot(accessCollection,dataListener(snap=>{
       accessByUid=new Map(snap.docs.map(d=>[d.id,{uid:d.id,...d.data()}]));
       emitAdminData(null,[...accessByUid.values()],null);
-    },e=>emitStatus("offline","Không tải được danh sách quyền",{error:e}));
-    adminRequestsUnsub=onSnapshot(requestCollection,snap=>emitAdminData(snap.docs.map(d=>({uid:d.id,...d.data()})),null,null),e=>emitStatus("offline","Không tải được yêu cầu tham gia",{error:e}));
-    auditUnsub=onSnapshot(query(auditCollection,orderBy("createdAt","desc"),limit(200)),snap=>emitAdminData(null,null,snap.docs.map(d=>({id:d.id,...d.data()}))),e=>emitStatus("offline","Không tải được nhật ký",{error:e}));
+    }),dataListener(()=>emitStatus("offline","Không tải được danh sách quyền")));
+    adminRequestsUnsub=onSnapshot(requestCollection,dataListener(snap=>emitAdminData(snap.docs.map(d=>({uid:d.id,...d.data()})),null,null)),dataListener(()=>emitStatus("offline","Không tải được yêu cầu tham gia")));
+    auditUnsub=onSnapshot(query(auditCollection,orderBy("createdAt","desc"),limit(200)),dataListener(snap=>emitAdminData(null,null,snap.docs.map(d=>({id:d.id,...d.data()})))),dataListener(()=>emitStatus("offline","Không tải được nhật ký")));
   };
   const startTaskListener=()=>{
     taskUnsub?.();
     const source=isAdmin()?query(taskCollection,orderBy("updatedAt","desc"),limit(200)):query(taskCollection,where("actorUid","==",user.uid),limit(200));
-    taskUnsub=onSnapshot(source,snap=>onTaskData?.(snap.docs.map(d=>({id:d.id,...d.data()}))),e=>emitStatus("offline","Không tải được trạng thái công việc",{error:e}));
+    taskUnsub=onSnapshot(source,dataListener(snap=>onTaskData?.(snap.docs.map(d=>({id:d.id,...d.data()})))),dataListener(()=>emitStatus("offline","Không tải được trạng thái công việc")));
     const swaps=isAdmin()?query(swapCollection,orderBy("updatedAt","desc"),limit(100)):query(swapCollection,where("actorUid","==",user.uid),limit(100));
-    swapUnsub=onSnapshot(swaps,snap=>onSwapData?.(snap.docs.map(d=>({id:d.id,...d.data()}))),e=>console.warn("Không tải được yêu cầu đổi việc",e.code));
+    swapUnsub=onSnapshot(swaps,dataListener(snap=>onSwapData?.(snap.docs.map(d=>({id:d.id,...d.data()})))),dataListener(()=>emitStatus("offline","Không tải được yêu cầu đổi việc")));
   };
   const startRoomListeners=()=>{
     stopDataListeners();
+    const epoch=dataGeneration;
+    const stillCurrent=()=>epoch===dataGeneration&&hasAccess();
+    const onRoomError=error=>{
+      if(!stillCurrent())return;
+      roomError=error?.code||"room";
+      emitSession();emitStatus("offline","Không thể đọc dữ liệu phòng");
+    };
     roomUnsub=onSnapshot(roomRef,{includeMetadataChanges:true},snap=>{
+      if(!stillCurrent())return;
       if(snap.metadata.fromCache){
         emitStatus(navigator.onLine?"syncing":"offline","Chưa xác nhận dữ liệu với máy chủ");
         return;
       }
+      if(!snap.exists()){onRoomError({code:"room-not-found"});return;}
+      if(!isAdmin()&&!snap.data()?.payload?.members?.[access.memberId]){
+        onRoomError({code:"invalid-member"});return;
+      }
+      roomError="";
       acceptRoomShape(snap.data()?.payload,Number(snap.data()?.revision)||0);
+      emitSession();
       emitStatus(snap.metadata.hasPendingWrites?"syncing":navigator.onLine?"online":"offline",snap.metadata.hasPendingWrites?"Đang đồng bộ…":navigator.onLine?"Đã đồng bộ":"Đang dùng dữ liệu ngoại tuyến");
-    },e=>emitStatus("offline","Không thể đọc dữ liệu phòng",{error:e}));
+    },onRoomError);
     if(isAdmin()){
       memberDataUnsub=onSnapshot(memberDataCollection,{includeMetadataChanges:true},snap=>{
-        if(snap.metadata.fromCache)return;
-        memberDataByUid=new Map(snap.docs.map(d=>[d.id,{uid:d.id,...d.data()}]));memberDataReady=true;rebuild();
-      },e=>{memberDataReady=false;emitStatus("offline","Không thể đọc dữ liệu thành viên",{error:e});});
+        if(!stillCurrent()||snap.metadata.fromCache)return;
+        memberDataByUid=new Map(snap.docs.map(d=>[d.id,{uid:d.id,...d.data()}]));memberDataReady=true;
+        if(roomError==="slow"&&roomReady)roomError="";
+        rebuild();emitSession();
+      },onRoomError);
     }else{
       memberDataUnsub=onSnapshot(doc(memberDataCollection,user.uid),{includeMetadataChanges:true},snap=>{
-        if(snap.metadata.fromCache)return;
-        memberDataByUid=snap.exists()?new Map([[snap.id,{uid:snap.id,...snap.data()}]]):new Map();memberDataReady=true;rebuild();
-      },e=>{memberDataReady=false;emitStatus("offline","Không thể đọc dữ liệu cá nhân",{error:e});});
+        if(!stillCurrent()||snap.metadata.fromCache)return;
+        memberDataByUid=snap.exists()?new Map([[snap.id,{uid:snap.id,...snap.data()}]]):new Map();memberDataReady=true;
+        if(roomError==="slow"&&roomReady)roomError="";
+        rebuild();emitSession();
+      },onRoomError);
     }
     startTaskListener();if(isAdmin())startAdminListeners();
   };
   const handleAccessChange=next=>{
-    const oldRole=access?.role;access=next?.active?next:null;
-    if(access&&user)accessByUid.set(user.uid,{uid:user.uid,...access});
-    emitSession();if(!access){stopDataListeners();return;}
-    if(!roomUnsub||oldRole!==access.role)startRoomListeners();rebuild();
+    const previous=access;
+    denied=!!next&&(!next.active||!["admin","member"].includes(next.role)||(next.role==="member"&&!next.memberId));
+    access=next?.active&&!denied?next:null;
+    if(!access)stopDataListeners();
+    else if(!roomUnsub||previous?.role!==access.role||previous?.memberId!==access.memberId)startRoomListeners();
+    emitSession();
   };
   const attachUserListeners=()=>{
     accessUnsub?.();requestUnsub?.();
+    const epoch=generation;
     accessUnsub=onSnapshot(doc(accessCollection,user.uid),{includeMetadataChanges:true},s=>{
-      if(s.metadata.fromCache)return;
+      if(epoch!==generation||s.metadata.fromCache)return;
+      accessError="";
       accessReady=true;
       handleAccessChange(s.exists()?{uid:s.id,...s.data()}:null);
-    },e=>{stopDataListeners();access=null;emitSession({status:"error",error:e});});
+    },e=>{if(epoch!==generation)return;stopDataListeners();access=null;accessError=e?.code||"access";emitSession();});
     requestUnsub=onSnapshot(doc(requestCollection,user.uid),{includeMetadataChanges:true},s=>{
-      if(s.metadata.fromCache)return;
+      if(epoch!==generation||s.metadata.fromCache)return;
+      if(accessReady&&accessError==="slow")accessError="";
       requestReady=true;ownRequest=s.exists()?{uid:s.id,...s.data()}:null;emitSession();
-    },e=>{if(!hasAccess())emitSession({status:"error",error:e});});
+    },e=>{if(epoch===generation&&!hasAccess()){accessError=e?.code||"access";emitSession();}});
   };
   const clearUserListeners=()=>{
+    generation++;
     accessUnsub?.();requestUnsub?.();accessUnsub=requestUnsub=null;
     stopDataListeners();access=null;ownRequest=null;
     accessReady=false;requestReady=false;restoreInFlight=null;
+    denied=false;accessError="";roomError="";
   };
-  const onlineHandler=()=>emitStatus("syncing","Đang kết nối lại…");
-  const offlineHandler=()=>emitStatus("offline","Mất kết nối · dữ liệu được giữ trên thiết bị");
+  const retryAccess=()=>{
+    if(!user)return;
+    clearUserListeners();emitSession();attachUserListeners();
+  };
+  const onlineHandler=()=>{emitStatus("syncing","Đang kết nối lại…");if(user&&(accessError||roomError))retryAccess();else emitSession();};
+  const offlineHandler=()=>{emitStatus("offline","Đang ngoại tuyến");emitSession();};
+  const pageShowHandler=event=>{
+    if(event.persisted&&signingIn&&!user){signingIn=false;authError="auth/cancelled-popup-request";emitSession();}
+  };
 
   const start=async()=>{
     if(started)return;started=true;emitStatus("syncing","Đang khởi động bảo mật…");
-    try{await setPersistence(auth,browserLocalPersistence);}catch(e){console.warn("P708 auth persistence",e);}
-    authUnsub=onAuthStateChanged(auth,next=>{clearUserListeners();user=next;if(!user){emitSession();emitStatus("offline","Chưa đăng nhập");return;}emitSession({status:"checking"});attachUserListeners();emitStatus("syncing","Đang kiểm tra quyền…");});
-    void getRedirectResult(auth).catch(error=>onStatus?.({mode:"offline",text:"Không thể hoàn tất đăng nhập Google",error}));
+    authRestoring=true;emitSession();
     window.addEventListener("online",onlineHandler);window.addEventListener("offline",offlineHandler);
+    window.addEventListener("pageshow",pageShowHandler);
+    await Promise.all([auth.authStateReady(),getRedirectResult(auth).catch(error=>{authError=error?.code||"redirect";})]);
+    if(!started)return;
+    authRestoring=false;
+    authUnsub=onAuthStateChanged(auth,next=>{
+      clearUserListeners();user=next;signingIn=false;
+      if(user)authError="";
+      emitSession();
+      if(!user){emitStatus("offline","Chưa đăng nhập");return;}
+      emitStatus("syncing","Đang kiểm tra quyền…");attachUserListeners();
+    });
   };
+  const environment=()=>authEnvironment({
+    userAgent:navigator.userAgent,platform:navigator.platform,maxTouchPoints:navigator.maxTouchPoints,
+    standalone:window.matchMedia("(display-mode: standalone)").matches||navigator.standalone===true
+  });
   const signInGoogle=async()=>{
+    if(signingIn||authRestoring||user)return;
+    if(!navigator.onLine){authError="auth/network-request-failed";emitSession();return;}
+    const {embedded,mobile,standalone}=environment();
+    if(embedded){authError="auth/operation-not-supported-in-this-environment";emitSession();return;}
     const firstParty=location.hostname===firebaseConfig.authDomain;
-    const standalone=window.matchMedia("(display-mode: standalone)").matches||navigator.standalone===true;
-    const ios=/iPhone|iPad|iPod/i.test(navigator.userAgent)||(navigator.platform==="MacIntel"&&navigator.maxTouchPoints>1);
-    const openFirebaseHosting=()=>location.assign(new URL(location.hash||"/","https://p708-room-manager.firebaseapp.com/").href);
-    if(!useEmulators&&(ios||standalone)){
-      if(!firstParty){openFirebaseHosting();return;}
-      await signInWithRedirect(auth,provider);return;
-    }
-    try{await signInWithPopup(auth,provider);}
-    catch(e){
-      if(!["auth/popup-blocked","auth/operation-not-supported-in-this-environment"].includes(e?.code))throw e;
-      if(!firstParty&&!useEmulators){openFirebaseHosting();return;}
-      await signInWithRedirect(auth,provider);
+    const redirect=()=>firstParty||useEmulators
+      ?signInWithRedirect(auth,provider):location.assign(authDestination(location.hash));
+    signingIn=true;authError="";emitSession();
+    try{
+      if(!useEmulators&&(mobile||standalone))await redirect();
+      else{
+        try{await signInWithPopup(auth,provider);}
+        catch(error){if(error?.code!=="auth/popup-blocked")throw error;await redirect();}
+      }
+    }catch(error){authError=error?.code||"unknown";}
+    finally{
+      signingIn=false;
+      emitSession();
     }
   };
   const signOut=()=>firebaseSignOut(auth);
@@ -565,20 +648,25 @@ export function createP708SecureEngine({firebaseConfig,roomCode,deviceId,onShape
   const forceSync=()=>{
     if(!user||!hasAccess())return Promise.resolve(false);
     if(restoreInFlight)return restoreInFlight;
-    const actor=user.uid;
+    const actor=user.uid,epoch=dataGeneration;
     const pending=getDocFromServer(roomRef).then(snap=>{
-      if(user?.uid!==actor||!hasAccess())return false;
+      if(user?.uid!==actor||epoch!==dataGeneration||!hasAccess())return false;
+      if(!snap.exists()||(!isAdmin()&&!snap.data()?.payload?.members?.[access.memberId]))return false;
       acceptRoomShape(snap.data()?.payload,Number(snap.data()?.revision)||0);
       emitStatus("online","Đã đồng bộ");
       return true;
     }).catch(e=>{
-      if(user?.uid===actor)emitStatus("offline","Không thể đồng bộ",{error:e});
+      if(user?.uid===actor&&epoch===dataGeneration)emitStatus("offline","Không thể đồng bộ");
       return false;
     }).finally(()=>{if(restoreInFlight===pending)restoreInFlight=null;});
     restoreInFlight=pending;
     return pending;
   };
   const flush=forceSync;
-  const stop=()=>{authUnsub?.();clearUserListeners();window.removeEventListener("online",onlineHandler);window.removeEventListener("offline",offlineHandler);started=false;};
-  return {start,stop,signInGoogle,signOut,requestAccess,cancelAccessRequest,approveRequest,updateAccess,revokeAccess,recordShape,submitTask,reviewTask,requestTaskSwap,reviewTaskSwap,reconcileTaskSubmissions,deleteTaskSubmissionsForWeek,deleteAccountFromRoom,cleanupAuditLogs,forceSync,flush};
+  const stop=()=>{
+    authUnsub?.();clearUserListeners();clearTimeout(waitingTimer);waitingFor="";
+    window.removeEventListener("online",onlineHandler);window.removeEventListener("offline",offlineHandler);
+    window.removeEventListener("pageshow",pageShowHandler);started=false;
+  };
+  return {start,stop,signInGoogle,signOut,retryAccess,environment,requestAccess,cancelAccessRequest,approveRequest,updateAccess,revokeAccess,recordShape,submitTask,reviewTask,requestTaskSwap,reviewTaskSwap,reconcileTaskSubmissions,deleteTaskSubmissionsForWeek,deleteAccountFromRoom,cleanupAuditLogs,forceSync,flush};
 }

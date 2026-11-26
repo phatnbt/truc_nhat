@@ -11,13 +11,13 @@
   <link rel="manifest" href="./manifest.webmanifest">
   <link rel="icon" type="image/png" sizes="32x32" href="./icons/icon-32.png">
   <link rel="apple-touch-icon" sizes="192x192" href="./icons/icon-192.png">
-  <link rel="stylesheet" href="./styles.css?v=20261127-4">
-  <link rel="stylesheet" href="./landing-ui.css?v=20261127-4">
-  <link rel="stylesheet" href="./billing-cycle.css?v=20261127-4">
+  <link rel="stylesheet" href="./styles.css?v=20261127-6">
+  <link rel="stylesheet" href="./landing-ui.css?v=20261127-6">
+  <link rel="stylesheet" href="./billing-cycle.css?v=20261127-6">
   <title>Quản lý phòng P708</title>
 </head>
 <body>
-  <header class="app-toolbar">
+  <header class="app-toolbar" inert>
     <div class="app-toolbar-inner">
       <button class="room-brand" data-go="home" type="button" aria-label="Trang chủ P708">
         <img src="./icons/icon-192.png" alt="" width="36" height="36"><span>P708 <small>PHÒNG SINH HOẠT</small></span>
@@ -45,7 +45,7 @@
     </div>
   </div>
 
-  <main>
+  <main inert>
     <section class="page active room-dashboard" id="page-home" data-page="home">
       <div class="shell home-shell">
         <header class="room-overview">
@@ -356,6 +356,6 @@
       window.addEventListener("p708:boot-ready",()=>clearTimeout(timer),{once:true});
     })();
   </script>
-  <script type="module" src="./app.js?v=20261127-4"></script>
+  <script type="module" src="./app.js?v=20261127-6"></script>
 </body>
 </html>

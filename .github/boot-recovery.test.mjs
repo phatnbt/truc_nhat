@@ -7,7 +7,7 @@ const start=fs.readFileSync(new URL("../src/boot/app-start.js",import.meta.url),
 const worker=fs.readFileSync(new URL("../sw.js",import.meta.url),"utf8");
 const app=fs.readFileSync(new URL("../app.js",import.meta.url),"utf8");
 
-const release="20261127-4";
+const release="20261127-6";
 
 assert.ok(index.includes("setTimeout(showRecovery,15000)"),"stalled boots must show recovery");
 assert.ok(index.includes('id="bootRetryButton"'),"recovery should offer an explicit retry");
@@ -26,16 +26,26 @@ assert.ok(worker.includes("url.search"),"versioned asset requests must fall back
 assert.ok(worker.includes("isValidRuntimeResponse"),"runtime responses must be MIME-validated before caching");
 assert.ok(worker.includes("content-type"),"runtime MIME validation must inspect Content-Type");
 
+const workerListeners={};
 const workerContext={
-  URL,Request,Response,fetch:async()=>new Response("",{status:200}),
-  caches:{open:async()=>({put:async()=>{}}),keys:async()=>[],delete:async()=>true,match:async()=>null},
+  URL,Request,Response,AbortController,setTimeout,clearTimeout,fetch:async()=>new Response("export {};",{status:200,headers:{"content-type":"text/javascript"}}),
+  caches:{open:async()=>({put:async()=>{},match:async()=>null}),keys:async()=>[],delete:async()=>true,match:async()=>null},
   clients:{matchAll:async()=>[],openWindow:async()=>{}},
-  self:{registration:{scope:"https://p708-room-manager.web.app/"},location:{href:"https://p708-room-manager.web.app/sw.js",origin:"https://p708-room-manager.web.app"},addEventListener:()=>{},skipWaiting:async()=>{},clients:{claim:async()=>{}}}
+  self:{registration:{scope:"https://p708-room-manager.web.app/"},location:{href:"https://p708-room-manager.web.app/sw.js",origin:"https://p708-room-manager.web.app"},addEventListener:(type,listener)=>{workerListeners[type]=listener;},skipWaiting:async()=>{},clients:{claim:async()=>{}}}
 };
 vm.runInNewContext(worker,workerContext);
 const jsRequest=new Request("https://p708-room-manager.web.app/app.js");
 assert.equal(workerContext.isValidRuntimeResponse(jsRequest,new Response("<html></html>",{status:200,headers:{"content-type":"text/html"}})),false,"HTML must never be cached as JavaScript");
 assert.equal(workerContext.isValidRuntimeResponse(jsRequest,new Response("export {};",{status:200,headers:{"content-type":"text/javascript"}})),true,"valid JavaScript responses must remain cacheable");
+function intercepted(path){
+  let used=false;
+  workerListeners.fetch({request:new Request(new URL(path,jsRequest.url)),respondWith:()=>{used=true;}});
+  return used;
+}
+assert.equal(intercepted("/__/auth/handler"),false);
+assert.equal(intercepted("/__/firebase/init.json"),false);
+assert.equal(intercepted("/app.js?v=old-auth-release"),false);
+assert.equal(intercepted(`/app.js?v=${release}`),true);
 
 const loader=fs.readFileSync(new URL("../src/boot/app-loader.js",import.meta.url),"utf8");
 assert.ok(loader.includes("await Promise.all(parts.map"),"classic scripts must download in parallel");
