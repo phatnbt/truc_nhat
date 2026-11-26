@@ -11,7 +11,7 @@ import {
   setDoc, deleteDoc, getDoc, getDocFromServer, getDocs, writeBatch, Timestamp, increment
 } from "https://www.gstatic.com/firebasejs/12.16.0/firebase-firestore.js";
 import { assertBillingPeriodUpdate, periodDateKeys, daysInMonthKey } from "./billing-cycle-period.js?v=20261126-1";
-import {authEnvironment,authDestination} from "./mobile-auth-policy.js?v=20261127-7";
+import {authEnvironment,authDestination} from "./mobile-auth-policy.js?v=20261127-8";
 
 const clone=value=>value==null?value:JSON.parse(JSON.stringify(value));
 const isObject=value=>value!==null&&typeof value==="object"&&!Array.isArray(value);
@@ -223,8 +223,11 @@ export function createP708SecureEngine({firebaseConfig,roomCode,deviceId,onShape
   };
   const startTaskListener=()=>{
     taskUnsub?.();
-    const source=isAdmin()?query(taskCollection,orderBy("updatedAt","desc"),limit(200)):query(taskCollection,where("actorUid","==",user.uid),limit(200));
-    taskUnsub=onSnapshot(source,dataListener(snap=>onTaskData?.(snap.docs.map(d=>({id:d.id,...d.data()})))),dataListener(()=>emitStatus("offline","Không tải được trạng thái công việc")));
+    const source=isAdmin()?query(taskCollection,orderBy("updatedAt","desc"),limit(200)):query(taskCollection,where("actorUid","==",user.uid));
+    taskUnsub=onSnapshot(source,{includeMetadataChanges:true},dataListener(snap=>{
+      if(snap.metadata.fromCache||snap.metadata.hasPendingWrites)return;
+      onTaskData?.(snap.docs.map(d=>({id:d.id,...d.data()})));
+    }),dataListener(()=>emitStatus("offline","Không tải được trạng thái công việc")));
     const swaps=isAdmin()?query(swapCollection,orderBy("updatedAt","desc"),limit(100)):query(swapCollection,where("actorUid","==",user.uid),limit(100));
     swapUnsub=onSnapshot(swaps,dataListener(snap=>onSwapData?.(snap.docs.map(d=>({id:d.id,...d.data()})))),dataListener(()=>emitStatus("offline","Không tải được yêu cầu đổi việc")));
   };
@@ -572,13 +575,17 @@ export function createP708SecureEngine({firebaseConfig,roomCode,deviceId,onShape
 
   const submitTask=async({scheduleId,weekStart,taskId,taskName,memberId,status="submitted",checks=[]})=>{
     if(!user||!hasAccess())throw new Error("Chưa có quyền truy cập.");if(isAdmin())throw new Error("Trưởng phòng dùng nút xác nhận trực tiếp.");if(!navigator.onLine)throw new Error("Đang ngoại tuyến.");if(memberId!==access.memberId)throw new Error("Bạn chỉ được báo công việc của mình.");
-    const schedule=optimisticShape?.schedules?.[weekStart],assignment=(schedule?.assignments||[]).find(a=>a?.taskId===taskId&&a?.personId===memberId&&!a?.cut);
-    if(!schedule||schedule.id!==scheduleId||!assignment)throw new Error("Công việc này không còn được phân cho bạn.");if(assignment.completed)throw new Error("Công việc đã được xác nhận hoàn thành.");
-    const id=taskDocId(weekStart,taskId,memberId),ref=doc(taskCollection,id);
+    const actor=user.uid,epoch=dataGeneration,id=taskDocId(weekStart,taskId,memberId),ref=doc(taskCollection,id);
     if(!["in_progress","submitted"].includes(status))throw new Error("Trạng thái không hợp lệ.");
     const completion=status==="submitted"?{checks}:{};
     await runTransaction(db,async tx=>{
-      const old=await tx.get(ref);
+      const room=await tx.get(roomRef),old=await tx.get(ref);
+      if(user?.uid!==actor||epoch!==dataGeneration||access?.memberId!==memberId)throw new Error("Tài khoản hoặc phân công đã thay đổi.");
+      const payload=room.data()?.payload,schedule=payload?.schedules?.[weekStart];
+      const assignment=schedule?.assignments?.find(a=>a.taskId===taskId&&a.personId===memberId&&!a.cut);
+      if(schedule?.id!==scheduleId||!assignment||payload?._sync?.deletedSchedules?.[weekStart])
+        throw new Error("Công việc này không còn được phân cho bạn.");
+      if(assignment.completed)throw new Error("Công việc đã được xác nhận hoàn thành.");
       if(old.exists()){
         const previous=old.data(),oldStatus=previous.status;
         if(previous.scheduleId!==scheduleId||previous.actorUid!==user.uid)throw new Error("Báo trực cũ đang giữ chỗ. Hãy nhờ trưởng phòng kiểm tra.");
@@ -592,14 +599,20 @@ export function createP708SecureEngine({firebaseConfig,roomCode,deviceId,onShape
     });
     return {id};
   };
-  const reviewTask=async({submissionId,status,note=""})=>{
+  const reviewTask=async({submissionId,status,note="",expectedSubmittedAt})=>{
     if(!isAdmin())throw new Error("Chỉ trưởng phòng được xác nhận.");if(!navigator.onLine)throw new Error("Đang ngoại tuyến.");if(!["approved","rejected"].includes(status))throw new Error("Trạng thái không hợp lệ.");
-    const actor=user.uid,ref=doc(taskCollection,submissionId),result=await runTransaction(db,async tx=>{
+    if(!expectedSubmittedAt||!Number.isInteger(expectedSubmittedAt.seconds)||!Number.isInteger(expectedSubmittedAt.nanoseconds))
+      throw new Error("Chưa có phiên bản báo cáo đã đồng bộ. Hãy thử lại.");
+    const actor=user.uid,epoch=dataGeneration,ref=doc(taskCollection,submissionId),result=await runTransaction(db,async tx=>{
       const taskSnap=await tx.get(ref),roomSnap=await tx.get(roomRef);
       if(!taskSnap.exists())throw new Error("Không tìm thấy báo hoàn thành.");
-      const task=taskSnap.data()||{};if(task.status===status)return null;if(task.status!=="submitted")throw new Error("Báo hoàn thành này đã được xử lý.");if(!roomSnap.exists())throw new Error("Không tìm thấy dữ liệu phòng.");
+      if(user?.uid!==actor||epoch!==dataGeneration||!isAdmin())throw new Error("Phiên hoặc quyền truy cập đã thay đổi.");
+      const task=taskSnap.data()||{};
+      if(task.submittedAt?.seconds!==expectedSubmittedAt.seconds||task.submittedAt?.nanoseconds!==expectedSubmittedAt.nanoseconds)
+        throw new Error("Thành viên đã gửi báo cáo mới. Hãy kiểm tra lại trước khi duyệt.");
+      if(task.status===status)return null;if(task.status!=="submitted")throw new Error("Báo hoàn thành này đã được xử lý.");if(!roomSnap.exists())throw new Error("Không tìm thấy dữ liệu phòng.");
       const payload=clone(roomSnap.data()?.payload)||{},schedule=payload?.schedules?.[task.weekStart];
-      if(!schedule||schedule.id!==task.scheduleId)throw new Error("Lịch trực tương ứng không còn tồn tại.");
+      if(!schedule||schedule.id!==task.scheduleId||payload._sync?.deletedSchedules?.[task.weekStart])throw new Error("Lịch trực tương ứng không còn tồn tại.");
       const assignment=(schedule.assignments||[]).find(a=>a?.taskId===task.taskId&&a?.personId===task.memberId&&!a?.cut);
       if(!assignment||assignment.completed)throw new Error("Phân công hoặc trạng thái đã thay đổi; hãy kiểm tra lại lịch.");
       if(status==="approved"){assignment.completed=true;schedule.updatedAt=new Date().toISOString();}
@@ -609,19 +622,20 @@ export function createP708SecureEngine({firebaseConfig,roomCode,deviceId,onShape
       await writeAudit({action:status==="approved"?"VERIFY_TASK":"REJECT_TASK",summary:`${status==="approved"?"Xác nhận":"Yêu cầu làm lại"}: ${task.taskName||"công việc"}`,targetMemberId:task.memberId||null},tx);
       return status==="approved"?{payload,revision:(Number(roomSnap.data()?.revision)||0)+1}:null;
     });
-    if(!result||user?.uid!==actor||!isAdmin())return true;
+    if(!result||user?.uid!==actor||epoch!==dataGeneration||!isAdmin())return true;
     acceptRoomShape(result.payload,result.revision);
     return true;
   };
   const completeTask=async({weekStart,scheduleId,taskId,memberId})=>{
     if(!isAdmin()||!navigator.onLine)throw new Error("Chỉ trưởng phòng đang kết nối mới được đánh dấu hoàn thành.");
-    const actor=user.uid;
+    const actor=user.uid,epoch=dataGeneration;
     const result=await runTransaction(db,async tx=>{
       const room=await tx.get(roomRef),payload=clone(room.data()?.payload),schedule=payload?.schedules?.[weekStart];
       const assignment=schedule?.assignments?.find(item=>item.taskId===taskId&&item.personId===memberId&&!item.cut);
-      if(schedule?.id!==scheduleId||!assignment)throw new Error("Phân công vừa thay đổi. Hãy kiểm tra lại.");
+      if(schedule?.id!==scheduleId||!assignment||payload?._sync?.deletedSchedules?.[weekStart])throw new Error("Phân công vừa thay đổi. Hãy kiểm tra lại.");
       if(assignment.completed)return null;
       const report=await tx.get(doc(taskCollection,taskDocId(weekStart,taskId,memberId)));
+      if(user?.uid!==actor||epoch!==dataGeneration||!isAdmin())throw new Error("Phiên hoặc quyền truy cập đã thay đổi.");
       if(report.data()?.scheduleId===scheduleId&&report.data()?.status==="submitted")
         throw new Error("Thành viên đang chờ xác nhận. Hãy dùng Xác nhận hoặc Làm lại.");
       assignment.completed=true;schedule.updatedAt=new Date().toISOString();
@@ -630,7 +644,7 @@ export function createP708SecureEngine({firebaseConfig,roomCode,deviceId,onShape
       await writeAudit({action:"UPDATE_TASK",summary:`${assignment.task||taskId}: Đã xong`,targetMemberId:memberId},tx);
       return {payload,revision:(Number(room.data()?.revision)||0)+1};
     });
-    if(result&&user?.uid===actor&&isAdmin())acceptRoomShape(result.payload,result.revision);
+    if(result&&user?.uid===actor&&epoch===dataGeneration&&isAdmin())acceptRoomShape(result.payload,result.revision);
     return true;
   };
   const requestTaskSwap=async({weekStart,scheduleId,taskId,otherTaskId,otherMemberId})=>{
@@ -684,16 +698,29 @@ export function createP708SecureEngine({firebaseConfig,roomCode,deviceId,onShape
     for(let i=0;i<items.length;i+=350){const batch=writeBatch(db),part=items.slice(i,i+350);part.forEach(item=>batch.set(item.ref,item.patch,{merge:true}));await batch.commit();updated+=part.length;}
     return updated;
   };
-  const deleteTaskSubmissionsForWeek=async(weekStart,scheduleId)=>{
-    if(!isAdmin())throw new Error("Chỉ trưởng phòng được dọn báo công việc.");if(!weekStart)return 0;
-    const snap=await getDocs(query(taskCollection,where("weekStart","==",weekStart)));
-    return commitDeletes(snap.docs.filter(item=>item.data().scheduleId===scheduleId));
-  };
-  const reconcileTaskSubmissions=async({weekStart,assignments=[]})=>{
+  const reconcileTaskSubmissions=async({weekStart,scheduleId})=>{
     if(!isAdmin())throw new Error("Chỉ trưởng phòng được đồng bộ báo công việc.");if(!weekStart)return 0;
-    const valid=new Set((assignments||[]).filter(a=>a&&!a.cut&&a.personId&&a.taskId).map(a=>`${a.taskId}::${a.personId}`)),snap=await getDocs(query(taskCollection,where("weekStart","==",weekStart)));
-    const stale=snap.docs.filter(d=>{const data=d.data()||{};return !valid.has(`${data.taskId}::${data.memberId}`);});return commitDeletes(stale);
+    const actor=user.uid,epoch=dataGeneration;
+    const snap=await getDocs(query(taskCollection,where("weekStart","==",weekStart)));
+    let deleted=0;
+    for(const candidate of snap.docs){
+      const removed=await runTransaction(db,async tx=>{
+        const room=await tx.get(roomRef),report=await tx.get(candidate.ref);
+        if(user?.uid!==actor||epoch!==dataGeneration||!isAdmin())throw new Error("Phiên hoặc quyền truy cập đã thay đổi.");
+        const task=report.data();
+        if(!room.exists()||!task||task.weekStart!==weekStart||(scheduleId&&task.scheduleId!==scheduleId))return false;
+        const current=room.data()?.payload?.schedules?.[weekStart];
+        const matches=current&&(task.scheduleId===current.id||!task.scheduleId)&&current.assignments?.some(
+          assignment=>!assignment.cut&&assignment.taskId===task.taskId&&assignment.personId===task.memberId);
+        if(matches)return false;
+        tx.delete(report.ref);
+        return true;
+      });
+      if(removed)deleted++;
+    }
+    return deleted;
   };
+  const deleteTaskSubmissionsForWeek=(weekStart,scheduleId)=>scheduleId?reconcileTaskSubmissions({weekStart,scheduleId}):Promise.resolve(0);
   const deleteAccountFromRoom=async targetUid=>{
     if(!isAdmin())throw new Error("Chỉ trưởng phòng được xóa tài khoản khỏi phòng.");if(targetUid===user.uid)throw new Error("Không thể tự xóa tài khoản đang đăng nhập.");
     const targetAccessRef=doc(accessCollection,targetUid),targetMemberRef=doc(memberDataCollection,targetUid),targetRequestRef=doc(requestCollection,targetUid),[configSnap,targetSnap]=await Promise.all([getDoc(configRef),getDoc(targetAccessRef)]);

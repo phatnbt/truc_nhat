@@ -103,8 +103,8 @@ function bindStaticEvents(){
     submitTask:openChecklist,
     startTask:index=>submitTask(index,"in_progress"),
     swapTask:openTaskSwap,
-    reviewApprove:index=>reviewTask(index,true),
-    reviewReject:index=>reviewTask(index,false),
+    reviewApprove:(index,button)=>reviewTask(index,true,button),
+    reviewReject:(index,button)=>reviewTask(index,false,button),
     adminTask:adminCompleteTask
   };
   const cleaningScheduleBox=$("#cleanScheduleBox");
@@ -141,7 +141,7 @@ function bindStaticEvents(){
         toast("Phân công vừa thay đổi. Hãy kiểm tra lại lịch trực.");
         return;
       }
-      action(index);
+      action(index,button);
       return;
     }
   });
@@ -206,7 +206,7 @@ function bindStaticEvents(){
 async function registerPwa(){
   if(!("serviceWorker" in navigator)||location.protocol==="file:")return;
   try{
-    const reg=await navigator.serviceWorker.register("./sw.js?v=20261127-7",{scope:"./",updateViaCache:"none"});
+    const reg=await navigator.serviceWorker.register("./sw.js?v=20261127-8",{scope:"./",updateViaCache:"none"});
     const banner=$("#pwaUpdateBanner");
     const showUpdate=()=>{banner.hidden=!(reg.waiting&&reg.active&&reg.waiting!==reg.active&&navigator.serviceWorker.controller);};
     showUpdate();

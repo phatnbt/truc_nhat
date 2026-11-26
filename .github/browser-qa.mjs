@@ -5,6 +5,7 @@ import {chromium,firefox,webkit,expect} from "@playwright/test";
 import {initializeTestEnvironment} from "@firebase/rules-unit-testing";
 import {doc,setDoc,updateDoc,getDocFromServer,Timestamp,FieldPath,increment} from "firebase/firestore";
 import {roomDateKey,parseDateKey,dateKey,addUtcDays,currentPeriodMonth,cycleBounds} from "../src/core/billing-cycle-period.js";
+import {runCriticalCleaningStress} from "./critical-cleaning-stress.mjs";
 
 const base="http://127.0.0.1:5178",projectId="demo-p708-production-audit",room="rooms/P708";
 assert.ok(process.env.FIRESTORE_EMULATOR_HOST && process.env.FIREBASE_AUTH_EMULATOR_HOST,"Run against local Auth and Firestore emulators.");
@@ -40,7 +41,7 @@ async function testAccount(kind, browser){
   assert.ok(user.localId,JSON.stringify(user.error));
   return {uid:user.localId,email};
 }
-async function login(page,account){
+async function login(page,account,memberCount=2){
   const errors=[];
   page.on("pageerror",e=>errors.push(e.message));
   await page.goto(base);
@@ -58,7 +59,7 @@ async function login(page,account){
     await signInWithEmailAndPassword(getAuth(getApp("p708-secure-manager-v5")),email,password);
   },{email:account.email,password});
   await expect(page.locator("#authGate")).toBeHidden({timeout:15000});
-  await expect(page.locator("#kpiMembers")).toHaveText("2");
+  await expect(page.locator("#kpiMembers")).toHaveText(String(memberCount));
   assert.equal(await page.evaluate(()=>window.p708SawUnexpectedAccessRequest),false,"a pending permission lookup must not show the access-request form");
   return errors;
 }
@@ -160,6 +161,13 @@ async function exercise(engine,name,width){
     await expect(taskRow).toContainText("Chờ xác nhận");
     const managerTask=manager.locator("#cleanScheduleBox tr").filter({hasText:"Lavabo"});
     if(name==="chromium"){
+      await expect(managerTask.getByRole("button",{name:"Xác nhận",exact:true})).toBeVisible();
+      const report=await dataFromServer("taskSubmissions",`${monday}__lavabo__b`);
+      assert.equal(report.status,"submitted");
+      const staleCleanup=await manager.evaluate(weekStart=>realtimeEngine.reconcileTaskSubmissions({weekStart,assignments:[]}),monday);
+      assert.equal(staleCleanup,0,"a stale repair roster must not delete a valid report");
+      assert.equal((await dataFromServer("taskSubmissions",`${monday}__lavabo__b`)).status,"submitted");
+      console.log("CRIT-stale-cleanup: server report remains submitted; cleanup deleted 0 documents.");
       await clickDuringSync(managerTask.getByRole("button",{name:"Làm lại"}),false);
       await expect(taskRow).toContainText("Cần làm lại");
       await expect(resident.locator('#homePetGarden [data-garden-member="b"]')).toContainText("0 EXP");
@@ -168,16 +176,22 @@ async function exercise(engine,name,width){
       await resident.locator('#taskChecklistForm [value="finish"]').check();
       await activate(resident.getByRole("button",{name:"Gửi xác nhận"}));
       await expect(taskRow).toContainText("Chờ xác nhận");
+      const staleReview=manager.evaluate(({submissionId,submittedAt})=>realtimeEngine.reviewTask({submissionId,status:"approved",expectedSubmittedAt:submittedAt}),{
+        submissionId:`${monday}__lavabo__b`,submittedAt:{seconds:report.submittedAt.seconds,nanoseconds:report.submittedAt.nanoseconds}
+      });
+      await assert.rejects(staleReview,/báo cáo mới/i);
+      assert.equal((await dataFromServer("taskSubmissions",`${monday}__lavabo__b`)).status,"submitted");
+      console.log("CRIT-stale-review: the older timestamp was rejected; replacement report remains submitted.");
     }
     const approval=managerTask.getByRole("button",{name:"Xác nhận",exact:true});
     await expect(approval).toBeEnabled();
     await clickDuringSync(approval,hasTouch);
     await expect(taskRow).toContainText("Đã xong");
     if(name==="chromium"){
-      await manager.evaluate(async({monday})=>{
-        const submissionId=`${monday}__lavabo__b`;
-        await Promise.all([realtimeEngine.reviewTask({submissionId,status:"approved"}),realtimeEngine.reviewTask({submissionId,status:"approved"})]);
-      },{monday});
+      const submissionId=`${monday}__lavabo__b`,{submittedAt}=await dataFromServer("taskSubmissions",submissionId);
+      await manager.evaluate(async args=>{
+        await Promise.all([realtimeEngine.reviewTask(args),realtimeEngine.reviewTask(args)]);
+      },{submissionId,status:"approved",expectedSubmittedAt:{seconds:submittedAt.seconds,nanoseconds:submittedAt.nanoseconds}});
     }
     await resident.reload();
     await expect(resident.locator("#authGate")).toBeHidden();
@@ -353,6 +367,9 @@ async function exercise(engine,name,width){
       await manager.context().setOffline(false);
       await manager.reload();
       await expect(manager.locator("#stockList")).toContainText("2 chai");
+      if(process.argv.includes("--critical-stress")){
+        await runCriticalCleaningStress({env,browser,manager,resident,member,monday,testAccount,login,room,viewport});
+      }
     }
     await resident.locator("#accountButton").click();
     await resident.locator("#signOutButton").click();
@@ -375,7 +392,8 @@ try {
   await fs.mkdir("test-results",{recursive:true});
   const browsers={chromium:[chromium,1280],firefox:[firefox,820],webkit:[webkit,390]};
   const failures=[];
-  for(const name of process.argv.slice(2).length?process.argv.slice(2):Object.keys(browsers)){
+  const selected=process.argv.slice(2).filter(argument=>!argument.startsWith("--"));
+  for(const name of selected.length?selected:Object.keys(browsers)){
     try{await exercise(browsers[name][0],name,browsers[name][1]);}
     catch(error){failures.push(error);console.error(`P708 browser QA failed: ${name}`,error.message);}
   }

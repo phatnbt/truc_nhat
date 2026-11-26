@@ -42,7 +42,10 @@ function renderCleaning(){
       if(!a.cut){
         if(a.completed)action='<span class="badge success">✅ Đã xác nhận</span>';
         else if(sub?.status==="approved")action=isAdmin()?`<button class="btn small soft" data-admin-task="${index}" type="button">Đồng bộ trạng thái</button>`:'<span class="badge success">✅ Đã duyệt · chờ đồng bộ</span>';
-        else if(isAdmin()&&sub?.status==="submitted")action=`<div class="task-actions"><button class="btn small green" data-review-approve="${index}" type="button">Xác nhận</button><button class="btn small danger" data-review-reject="${index}" type="button">Làm lại</button></div>`;
+        else if(isAdmin()&&sub?.status==="submitted"){
+          const review=`data-review-id="${esc(sub.id)}" data-review-version="${esc(`${sub.submittedAt?.seconds}:${sub.submittedAt?.nanoseconds}`)}"`;
+          action=`<div class="task-actions"><button class="btn small green" ${review} data-review-approve="${index}" type="button">Xác nhận</button><button class="btn small danger" ${review} data-review-reject="${index}" type="button">Làm lại</button></div>`;
+        }
         else if(isAdmin())action=`<button class="btn small soft" data-admin-task="${index}" type="button">Đánh dấu xong</button>`;
         else if(mine&&sub?.status==="submitted")action='<span class="badge warning">⏳ Chờ xác nhận</span>';
         else if(mine)action=`<div class="task-actions">${sub?"":`<button class="btn small soft" data-start-task="${index}" type="button">Bắt đầu</button><button class="btn small" data-swap-task="${index}" type="button">Đổi việc</button>`}<button class="btn small primary" data-submit-task="${index}" type="button">✓ Tôi đã làm</button></div>`;
