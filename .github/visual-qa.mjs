@@ -114,7 +114,11 @@ async function capture(browser,browserName,ref,width){
             errors.push(`${view} dark heading: ${color}`);
           }
         }
-        if(ref==="working"&&view==="billing")errors.push(...(await checkBillingContrast(page)).map(error=>`billing ${theme}: ${error}`));
+        if(ref==="working"&&view==="billing"){
+          await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));
+          errors.push(...(await checkBillingContrast(page)).map(error=>`billing ${theme}: ${error}`));
+          if(width===390)await page.locator(".calendar-card").screenshot({path:`${out}/${ref}-${browserName}-${width}-${theme}-calendar.png`});
+        }
         if([390,1440].includes(width))await page.screenshot({path:`${out}/${ref}-${browserName}-${width}-${theme}-${view}.png`});
       }
     }

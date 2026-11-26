@@ -165,5 +165,5 @@ body.modal-open .mobile-nav,body.modal-open .floating-pet-host,body[data-page="h
   .home-priority .action-icon{width:32px;height:32px}
 }
 @media(prefers-reduced-motion:reduce){
-  *,*::before,*::after{animation-duration:.001ms!important;scroll-behavior:auto!important;transition-duration:.001ms!important}
+  *,*::before,*::after{animation-duration:.001ms!important;scroll-behavior:auto!important;transition:none!important}
 }
