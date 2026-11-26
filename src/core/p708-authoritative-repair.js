@@ -51,8 +51,10 @@ function overlayMemberData(shape,memberDocs){
     if(!memberId||!output.members?.[memberId])continue;
     if(typeof data.presence==="boolean")output.presence[memberId]=data.presence;
     for(const [month,monthData] of Object.entries(data.billingMonths||{})){
+      const bill=output.billingMonths[month];
+      if(bill?.closed&&bill.closedDaysVersion===1)continue;
       const entry=memberPersonEntry(output,memberId,month);
-      if(!entry)continue;
+      if(!entry||entry[1].daysShared===true)continue;
       output.billingMonths[month].people[entry[0]].days=clone(monthData?.days||{});
     }
   }

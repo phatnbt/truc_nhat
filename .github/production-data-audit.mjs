@@ -2,7 +2,9 @@ import { createRequire } from "node:module";
 const require=createRequire(import.meta.url);
 const admin=require("../functions/node_modules/firebase-admin");
 
-if(!admin.apps.length)admin.initializeApp({projectId:"p708-room-manager"});
+const dryRun=process.argv.includes("--attendance-dry-run");
+const projectId=dryRun&&process.env.FIRESTORE_EMULATOR_HOST?"demo-p708-attendance-audit":"p708-room-manager";
+if(!admin.apps.length)admin.initializeApp({projectId});
 const db=admin.firestore();
 const roomId="P708";
 
@@ -68,6 +70,28 @@ for(const [month,bill] of Object.entries(payload.billingMonths||{})){
 }
 
 const accesses=accessSnap.docs.map(doc=>doc.data()||{});
+const currentLinkByUid=new Map(accessSnap.docs.filter(doc=>doc.data()?.active===true).map(doc=>[doc.id,doc.data()?.memberId]));
+const attendanceDryRun={openPeriods:{},protectedClosedDifferences:0,unmatchedRows:0};
+const selectedDayKeys=days=>Object.keys(days||{}).filter(key=>days[key]===true).sort().join(",");
+for(const snapshot of memberDataSnap.docs){
+  const data=snapshot.data(),memberId=currentLinkByUid.get(snapshot.id);
+  if(!memberId||data.memberId!==memberId)continue;
+  for(const [month,entry] of Object.entries(data.billingMonths||{})){
+    const bill=payload.billingMonths?.[month];
+    if(!bill)continue;
+    const people=Object.values(bill.people||{}).filter(person=>person?.memberId===memberId);
+    if(people.length!==1){attendanceDryRun.unmatchedRows++;continue;}
+    if(selectedDayKeys(entry?.days)===selectedDayKeys(people[0].days))continue;
+    if(bill.closed){attendanceDryRun.protectedClosedDifferences++;continue;}
+    const counts=attendanceDryRun.openPeriods[month]??={legacyOverrides:0,sharedMirrorDifferences:0};
+    if(people[0].daysShared===true)counts.sharedMirrorDifferences++;
+    else counts.legacyOverrides++;
+  }
+}
+if(dryRun){
+  console.log(JSON.stringify({revision:Number(room.revision)||0,...attendanceDryRun},null,2));
+  process.exit(0);
+}
 const accessSummary=[];
 for(const account of accesses){
   const memberId=account.memberId||null;
@@ -142,6 +166,7 @@ const report={
   accessAliasGroups,
   accessSummary,
   orphanMemberDataCount:orphanMemberData.length,
+  attendanceDryRun,
   orphanMemberData
 };
 console.log("P708_PRODUCTION_DATA_AUDIT="+JSON.stringify(report,null,2));

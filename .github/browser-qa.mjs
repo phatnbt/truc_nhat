@@ -3,8 +3,8 @@ import fs from "node:fs/promises";
 import {randomUUID} from "node:crypto";
 import {chromium,firefox,webkit,expect} from "@playwright/test";
 import {initializeTestEnvironment} from "@firebase/rules-unit-testing";
-import {doc,setDoc,getDocFromServer,Timestamp} from "firebase/firestore";
-import {roomDateKey,parseDateKey,dateKey,addUtcDays} from "../src/core/billing-cycle-period.js";
+import {doc,setDoc,updateDoc,getDocFromServer,Timestamp,FieldPath,increment} from "firebase/firestore";
+import {roomDateKey,parseDateKey,dateKey,addUtcDays,currentPeriodMonth,cycleBounds} from "../src/core/billing-cycle-period.js";
 
 const base="http://127.0.0.1:5178",projectId="demo-p708-production-audit",room="rooms/P708";
 assert.ok(process.env.FIRESTORE_EMULATOR_HOST && process.env.FIREBASE_AUTH_EMULATOR_HOST,"Run against local Auth and Firestore emulators.");
@@ -12,6 +12,8 @@ const env=await initializeTestEnvironment({projectId,firestore:{rules:await fs.r
 const clock=parseDateKey(roomDateKey());
 const monday=dateKey(addUtcDays(clock,-((clock.getUTCDay()+6)%7)));
 const billMonth="2026-08";
+const cycleMonth=currentPeriodMonth();
+const activeCycle=cycleBounds(cycleMonth);
 const password="local-test-password";
 const auth=process.env.FIREBASE_AUTH_EMULATOR_HOST;
 const testRun=randomUUID();
@@ -94,7 +96,9 @@ async function exercise(engine,name,width){
       billingMonths:{[billMonth]:{id:"bill-1",month:billMonth,electricity:10000,water:2000,closed:false,people:{
         "person:a":{id:"a",memberId:"a",name:"An",days:{"1":true},paid:false,paidAmount:0},
         "person:b":{id:"b",memberId:"b",name:"Bình",days:{"1":true},paid:false,paidAmount:0}
-      }}}
+      }},[cycleMonth]:{id:"bill-cycle",month:cycleMonth,cycleMode:"29-28",cycleStart:activeCycle.start,cycleEnd:activeCycle.end,
+        electricity:5000,water:1000,closed:false,people:{"person:b":{id:"b",memberId:"b",name:"Bình",days:{"1":true}}}}
+      }
     }});
   });
   const browser=await engine.launch();
@@ -154,10 +158,27 @@ async function exercise(engine,name,width){
     await resident.locator('#taskChecklistForm [value="finish"]').check();
     await activate(resident.getByRole("button",{name:"Gửi xác nhận"}));
     await expect(taskRow).toContainText("Chờ xác nhận");
-    const approval=manager.locator("#cleanScheduleBox tr").filter({hasText:"Lavabo"}).getByRole("button",{name:"Xác nhận",exact:true});
+    const managerTask=manager.locator("#cleanScheduleBox tr").filter({hasText:"Lavabo"});
+    if(name==="chromium"){
+      await clickDuringSync(managerTask.getByRole("button",{name:"Làm lại"}),false);
+      await expect(taskRow).toContainText("Cần làm lại");
+      await expect(resident.locator('#homePetGarden [data-garden-member="b"]')).toContainText("0 EXP");
+      await clickDuringSync(taskRow.getByRole("button",{name:"Tôi đã làm"}),false);
+      await resident.locator('#taskChecklistForm [value="task"]').check();
+      await resident.locator('#taskChecklistForm [value="finish"]').check();
+      await activate(resident.getByRole("button",{name:"Gửi xác nhận"}));
+      await expect(taskRow).toContainText("Chờ xác nhận");
+    }
+    const approval=managerTask.getByRole("button",{name:"Xác nhận",exact:true});
     await expect(approval).toBeEnabled();
     await clickDuringSync(approval,hasTouch);
     await expect(taskRow).toContainText("Đã xong");
+    if(name==="chromium"){
+      await manager.evaluate(async({monday})=>{
+        const submissionId=`${monday}__lavabo__b`;
+        await Promise.all([realtimeEngine.reviewTask({submissionId,status:"approved"}),realtimeEngine.reviewTask({submissionId,status:"approved"})]);
+      },{monday});
+    }
     await resident.reload();
     await expect(resident.locator("#authGate")).toBeHidden();
     await expect(resident.locator("#cleanScheduleBox tr").filter({hasText:"Lavabo"})).toContainText("Đã xong");
@@ -199,9 +220,54 @@ async function exercise(engine,name,width){
       const personalData=await memberDataFromServer(member.uid);
       assert.equal(personalData.presence,!presenceFirst);
       assert.equal(personalData.billingMonths[billMonth].days["1"],true,"the pre-existing room day is preserved");
+      await expect.poll(async()=>(await roomPayloadFromServer()).billingMonths[billMonth].people["person:b"].days["2"]).toBe(true);
       await expect(resident.locator("#toast")).toHaveText("ngày 2: Có ở");
       await clickDuringSync(memberSecondDay,false,false);
       await expect.poll(async()=>(await memberDataFromServer(member.uid))?.billingMonths[billMonth]?.days["2"]).toBe(false);
+      if(name==="chromium"){
+        const secondDevice=await browser.newPage({viewport,timezoneId:"America/Los_Angeles"});
+        try{
+          await login(secondDevice,member);
+          const save=(device,changes)=>device.evaluate(async({month,changes})=>{
+            return realtimeEngine.saveBillingDays({month,billId:"bill-1",personId:"b",memberId:"b",changes,
+              audit:{action:"UPDATE_BILL_DAY",targetMemberId:"b",summary:"Concurrent day test"}});
+          },{month:billMonth,changes});
+          await Promise.all([save(resident,{"10":true}),save(secondDevice,{"11":true})]);
+          const days=()=>roomPayloadFromServer().then(payload=>payload.billingMonths[billMonth].people["person:b"].days);
+          const mergedDays=await days();
+          assert.equal(mergedDays["10"],true);
+          assert.equal(mergedDays["11"],true);
+          await Promise.all([save(resident,{"10":false}),save(secondDevice,{"10":false})]);
+          assert.equal((await days())["10"],false);
+          assert.equal((await days())["11"],true);
+          await secondDevice.context().setOffline(true);
+          await assert.rejects(save(secondDevice,{"12":true}),/ngoại tuyến/i);
+          await secondDevice.context().setOffline(false);
+          await secondDevice.evaluate(()=>realtimeEngine.forceSync());
+          await save(secondDevice,{"11":false});
+          assert.equal((await days())["11"],false);
+          assert.equal((await days())["12"]===true,false);
+          assert.equal((await days())["1"],true);
+        }finally{await secondDevice.close();}
+        await env.withSecurityRulesDisabled(async context=>{
+          // Reproduce a date-mode bill saved by an older app with numeric day keys.
+          await updateDoc(doc(context.firestore(),room),
+            new FieldPath("payload","billingMonths",cycleMonth,"people","person:b","days"),{"1":true},
+            "revision",increment(1));
+        });
+        await resident.locator("#billMonth").fill(cycleMonth);
+        await resident.locator("#billMonth").dispatchEvent("change");
+        const cycleDay=resident.locator(`[data-billing-date="${cycleMonth}-01"]`);
+        await expect(cycleDay).toHaveAttribute("aria-pressed","true");
+        await clickDuringSync(cycleDay,false,false);
+        await expect.poll(async()=>(await roomPayloadFromServer()).billingMonths[cycleMonth].people["person:b"].days[`${cycleMonth}-01`]).toBe(false);
+        await expect(cycleDay).toHaveAttribute("aria-pressed","false");
+        await resident.locator("#billMonth").fill(billMonth);
+        await resident.locator("#billMonth").dispatchEvent("change");
+        await resident.locator("#billMonth").fill(cycleMonth);
+        await resident.locator("#billMonth").dispatchEvent("change");
+        await expect(cycleDay).toHaveAttribute("aria-pressed","false");
+      }
     }
 
     await manager.goto(base+"/#billing");
@@ -209,6 +275,9 @@ async function exercise(engine,name,width){
     await manager.locator("#billMonth").dispatchEvent("change");
     await expect(manager.locator("#billMonth")).toHaveValue(billMonth);
     await expect(manager.locator("#billingTable")).toContainText("6.000");
+    const personA=manager.locator('#billPeopleList [data-person="a"]');
+    if(hasTouch)await personA.tap();else await personA.click();
+    await expect(manager.locator("#calendarPersonTitle")).toHaveText("Lịch ở của An");
     const secondDay=manager.locator(`[data-billing-date="${billMonth}-02"]`);
     await activate(manager.locator("#billRangePanel summary"));
     await manager.locator("#stayFrom").fill(`${billMonth}-02`);

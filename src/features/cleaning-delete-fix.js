@@ -67,7 +67,7 @@
 
       if(result?.reason==="changed")throw new Error("Lịch tuần này đã thay đổi trên thiết bị khác. Hãy tải lại rồi thử xóa lại.");
 
-      await realtimeEngine?.deleteTaskSubmissionsForWeek(weekStart).catch(error=>{
+      await realtimeEngine?.deleteTaskSubmissionsForWeek(weekStart,scheduleId).catch(error=>{
         console.warn("P708 cleanup week submissions",error);
       });
 
