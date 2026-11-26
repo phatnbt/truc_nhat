@@ -26,7 +26,9 @@ try{
   await debug.goto("http://127.0.0.1:5178/index.html?debug=1&code=private-placeholder&email=private-placeholder");
   await debug.locator("#googleLoginButton").waitFor({state:"visible"});
   await debug.locator("#pwaDebugPanel summary").click();
-  const report=JSON.parse(await debug.locator("#pwaDebugOutput").textContent());
+  const output=debug.locator("#pwaDebugOutput");
+  await expect(output).not.toBeEmpty();
+  const report=JSON.parse(await output.textContent());
   assert.equal(report.display,"standalone");
   assert.equal(report.localStorage,false);
   assert.equal(report.release,report.loader);

@@ -194,7 +194,8 @@ async function saveManual(){
     const value=$(`[data-manual-task="${task.id}"]`)?.value,old=oldByTask[task.id];
     if(value==="__CUT__")return {taskId:task.id,task:task.name,personId:null,personName:"Tạm cắt",completed:false,cut:true};
     const m=state.members.find(x=>x.id===value),unchanged=!!m&&old&&!old.cut&&old.personId===m.id;
-    return {taskId:task.id,task:task.name,personId:m?.id||null,personName:m?.name||"Không rõ",completed:unchanged?!!old.completed:false,cut:!m};
+    return {taskId:task.id,task:task.name,personId:m?.id||null,personName:m?.name||"Không rõ",completed:unchanged?!!old.completed:false,cut:!m,
+      ...(unchanged&&old.needsRedo?{needsRedo:true}:{})};
   });
   s.updatedAt=nowIso();
   closeModal("manualModal");
@@ -309,6 +310,21 @@ async function adminCompleteTask(index){
     await realtimeEngine.completeTask({weekStart:s.weekStart,scheduleId:s.id,taskId:a.taskId,memberId:a.personId});
     toast("Đã đánh dấu hoàn thành");
   }catch(error){toast(error?.message||"Không thể đánh dấu. Hãy thử lại.",5000);}
+}
+async function reopenCompletedTask(index,button){
+  if(!requireAdmin())return;
+  const schedule=currentSchedule(),task=schedule?.assignments[index];
+  if(!task?.completed||task.cut||!task.personId)return;
+  if(!confirm(`Yêu cầu ${task.personName} làm lại “${task.task}”? Xác nhận hiện tại sẽ được gỡ.`))return;
+  const key=`${schedule.id}:${task.taskId}:${task.personId}`;
+  if(pendingTaskReviews.has(key))return;
+  pendingTaskReviews.add(key);button.disabled=true;
+  try{
+    await realtimeEngine.reopenTask({weekStart:schedule.weekStart,scheduleId:schedule.id,taskId:task.taskId,
+      memberId:task.personId,expectedScheduleUpdatedAt:button.dataset.scheduleVersion});
+    toast("Đã yêu cầu làm lại công việc.");
+  }catch(error){toast(error?.message||"Không thể yêu cầu làm lại.");}
+  finally{pendingTaskReviews.delete(key);button.disabled=false;}
 }
 function scheduleText(){
   const s=currentSchedule();

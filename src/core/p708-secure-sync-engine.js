@@ -10,8 +10,8 @@ import {
   doc, collection, query, where, orderBy, limit, onSnapshot, runTransaction, serverTimestamp, FieldPath,
   setDoc, deleteDoc, getDoc, getDocFromServer, getDocs, writeBatch, Timestamp, increment
 } from "https://www.gstatic.com/firebasejs/12.16.0/firebase-firestore.js";
-import { assertBillingPeriodUpdate, periodDateKeys, daysInMonthKey } from "./billing-cycle-period.js?v=20261127-13";
-import {authEnvironment,signInMethod,sessionStorageAvailable} from "./mobile-auth-policy.js?v=20261127-13";
+import { assertBillingPeriodUpdate, periodDateKeys, daysInMonthKey } from "./billing-cycle-period.js?v=20261127-14";
+import {authEnvironment,signInMethod,sessionStorageAvailable} from "./mobile-auth-policy.js?v=20261127-14";
 
 const clone=value=>value==null?value:JSON.parse(JSON.stringify(value));
 const isObject=value=>value!==null&&typeof value==="object"&&!Array.isArray(value);
@@ -410,18 +410,41 @@ export function createP708SecureEngine({firebaseConfig,roomCode,deviceId,onShape
     await setDoc(doc(requestCollection,user.uid),{uid:user.uid,email:user.email||"",displayName:name,photoURL:String(user.photoURL||"").slice(0,2048),status:"pending",requestedAt:serverTimestamp(),updatedAt:serverTimestamp()});
   };
   const cancelAccessRequest=async()=>{if(user)await deleteDoc(doc(requestCollection,user.uid));};
+  const dismissAccessRequest=async(uid,expectedRequestedAt)=>{
+    if(!isAdmin())throw new Error("Chỉ trưởng phòng được xóa yêu cầu.");
+    if(!navigator.onLine)throw new Error("Đang ngoại tuyến.");
+    const actor=user.uid,epoch=dataGeneration,ref=doc(requestCollection,uid);
+    await runTransaction(db,async tx=>{
+      const request=await tx.get(ref),data=request.data();
+      if(user?.uid!==actor||epoch!==dataGeneration||!isAdmin())throw new Error("Phiên hoặc quyền truy cập đã thay đổi.");
+      if(!data)return;
+      if(data.status!=="pending"||data.requestedAt?.seconds!==expectedRequestedAt?.seconds||
+        data.requestedAt?.nanoseconds!==expectedRequestedAt?.nanoseconds)
+        throw new Error("Yêu cầu đã thay đổi. Hãy kiểm tra lại.");
+      tx.delete(ref);
+      await writeAudit({action:"DISMISS_ACCESS_REQUEST",summary:`Xóa yêu cầu tham gia của ${data.displayName||"thành viên"}`},tx);
+    });
+  };
 
   const approveRequest=async({uid,memberId,role="member",displayName=""})=>{
     if(!isAdmin())throw new Error("Chỉ trưởng phòng được duyệt.");if(!uid)throw new Error("Thiếu UID tài khoản.");
-    const reqRef=doc(requestCollection,uid),accessRef=doc(accessCollection,uid),memberRef=doc(memberDataCollection,uid),req=await getDoc(reqRef);
-    if(!req.exists())throw new Error("Yêu cầu tham gia không còn tồn tại.");
-    const data=req.data()||{},normalizedRole=role==="admin"?"admin":"member",normalizedMemberId=memberId||null,batch=writeBatch(db),initialMemberData=normalizedMemberId?extractMemberData(optimisticShape,normalizedMemberId,{}):null;
-    batch.set(accessRef,{email:data.email||"",displayName:String(displayName||data.displayName||"Thành viên").trim().slice(0,80)||"Thành viên",role:normalizedRole,memberId:normalizedMemberId,active:true,approvedBy:user.uid,createdAt:serverTimestamp(),updatedAt:serverTimestamp()});
-    batch.delete(reqRef);
-    if(initialMemberData)batch.set(memberRef,{...initialMemberData,updatedBy:user.uid,updatedAt:serverTimestamp()});else batch.delete(memberRef);
-    await batch.commit();
+    const reqRef=doc(requestCollection,uid),accessRef=doc(accessCollection,uid),memberRef=doc(memberDataCollection,uid);
+    const normalizedRole=role==="admin"?"admin":"member",normalizedMemberId=memberId||null,actor=user.uid,epoch=dataGeneration;
+    const initialMemberData=await runTransaction(db,async tx=>{
+      const req=await tx.get(reqRef),room=await tx.get(roomRef);
+      if(user?.uid!==actor||epoch!==dataGeneration||!isAdmin())throw new Error("Phiên hoặc quyền truy cập đã thay đổi.");
+      const data=req.data(),payload=room.data()?.payload;
+      if(!data||data.status!=="pending")throw new Error("Yêu cầu tham gia không còn tồn tại.");
+      if(normalizedMemberId&&!payload?.members?.[normalizedMemberId])throw new Error("Thành viên đã rời danh sách phòng.");
+      const memberData=normalizedMemberId?extractMemberData(payload,normalizedMemberId,{}):null;
+      tx.set(accessRef,{email:data.email||"",displayName:String(displayName||data.displayName||"Thành viên").trim().slice(0,80)||"Thành viên",role:normalizedRole,memberId:normalizedMemberId,active:true,approvedBy:actor,createdAt:serverTimestamp(),updatedAt:serverTimestamp()});
+      tx.delete(reqRef);
+      if(memberData)tx.set(memberRef,{...memberData,updatedBy:actor,updatedAt:serverTimestamp()});else tx.delete(memberRef);
+      await writeAudit({action:"APPROVE_ACCESS",summary:`Duyệt quyền cho ${displayName||data.displayName||data.email||uid}`,targetMemberId:normalizedMemberId},tx);
+      return memberData;
+    });
+    if(user?.uid!==actor||epoch!==dataGeneration||!isAdmin())return;
     if(initialMemberData)memberDataByUid.set(uid,{uid,...clone(initialMemberData)});else memberDataByUid.delete(uid);rebuild();
-    await writeAudit({action:"APPROVE_ACCESS",summary:`Duyệt quyền cho ${displayName||data.displayName||data.email||uid}`,targetMemberId:normalizedMemberId});
   };
   const updateAccess=async({uid,memberId,role,displayName,active=true})=>{
     if(!isAdmin())throw new Error("Chỉ trưởng phòng được sửa quyền.");if(!uid)throw new Error("Thiếu UID tài khoản.");
@@ -663,7 +686,7 @@ export function createP708SecureEngine({firebaseConfig,roomCode,deviceId,onShape
       if(!schedule||schedule.id!==task.scheduleId||payload._sync?.deletedSchedules?.[task.weekStart])throw new Error("Lịch trực tương ứng không còn tồn tại.");
       const assignment=(schedule.assignments||[]).find(a=>a?.taskId===task.taskId&&a?.personId===task.memberId&&!a?.cut);
       if(!assignment||assignment.completed)throw new Error("Phân công hoặc trạng thái đã thay đổi; hãy kiểm tra lại lịch.");
-      if(status==="approved"){assignment.completed=true;schedule.updatedAt=new Date().toISOString();}
+      if(status==="approved"){assignment.completed=true;delete assignment.needsRedo;schedule.updatedAt=new Date().toISOString();}
       tx.set(ref,{...task,status,reviewNote:String(note||"").slice(0,300),reviewedBy:user.uid,reviewedAt:serverTimestamp(),updatedAt:serverTimestamp()});
       if(status==="approved")tx.update(roomRef,new FieldPath("payload","schedules",task.weekStart),schedule,
         "revision",increment(1),"lastAdminUid",actor,"lastDeviceId",deviceId,"updatedAt",serverTimestamp());
@@ -686,7 +709,7 @@ export function createP708SecureEngine({firebaseConfig,roomCode,deviceId,onShape
       if(user?.uid!==actor||epoch!==dataGeneration||!isAdmin())throw new Error("Phiên hoặc quyền truy cập đã thay đổi.");
       if(report.data()?.scheduleId===scheduleId&&report.data()?.status==="submitted")
         throw new Error("Thành viên đang chờ xác nhận. Hãy dùng Xác nhận hoặc Làm lại.");
-      assignment.completed=true;schedule.updatedAt=new Date().toISOString();
+      assignment.completed=true;delete assignment.needsRedo;schedule.updatedAt=new Date().toISOString();
       tx.update(roomRef,new FieldPath("payload","schedules",weekStart),schedule,
         "revision",increment(1),"lastAdminUid",actor,"lastDeviceId",deviceId,"updatedAt",serverTimestamp());
       await writeAudit({action:"UPDATE_TASK",summary:`${assignment.task||taskId}: Đã xong`,targetMemberId:memberId},tx);
@@ -694,6 +717,35 @@ export function createP708SecureEngine({firebaseConfig,roomCode,deviceId,onShape
     });
     if(result&&user?.uid===actor&&epoch===dataGeneration&&isAdmin())acceptRoomShape(result.payload,result.revision);
     return true;
+  };
+  const reopenTask=async({weekStart,scheduleId,taskId,memberId,expectedScheduleUpdatedAt})=>{
+    if(!isAdmin()||!navigator.onLine)throw new Error("Chỉ trưởng phòng đang kết nối mới được yêu cầu làm lại.");
+    const actor=user.uid,epoch=dataGeneration,ref=doc(taskCollection,taskDocId(weekStart,taskId,memberId));
+    const result=await runTransaction(db,async tx=>{
+      const room=await tx.get(roomRef),report=await tx.get(ref);
+      if(user?.uid!==actor||epoch!==dataGeneration||!isAdmin())throw new Error("Phiên hoặc quyền truy cập đã thay đổi.");
+      const payload=clone(room.data()?.payload),schedule=payload?.schedules?.[weekStart];
+      const assignment=schedule?.assignments?.find(item=>item.taskId===taskId&&item.personId===memberId&&!item.cut);
+      if(schedule?.id!==scheduleId||!assignment||payload?._sync?.deletedSchedules?.[weekStart])
+        throw new Error("Phân công vừa thay đổi. Hãy kiểm tra lại.");
+      if(!assignment.completed&&assignment.needsRedo)return null;
+      const latest=schedule.updatedAt||schedule.createdAt;
+      if(!assignment.completed||latest&&latest!==expectedScheduleUpdatedAt)
+        throw new Error("Lịch trực vừa thay đổi. Hãy thử lại trên trạng thái mới.");
+      const task=report.data();
+      if(task?.scheduleId===scheduleId&&task.status==="approved"){
+        tx.update(ref,{status:"rejected",reviewNote:"Hoàn tác xác nhận và yêu cầu làm lại",reviewedBy:actor,
+          reviewedAt:serverTimestamp(),updatedAt:serverTimestamp()});
+      }
+      assignment.completed=false;
+      assignment.needsRedo=true;
+      schedule.updatedAt=new Date().toISOString();
+      tx.update(roomRef,new FieldPath("payload","schedules",weekStart),schedule,
+        "revision",increment(1),"lastAdminUid",actor,"lastDeviceId",deviceId,"updatedAt",serverTimestamp());
+      await writeAudit({action:"REJECT_TASK",summary:`Hoàn tác xác nhận và yêu cầu làm lại: ${assignment.task||taskId}`,targetMemberId:memberId},tx);
+      return {payload,revision:(Number(room.data()?.revision)||0)+1};
+    });
+    if(result&&user?.uid===actor&&epoch===dataGeneration&&isAdmin())acceptRoomShape(result.payload,result.revision);
   };
   const requestTaskSwap=async({weekStart,scheduleId,taskId,otherTaskId,otherMemberId})=>{
     const memberId=access?.memberId;
@@ -828,8 +880,8 @@ export function createP708SecureEngine({firebaseConfig,roomCode,deviceId,onShape
     document.removeEventListener("visibilitychange",visibilityHandler);
     started=false;
   };
-  const writes={requestAccess,cancelAccessRequest,approveRequest,updateAccess,revokeAccess,recordShape,
-    saveBillingDays,submitTask,reviewTask,completeTask,requestTaskSwap,reviewTaskSwap,reconcileTaskSubmissions,
+  const writes={requestAccess,cancelAccessRequest,dismissAccessRequest,approveRequest,updateAccess,revokeAccess,recordShape,
+    saveBillingDays,submitTask,reviewTask,completeTask,reopenTask,requestTaskSwap,reviewTaskSwap,reconcileTaskSubmissions,
     deleteTaskSubmissionsForWeek,deleteAccountFromRoom,cleanupAuditLogs};
   for(const key of Object.keys(writes))writes[key]=trackWrite(writes[key]);
   return {start,stop,signInGoogle,signOut,retryAccess,environment,forceSync,flush,...writes,

@@ -40,7 +40,10 @@ function renderCleaning(){
       if(filter==="pending"&&(a.cut||a.completed))return "";
       const sub=submissionFor(s,a),mine=a.personId===myMemberId();let action="—";
       if(!a.cut){
-        if(a.completed)action='<span class="badge success">✅ Đã xác nhận</span>';
+        if(a.completed){
+          const confirmed='<span class="badge success">✅ Đã xác nhận</span>';
+          action=isAdmin()&&a.personId?`<div class="task-actions">${confirmed}<button class="btn small danger" data-reopen-task="${index}" data-schedule-version="${esc(s.updatedAt||"")}" type="button">Yêu cầu làm lại</button></div>`:confirmed;
+        }
         else if(sub?.status==="approved")action=isAdmin()?`<button class="btn small soft" data-admin-task="${index}" type="button">Đồng bộ trạng thái</button>`:'<span class="badge success">✅ Đã duyệt · chờ đồng bộ</span>';
         else if(isAdmin()&&sub?.status==="submitted"){
           const review=`data-review-id="${esc(sub.id)}" data-review-version="${esc(`${sub.submittedAt?.seconds}:${sub.submittedAt?.nanoseconds}`)}"`;
@@ -52,7 +55,7 @@ function renderCleaning(){
         else action='<span class="badge">Chỉ xem</span>';
       }
       const overdue=dateValue(addDays(parseDate(s.weekStart),6))<P708BillingCycle.roomDateKey();
-      const status=a.cut?"Được miễn":a.completed?"Đã xong":sub?.status==="approved"?"Đã duyệt · chưa khớp lịch":sub?.status==="submitted"?"Chờ xác nhận":sub?.status==="rejected"?"Cần làm lại":overdue?"Quá hạn":sub?.status==="in_progress"?"Đang thực hiện":"Chưa thực hiện";
+      const status=a.cut?"Được miễn":a.completed?"Đã xong":sub?.status==="approved"?"Đã duyệt · chưa khớp lịch":sub?.status==="submitted"?"Chờ xác nhận":sub?.status==="rejected"||a.needsRedo?"Cần làm lại":overdue?"Quá hạn":sub?.status==="in_progress"?"Đang thực hiện":"Chưa thực hiện";
       const suggestion=replacements[a.taskId];
       const task=TASKS.find(t=>t.id===a.taskId);
       const weight=P708CleaningFairness.effectiveTaskWeight(a.taskId,state.settings.weights,task?.w);

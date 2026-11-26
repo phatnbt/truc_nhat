@@ -211,6 +211,21 @@ async function exercise(engine,name,width){
     await expect(resident.locator("#authGate")).toBeHidden();
     await expect(resident.locator("#cleanScheduleBox tr").filter({hasText:"Lavabo"})).toContainText("Đã xong");
     await expect(resident.locator('#homePetGarden [data-garden-member="b"]')).toContainText("10 EXP");
+    await expect(taskRow.getByRole("button",{name:"Yêu cầu làm lại"})).toHaveCount(0);
+    manager.once("dialog",dialog=>dialog.accept());
+    await clickDuringSync(managerTask.getByRole("button",{name:"Yêu cầu làm lại"}),hasTouch);
+    await expect(taskRow).toContainText("Cần làm lại");
+    await expect(resident.locator('#homePetGarden [data-garden-member="b"]')).toContainText("0 EXP");
+    assert.equal((await dataFromServer("taskSubmissions",`${monday}__lavabo__b`)).status,"rejected");
+    assert.equal((await roomPayloadFromServer()).schedules[monday].assignments.find(task=>task.taskId==="lavabo").completed,false);
+    await clickDuringSync(taskRow.getByRole("button",{name:"Tôi đã làm"}),hasTouch);
+    await resident.locator('#taskChecklistForm [value="task"]').check();
+    await resident.locator('#taskChecklistForm [value="finish"]').check();
+    await activate(resident.getByRole("button",{name:"Gửi xác nhận"}));
+    await expect(taskRow).toContainText("Chờ xác nhận");
+    await clickDuringSync(approval,hasTouch);
+    await expect(taskRow).toContainText("Đã xong");
+    await expect(resident.locator('#homePetGarden [data-garden-member="b"]')).toContainText("10 EXP");
     await activate(resident.locator("[data-swap-task]").first());
     await expect(resident.locator("#swapTaskModal")).toBeVisible();
     await activate(resident.locator("#sendSwapButton"));
@@ -222,6 +237,38 @@ async function exercise(engine,name,width){
     const manualRow=manager.locator('#cleanScheduleBox tr[data-task-key^="san:"]');
     await clickDuringSync(manualRow.getByRole("button",{name:"Đánh dấu xong"}),hasTouch);
     await expect(manualRow).toContainText("Đã xong");
+    manager.once("dialog",dialog=>dialog.accept());
+    await clickDuringSync(manualRow.getByRole("button",{name:"Yêu cầu làm lại"}),hasTouch);
+    await expect(manualRow).toContainText("Cần làm lại");
+    await clickDuringSync(manualRow.getByRole("button",{name:"Đánh dấu xong"}),hasTouch);
+    await expect(manualRow).toContainText("Đã xong");
+
+    if(name==="chromium"){
+      const applicant=await testAccount("pending-removal",name);
+      await env.withSecurityRulesDisabled(async context=>{
+        await setDoc(doc(context.firestore(),room,"accessRequests",applicant.uid),{
+          ...applicant,displayName:"Ứng viên QA",status:"pending",requestedAt:Timestamp.now(),updatedAt:Timestamp.now()
+        });
+      });
+      await manager.locator("#cleanMemberName").fill("Thành viên QA");
+      await manager.locator("#addMemberButton").click();
+      await expect(manager.locator("#kpiMembers")).toHaveText("3");
+      await manager.locator("#accountButton").click();
+      const requestRow=manager.locator(".access-row").filter({hasText:"Ứng viên QA"});
+      await expect(requestRow).toBeVisible();
+      manager.once("dialog",dialog=>dialog.accept());
+      await requestRow.getByRole("button",{name:"Xóa yêu cầu"}).click();
+      await expect(requestRow).toHaveCount(0);
+      assert.equal(await dataFromServer("accessRequests",applicant.uid),undefined);
+      await assert.rejects(manager.evaluate(uid=>realtimeEngine.approveRequest({uid,memberId:"b"}),applicant.uid),/không còn tồn tại/i);
+      assert.equal(await dataFromServer("access",applicant.uid),undefined);
+      manager.once("dialog",dialog=>dialog.accept());
+      await manager.locator("#accessModalBody .room-presence").filter({hasText:"Thành viên QA"}).getByRole("button",{name:"Xóa thành viên"}).click();
+      await expect(manager.locator("#kpiMembers")).toHaveText("2");
+      await expect(manager.getByRole("heading",{name:"Danh sách thành viên (2)"})).toBeVisible();
+      await manager.locator('#accessModal .modal-actions [data-close="accessModal"]').click();
+      console.log("Manager undo, resubmission, pending request dismissal and roster removal passed.");
+    }
 
     if(name!=="webkit"){
       // Cover presence-first and billing-first independently on fresh member documents.

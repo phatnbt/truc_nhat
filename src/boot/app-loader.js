@@ -1,7 +1,7 @@
 const FIREBASE_RUNTIME_ENDPOINT="/__/firebase/init.json";
 const FIREBASE_RUNTIME_FALLBACK="https://p708-room-manager.web.app/firebase-config.runtime.json";
 const IS_LOCAL=["localhost","127.0.0.1","[::1]"].includes(location.hostname);
-const LOADER_RELEASE="20261127-13";
+const LOADER_RELEASE="20261127-14";
 const boot=globalThis.P708Boot;
 
 const coreParts=[
@@ -72,15 +72,15 @@ async function loadFirebaseRuntimeConfig(){
 
 async function loadDependencies(){
   const [engine,auth,repair,mapping,billing,fairness,streak,expense,schedules]=await Promise.all([
-    import("../core/p708-secure-sync-engine.js?v=20261127-13"),
-    import("../core/mobile-auth-policy.js?v=20261127-13"),
-    import("../core/p708-authoritative-repair.js?v=20261127-13"),
-    import("../core/p708-canonical-mapping-repair.js?v=20261127-13"),
-    import("../core/billing-cycle-period.js?v=20261127-13"),
-    import("../core/cleaning-fairness.js?v=20261127-13"),
-    import("../core/cleaning-streak.js?v=20261127-13"),
-    import("../core/expense-split.js?v=20261127-13"),
-    import("../core/cleaning-schedule-store.js?v=20261127-13")
+    import("../core/p708-secure-sync-engine.js?v=20261127-14"),
+    import("../core/mobile-auth-policy.js?v=20261127-14"),
+    import("../core/p708-authoritative-repair.js?v=20261127-14"),
+    import("../core/p708-canonical-mapping-repair.js?v=20261127-14"),
+    import("../core/billing-cycle-period.js?v=20261127-14"),
+    import("../core/cleaning-fairness.js?v=20261127-14"),
+    import("../core/cleaning-streak.js?v=20261127-14"),
+    import("../core/expense-split.js?v=20261127-14"),
+    import("../core/cleaning-schedule-store.js?v=20261127-14")
   ]);
   let externalWrites=0;
   const trackExternal=operation=>async(...args)=>{
