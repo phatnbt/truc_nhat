@@ -109,7 +109,7 @@ export function createP708SecureEngine({firebaseConfig,roomCode,deviceId,initial
 
   let user=null,access=null,ownRequest=null,adminExists=false,
     remoteShape=clone(initialShape)||{},optimisticShape=clone(initialShape)||{},
-    memberDataByUid=new Map(),accessByUid=new Map(),started=false,repairingPrimaryAccess=false,memberDataReady=false;
+    memberDataByUid=new Map(),accessByUid=new Map(),started=false,memberDataReady=false;
   let authUnsub=null,configUnsub=null,accessUnsub=null,requestUnsub=null,
     roomUnsub=null,memberDataUnsub=null,adminAccessUnsub=null,adminRequestsUnsub=null,
     auditUnsub=null,taskUnsub=null;
@@ -200,19 +200,9 @@ export function createP708SecureEngine({firebaseConfig,roomCode,deviceId,initial
     emitSession();if(!access){stopDataListeners();return;}
     if(!roomUnsub||oldRole!==access.role)startRoomListeners();rebuild();
   };
-  const repairPrimaryAccess=async configData=>{
-    if(repairingPrimaryAccess||!user||configData?.adminUid!==user.uid)return;
-    repairingPrimaryAccess=true;
-    try{
-      const ref=doc(accessCollection,user.uid),snap=await getDoc(ref),current=snap.exists()?snap.data():{};
-      if(!snap.exists()||current.active!==true||current.role!=="admin"){
-        await setDoc(ref,{...current,email:user.email||current.email||"",displayName:current.displayName||user.displayName||"Trưởng phòng",role:"admin",memberId:current.memberId||null,active:true,createdAt:current.createdAt||serverTimestamp(),updatedAt:serverTimestamp(),updatedBy:user.uid},{merge:true});
-      }
-    }finally{repairingPrimaryAccess=false;}
-  };
   const attachUserListeners=()=>{
     configUnsub?.();accessUnsub?.();requestUnsub?.();
-    configUnsub=onSnapshot(configRef,s=>{const config=s.exists()?s.data():null;adminExists=!!config?.adminUid;if(config?.adminUid===user?.uid)void repairPrimaryAccess(config).catch(e=>emitSession({error:e}));emitSession();},e=>emitSession({error:e}));
+    configUnsub=onSnapshot(configRef,s=>{adminExists=!!s.data()?.adminUid;emitSession();},e=>emitSession({error:e}));
     accessUnsub=onSnapshot(doc(accessCollection,user.uid),s=>handleAccessChange(s.exists()?{uid:s.id,...s.data()}:null),e=>emitSession({error:e}));
     requestUnsub=onSnapshot(doc(requestCollection,user.uid),s=>{ownRequest=s.exists()?{uid:s.id,...s.data()}:null;emitSession();},e=>emitSession({error:e}));
   };
@@ -236,15 +226,6 @@ export function createP708SecureEngine({firebaseConfig,roomCode,deviceId,initial
   };
   const signOut=()=>firebaseSignOut(auth);
 
-  const claimAdmin=async displayName=>{
-    if(!user)throw new Error("Bạn cần đăng nhập trước.");
-    const accessRef=doc(accessCollection,user.uid),name=String(displayName||user.displayName||"Trưởng phòng").trim().slice(0,80)||"Trưởng phòng";
-    await runTransaction(db,async tx=>{
-      const snap=await tx.get(configRef);if(snap.exists()&&snap.data()?.adminUid)throw new Error("Phòng đã có trưởng phòng.");
-      tx.set(configRef,{roomCode,adminUid:user.uid,createdAt:serverTimestamp()});
-      tx.set(accessRef,{email:user.email||"",displayName:name,role:"admin",memberId:null,active:true,createdAt:serverTimestamp(),updatedAt:serverTimestamp()});
-    });
-  };
   const requestAccess=async displayName=>{
     if(!user)throw new Error("Bạn cần đăng nhập trước.");
     const name=String(displayName||user.displayName||"").trim();
@@ -417,5 +398,5 @@ export function createP708SecureEngine({firebaseConfig,roomCode,deviceId,initial
   };
   const flush=forceSync;
   const stop=()=>{authUnsub?.();clearUserListeners();window.removeEventListener("online",onlineHandler);window.removeEventListener("offline",offlineHandler);started=false;};
-  return {start,stop,signInGoogle,signOut,claimAdmin,requestAccess,cancelAccessRequest,approveRequest,updateAccess,revokeAccess,recordShape,submitTask,reviewTask,reconcileTaskSubmissions,deleteTaskSubmissionsForWeek,deleteAccountFromRoom,cleanupAuditLogs,forceSync,flush};
+  return {start,stop,signInGoogle,signOut,requestAccess,cancelAccessRequest,approveRequest,updateAccess,revokeAccess,recordShape,submitTask,reviewTask,reconcileTaskSubmissions,deleteTaskSubmissionsForWeek,deleteAccountFromRoom,cleanupAuditLogs,forceSync,flush};
 }

@@ -64,6 +64,11 @@ try{
   await assertSucceeds(getDoc(doc(member1,`rooms/${roomId}`)));
   await assertFails(getDoc(doc(outsider,`rooms/${roomId}`)));
   await assertFails(getDoc(doc(anon,`rooms/${roomId}`)));
+  await assertFails(setDoc(doc(outsider,"rooms/UNPROVISIONED/security/config"),{
+    roomCode:"UNPROVISIONED",adminUid:"outsider",createdAt:serverTimestamp()
+  }));
+  await assertFails(updateDoc(doc(member1,`rooms/${roomId}/access/member1`),{role:"admin"}));
+  await assertFails(getDoc(doc(member1,"rooms/UNPROVISIONED")));
 
   await assertFails(updateDoc(doc(member1,`rooms/${roomId}`),{revision:2}));
   await assertSucceeds(updateDoc(doc(delegated,`rooms/${roomId}`),{
@@ -127,6 +132,10 @@ try{
   await assertFails(getDoc(doc(member1,`rooms/${roomId}/taskSubmissions/${weekStart}__san__m2`)));
   await assertSucceeds(getDocs(query(collection(member1,`rooms/${roomId}/taskSubmissions`),where("actorUid","==","member1"))));
   await assertFails(getDocs(collection(member1,`rooms/${roomId}/taskSubmissions`)));
+  const adminTask=doc(admin,ownTaskRef.path);
+  const review=status=>({status,reviewedBy:"admin",reviewNote:"Reviewed",reviewedAt:serverTimestamp(),updatedAt:serverTimestamp()});
+  await assertSucceeds(updateDoc(adminTask,review("approved")));
+  await assertFails(updateDoc(adminTask,review("rejected")));
 
   await assertSucceeds(setDoc(doc(member1,`rooms/${roomId}/auditLogs/member-log`),{
     roomCode:roomId,actorUid:"member1",actorName:"Member One",actorEmail:"m1@example.com",role:"member",
@@ -143,6 +152,10 @@ try{
   await assertFails(deleteDoc(doc(delegated,`rooms/${roomId}/access/admin`)));
   await assertFails(updateDoc(doc(admin,`rooms/${roomId}/access/admin`),{role:"member",active:false}));
   await assertSucceeds(updateDoc(doc(admin,`rooms/${roomId}/access/admin`),{displayName:"Primary Admin Updated",role:"admin",active:true,email:"admin@example.com"}));
+  await env.withSecurityRulesDisabled(async context=>{
+    await updateDoc(doc(context.firestore(),`rooms/${roomId}/access/admin`),{active:false});
+  });
+  await assertFails(getDoc(doc(admin,`rooms/${roomId}`)));
 
   console.log("Firestore rules QA PASSED");
 } finally {

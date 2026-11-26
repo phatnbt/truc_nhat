@@ -9,17 +9,13 @@ service cloud.firestore {
     function taskSubmissionPath(roomId, submissionId) { return /databases/$(database)/documents/rooms/$(roomId)/taskSubmissions/$(submissionId); }
 
     function isPrimaryAdmin(roomId) {
-      return signedIn()
+      return hasActiveAccess(roomId)
         && exists(configPath(roomId))
         && get(configPath(roomId)).data.adminUid == request.auth.uid;
     }
     function isPrimaryUid(roomId, uid) {
       return exists(configPath(roomId))
         && get(configPath(roomId)).data.adminUid == uid;
-    }
-    function willBePrimaryAdmin(roomId) {
-      return signedIn()
-        && getAfter(configPath(roomId)).data.adminUid == request.auth.uid;
     }
     function hasActiveAccess(roomId) {
       return signedIn()
@@ -95,7 +91,8 @@ service cloud.firestore {
       return value is map
         && value.taskId == taskId
         && value.personId == memberId
-        && value.cut != true;
+        && value.cut != true
+        && value.get('completed', false) != true;
     }
     function assignmentAtMatches(roomId, weekStart, index, taskId, memberId) {
       let assignments = get(roomPath(roomId)).data.payload.schedules[weekStart].assignments;
@@ -168,23 +165,13 @@ service cloud.firestore {
       allow delete: if false;
 
       match /security/{configId} {
-        allow read: if signedIn();
-        allow create: if signedIn()
-          && configId == 'config'
-          && !exists(configPath(roomId))
-          && request.resource.data.adminUid == request.auth.uid
-          && request.resource.data.roomCode == roomId
-          && request.resource.data.createdAt == request.time
-          && request.resource.data.keys().hasOnly(['roomCode', 'adminUid', 'createdAt']);
-        allow update, delete: if false;
+        allow get: if signedIn() && configId == 'config';
+        allow write: if false;
       }
 
       match /access/{uid} {
         allow read: if signedIn() && (uid == request.auth.uid || isAdmin(roomId));
-        allow create: if (isAdmin(roomId) && !isPrimaryUid(roomId, uid))
-          || (signedIn() && uid == request.auth.uid && willBePrimaryAdmin(roomId)
-            && request.resource.data.role == 'admin' && request.resource.data.active == true
-            && request.resource.data.email == request.auth.token.email);
+        allow create: if isAdmin(roomId) && !isPrimaryUid(roomId, uid);
         allow update: if isAdmin(roomId) && (!isPrimaryUid(roomId, uid)
           || (uid == request.auth.uid && request.resource.data.role == 'admin'
             && request.resource.data.active == true && request.resource.data.email == request.auth.token.email));
@@ -223,7 +210,11 @@ service cloud.firestore {
             'weekStart', 'taskId', 'taskName', 'status', 'submittedAt', 'updatedAt'
           ]);
         allow update: if (isAdmin(roomId)
+          && resource.data.status == 'submitted'
+          && taskIsCurrentlyAssigned(roomId, resource.data.weekStart, resource.data.scheduleId, resource.data.taskId, resource.data.memberId)
           && request.resource.data.status in ['approved', 'rejected']
+          && request.resource.data.reviewNote is string
+          && request.resource.data.reviewNote.size() <= 300
           && request.resource.data.reviewedBy == request.auth.uid
           && request.resource.data.reviewedAt == request.time
           && request.resource.data.updatedAt == request.time

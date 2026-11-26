@@ -1,18 +1,6 @@
 name: Firebase Production Deploy
 
 on:
-  push:
-    branches: [main]
-    paths:
-      - "**/*.html"
-      - "**/*.css"
-      - "**/*.js"
-      - "**/*.webmanifest"
-      - "icons/**"
-      - "firebase.json"
-      - "firestore-secure.rules"
-      - ".github/security-scan.test.mjs"
-      - ".github/workflows/firebase-deploy.yml"
   workflow_dispatch:
 
 permissions:
@@ -24,6 +12,7 @@ concurrency:
 
 jobs:
   deploy:
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:

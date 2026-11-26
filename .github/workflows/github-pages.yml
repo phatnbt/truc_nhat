@@ -1,18 +1,6 @@
 name: GitHub Pages Deploy
 
 on:
-  push:
-    branches: [main]
-    paths:
-      - "index.html"
-      - "app.js"
-      - "sw.js"
-      - "offline.html"
-      - "manifest.webmanifest"
-      - "**/*.css"
-      - "src/**"
-      - "icons/**"
-      - ".github/workflows/github-pages.yml"
   workflow_dispatch:
 
 permissions:
@@ -26,6 +14,7 @@ concurrency:
 
 jobs:
   build:
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout

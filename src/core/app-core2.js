@@ -130,8 +130,8 @@ function renderAuthGate(){
     $("#cancelRequestButton")?.addEventListener("click",cancelAccessRequest);$("#gateSignOutButton")?.addEventListener("click",secureSignOut);return;
   }
   if(!authSession.adminExists){
-    box.innerHTML=`<h2>Thiết lập trưởng phòng đầu tiên</h2>${authUserCard()}<p>Chỉ người quản lý phòng nên nhận quyền này trước khi chia link.</p><div class="field"><label>Tên hiển thị</label><input id="claimAdminName" maxlength="80" value="${esc(authSession.user.displayName||"")}"></div><div class="auth-actions"><button class="btn primary" id="claimAdminButton" type="button">👑 Nhận quyền trưởng phòng</button><button class="btn" id="gateSignOutButton" type="button">Đăng xuất</button></div>`;
-    $("#claimAdminButton")?.addEventListener("click",claimFirstAdmin);$("#gateSignOutButton")?.addEventListener("click",secureSignOut);return;
+    box.innerHTML=`<h2>Phòng chưa được thiết lập</h2>${authUserCard()}<p>Vui lòng liên hệ người quản lý phòng.</p><div class="auth-actions"><button class="btn" id="gateSignOutButton" type="button">Đăng xuất</button></div>`;
+    $("#gateSignOutButton")?.addEventListener("click",secureSignOut);return;
   }
   box.innerHTML=`<h2>Gửi yêu cầu tham gia phòng</h2>${authUserCard()}<p>Nhập đúng tên đang có trong danh sách phòng để trưởng phòng liên kết tài khoản.</p><div class="field"><label>Tên trong phòng</label><input id="requestDisplayName" maxlength="80" value="${esc(authSession.user.displayName||"")}"></div><div class="auth-actions"><button class="btn primary" id="sendRequestButton" type="button">Gửi yêu cầu</button><button class="btn" id="gateSignOutButton" type="button">Đăng xuất</button></div>`;
   $("#sendRequestButton")?.addEventListener("click",sendAccessRequest);$("#gateSignOutButton")?.addEventListener("click",secureSignOut);
@@ -157,7 +157,6 @@ function renderAccessModal(){
 
 async function secureGoogleLogin(){try{await realtimeEngine?.signInGoogle();}catch(e){toast(e?.message||"Không thể đăng nhập Google");}}
 async function secureSignOut(){try{closeModal("accessModal");await realtimeEngine?.signOut();}catch(e){toast(e?.message||"Không thể đăng xuất");}}
-async function claimFirstAdmin(){try{await realtimeEngine?.claimAdmin($("#claimAdminName")?.value?.trim());toast("Đã thiết lập trưởng phòng");}catch(e){toast(e?.message||"Không thể nhận quyền");}}
 async function sendAccessRequest(){try{await realtimeEngine?.requestAccess($("#requestDisplayName")?.value?.trim());toast("Đã gửi yêu cầu");}catch(e){toast(e?.message||"Không thể gửi yêu cầu");}}
 async function cancelAccessRequest(){try{await realtimeEngine?.cancelAccessRequest();toast("Đã hủy yêu cầu");}catch(e){toast(e?.message||"Không thể hủy");}}
 async function approveAccess(targetUid){
