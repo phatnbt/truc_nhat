@@ -38,13 +38,9 @@ function scheduleReminderNotifications(force=false){
 async function startCloud(){
   let bootReady=false;
   const signalBootReady=()=>{if(bootReady)return;bootReady=true;window.dispatchEvent(new Event("p708:boot-ready"));};
-  let initialShape;
-  try{initialShape=toSyncShape(state);}catch(e){
-    state=normalizeState(state);initialShape=toSyncShape(state);
-    toast(e?.message||"Đã chuẩn hóa dữ liệu cục bộ",5000);
-  }
+  try{localStorage.removeItem(CACHE_KEY);}catch{}
   realtimeEngine=createP708SecureEngine({
-    firebaseConfig:FIREBASE_CONFIG,roomCode:ROOM_CODE,deviceId:DEVICE_ID,initialShape,
+    firebaseConfig:FIREBASE_CONFIG,roomCode:ROOM_CODE,deviceId:DEVICE_ID,
     onShape:(shape)=>{
       state=fromSyncShape(shape);confirmedState=clone(state);
       if(ui.selectedScheduleId&&!state.schedules.some(s=>s.id===ui.selectedScheduleId))ui.selectedScheduleId=null;
@@ -53,7 +49,17 @@ async function startCloud(){
       renderAll();
     },
     onStatus:status=>{syncStatus={mode:status.mode||"online",text:status.text||"Đã đồng bộ"};renderSync();},
-    onSession:session=>{authSession={...authSession,...session};renderAuthGate();signalBootReady();renderAll();},
+    onSession:session=>{
+      if(session.status!=="active"||session.user?.uid!==authSession.user?.uid||session.access?.role!==authSession.access?.role){
+        state=defaultState();
+        confirmedState=clone(state);
+        accessRequests=[];accessAccounts=[];auditLogs=[];taskSubmissions=[];
+        ui.selectedScheduleId=null;ui.activeBillPersonId=null;
+        $$(".modal.show").forEach(modal=>closeModal(modal.id));
+      }
+      authSession={...authSession,...session};
+      renderAuthGate();signalBootReady();renderAll();
+    },
     onAdminData:data=>{
       if(data.requests!==undefined)accessRequests=data.requests;
       if(data.accesses!==undefined)accessAccounts=data.accesses;

@@ -126,16 +126,10 @@ function normalizeState(input){
   });
   return s;
 }
-function loadState(){
-  try {
-    const raw=storageGet(CACHE_KEY)||storageGet("cleaning_shared_apps_script_v2")||storageGet("cleaning_shared_apps_script_v1");
-    return normalizeState(JSON.parse(raw||"null")||defaultState());
-  } catch { return normalizeState(defaultState()); }
-}
 function loadUi(){ try { const parsed=JSON.parse(storageGet(UI_KEY)||"null")||{};return {...defaultUi(),...parsed,selectedMonth:validMonthKey(parsed.selectedMonth)?parsed.selectedMonth:todayMonth()}; } catch { return defaultUi(); } }
-function saveLocal(){ storageSet(CACHE_KEY,JSON.stringify(state)); storageSet(UI_KEY,JSON.stringify(ui)); }
+function saveLocal(){ storageSet(UI_KEY,JSON.stringify({selectedMonth:ui.selectedMonth})); }
 
-let state=loadState();
+let state=defaultState();
 let confirmedState=clone(state);
 let ui=loadUi();
 let authSession={status:"loading",user:null,access:null,request:null,adminExists:false};
