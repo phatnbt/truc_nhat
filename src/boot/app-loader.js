@@ -89,8 +89,8 @@ const parts = [
   "../features/ui-icon-polish.js?v=20261029-1",
   "../features/today-calendar.js?v=20260913-1",
   "../features/room-resources.js",
-  "./app-start.js?v=20261029-2",
   "../features/notification-enhancements.js?v=20261029-1",
+  "./app-start.js?v=20261029-2",
   "../features/mobile-install-bridge.js?v=20260913-1",
   "../features/mobile-install-guide.js?v=20260913-1"
 ];

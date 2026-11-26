@@ -1,40 +1,3 @@
-async function requestNotifications(){
-  if(!("Notification" in window))return toast("Trình duyệt này không hỗ trợ thông báo");
-  const permission=await Notification.requestPermission();
-  toast(permission==="granted"?"Đã bật nhắc việc khi mở ứng dụng":"Bạn chưa cho phép thông báo");
-  if(permission==="granted")scheduleReminderNotifications(true);
-}
-function notificationKey(title){return `P708_NOTIFY_${new Date().toISOString().slice(0,10)}_${title}`;}
-async function showNotification(title,body){
-  const key=notificationKey(title);if(storageGet(key))return;
-  storageSet(key,"1");
-  try{
-    const reg=await navigator.serviceWorker?.ready;
-    if(reg?.showNotification)await reg.showNotification(title,{body,icon:"./icons/icon-192.png",badge:"./icons/icon-32.png",tag:key});
-    else new Notification(title,{body});
-  }catch{}
-}
-function scheduleReminderNotifications(force=false){
-  if(!("Notification" in window))return;
-  if(!force&&Notification.permission!=="granted")return;
-  if(authSession.status!=="active")return;
-  const s=currentSchedule(),myId=myMemberId();
-  if(myId&&s){
-    s.assignments.filter(a=>a.personId===myId&&!a.cut&&!a.completed).forEach(a=>{
-      const sub=submissionFor(s,a);
-      if(sub?.status!=="submitted")void showNotification(`P708 · ${a.task}`,"Bạn có công việc trực chưa báo hoàn thành.");
-    });
-  }
-  const c=billCalc(),mine=c.people.find(p=>p.memberId===myId);
-  if(mine&&c.b.closed&&!isBillPaid(mine,c.due[mine.id]||0)&&(c.due[mine.id]||0)>0)void showNotification("P708 · Tiền điện nước",`Bạn chưa được ghi nhận thanh toán ${money(c.due[mine.id])}.`);
-  if(isAdmin()&&accessRequests.length)void showNotification("P708 · Yêu cầu tham gia",`Có ${accessRequests.length} tài khoản đang chờ duyệt.`);
-  if(isAdmin()){
-    const items=typeof relevantTaskSubmissions==="function"?relevantTaskSubmissions():taskSubmissions;
-    const count=items.filter(x=>x.status==="submitted").length;
-    if(count)void showNotification("P708 · Công việc chờ xác nhận",`Có ${count} công việc thành viên đã báo hoàn thành.`);
-  }
-}
-
 async function startCloud(){
   let bootReady=false;
   const signalBootReady=()=>{if(bootReady)return;bootReady=true;window.dispatchEvent(new Event("p708:boot-ready"));};
@@ -91,8 +54,7 @@ function bindStaticEvents(){
   $$(".modal").forEach(modal=>modal.addEventListener("click",e=>{if(e.target===modal)closeModal(modal.id);}));
   $("#accountButton")?.addEventListener("click",()=>{renderAccessModal();openModal("accessModal");});
   $("#signOutButton")?.addEventListener("click",secureSignOut);
-  $("#notificationButton")?.addEventListener("click",requestNotifications);
-  $("#refreshReminderButton")?.addEventListener("click",()=>{renderHome();scheduleReminderNotifications(true);toast("Đã làm mới nhắc việc");});
+  $("#refreshReminderButton")?.addEventListener("click",()=>{renderHome();renderNotificationCenter();toast("Đã làm mới nhắc việc");});
   $("#cleaningRulesButton")?.addEventListener("click",()=>{renderCleaningRules();openModal("cleaningRulesModal");});
   $("#sendCleaningReminderButton")?.addEventListener("click",sendCleaningReminder);
 
@@ -154,6 +116,7 @@ async function registerPwa(){
 
 bindStaticEvents();
 bindRoomResources();
+bindNotificationCenter();
 if($("#cleanWeek"))$("#cleanWeek").value=dateValue(nextMonday());
 state.billing.selectedMonth=validMonthKey(ui.selectedMonth)?ui.selectedMonth:state.billing.selectedMonth||todayMonth();
 renderAll();

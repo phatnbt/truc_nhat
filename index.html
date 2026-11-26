@@ -38,7 +38,7 @@
           </div>
           <div class="header-actions">
             <button class="icon-btn" id="themeButton" type="button" aria-label="Chế độ tối" aria-pressed="false" title="Chế độ tối">◐</button>
-            <button class="btn nav-notify" id="notificationButton" type="button" aria-label="Thông báo">🔔 <span>Bật nhắc việc</span></button>
+            <button class="btn nav-notify" id="notificationButton" type="button" aria-label="Thông báo">🔔 <b id="noticeCount"></b></button>
           </div>
           <span class="room-sync" id="homeSyncText" role="status">Đang kết nối…</span>
         </header>
@@ -234,6 +234,22 @@
       <div class="card-head"><h3 id="schedulePreviewTitle"></h3><button class="icon-btn" data-close="schedulePreviewModal" type="button" aria-label="Đóng">✕</button></div>
       <div class="modal-body" id="schedulePreviewFields"></div>
       <div class="modal-actions"><button class="btn" data-close="schedulePreviewModal" type="button">Hủy</button><button class="btn primary" id="confirmScheduleButton" type="button">Xác nhận và khóa</button></div>
+    </div>
+  </div>
+  <div class="modal" id="noticeModal" role="dialog" aria-modal="true" aria-labelledby="noticeTitle">
+    <div class="modal-card">
+      <div class="card-head"><h3 id="noticeTitle">Thông báo</h3><button class="icon-btn" type="button" data-close="noticeModal" aria-label="Đóng">✕</button></div>
+      <div class="modal-body">
+        <div id="noticeList" class="notice-list"></div>
+        <details class="history-details">
+          <summary>Cài đặt thông báo</summary>
+          <div class="card-body notice-options">
+            <div id="noticeChannels" class="notice-options"></div>
+            <label><input type="checkbox" id="noticeLocal"> Hiện thông báo thiết bị khi đang mở ứng dụng</label>
+          </div>
+        </details>
+      </div>
+      <div class="modal-actions"><button class="btn" id="noticeMarkAll" type="button">Đánh dấu đã đọc tất cả</button></div>
     </div>
   </div>
   <div class="modal" id="cleaningRulesModal" role="dialog" aria-modal="true" aria-labelledby="cleaningRulesTitle"><div class="modal-card cleaning-rules-modal-card"><div class="card-head"><div><p class="eyebrow">TRỰC NHẬT CÔNG BẰNG</p><h3 id="cleaningRulesTitle">Luật tính điểm</h3><p>Điểm thể hiện khối lượng công việc để cân bằng lịch các tuần sau.</p></div><button class="icon-btn" data-close="cleaningRulesModal" type="button" aria-label="Đóng luật tính điểm">✕</button></div><div class="modal-body"><div class="cleaning-rule-list" id="cleaningRulesTaskList"></div><div class="cleaning-rule-note"><b>Điểm được tính thế nào?</b><ul><li>Mỗi việc đã phân công và không bị “Tạm cắt” được cộng theo bảng trên.</li><li>Điểm dùng để cân bằng khối lượng, không phải điểm thưởng hoặc phạt.</li><li>Hệ thống ưu tiên người có tổng khối lượng thấp hơn và hạn chế lặp lại cùng việc ở hai tuần liên tiếp.</li><li>Nếu vắng từ 2 tuần liên tiếp, hệ thống chỉ cộng khối lượng quy đổi khi xếp lịch; số này không hiển thị thành điểm thực tế.</li><li>Reset điểm sẽ đưa điểm đang tính về 0 nhưng vẫn giữ lịch sử phân công.</li></ul></div></div><div class="modal-actions"><button class="btn primary" data-close="cleaningRulesModal" type="button">Đã hiểu</button></div></div></div>

@@ -1,4 +1,5 @@
 const DAY_MS=86400000;
+const ROOM_UTC_OFFSET=7*3600000;
 
 const dateMs=value=>{
   const m=/^(\d{4})-(\d{2})-(\d{2})$/.exec(String(value||""));
@@ -28,7 +29,7 @@ export function scheduleOutcome(schedule,member,{now=Date.now()}={}){
   if(completed===assigned.length)return {status:"complete",assigned:assigned.length,completed};
 
   const start=dateMs(schedule.weekStart);
-  const deadline=Number.isFinite(start)?start+7*DAY_MS:Infinity;
+  const deadline=Number.isFinite(start)?start+7*DAY_MS-ROOM_UTC_OFFSET:Infinity;
   return {
     status:now>=deadline?"missed":"pending",
     assigned:assigned.length,
@@ -76,6 +77,32 @@ export function petStage(streak=0){
   if(n>=3)return {level:2,name:"Mèo Mây",emoji:"☁️",asset:"./icons/pets/cloud-cat.svg",next:6};
   if(n>=1)return {level:1,name:"Mầm Mây",emoji:"🌱",asset:"./icons/pets/cloud-sprout.svg",next:3};
   return {level:0,name:"Trứng Mây",emoji:"🥚",asset:"./icons/pets/cloud-egg.svg",next:1};
+}
+
+export function petExperience(schedules, memberId) {
+  const completed=new Set();
+  for(const {weekStart,assignments} of schedules){
+    if(!weekStart)continue;
+    for(const task of assignments||[]){
+      if(task.personId===memberId&&task.taskId&&task.completed===true&&!task.cut){
+        completed.add(JSON.stringify([weekStart,task.taskId,memberId]));
+      }
+    }
+  }
+  const xp=completed.size*10,level=1+Math.floor(xp/50);
+  return {xp,level,rewards:[{level:2,label:"Mầm xanh",value:"leaf"},{level:4,label:"Sao nhỏ",value:"star"}].filter(reward=>level>=reward.level)};
+}
+
+export function roomCleaningGoal(schedules, now=Date.now()) {
+  const ordered=[...schedules].sort((a,b)=>a.weekStart.localeCompare(b.weekStart));
+  let streak=0;
+  for(const schedule of ordered){
+    const tasks=(schedule.assignments||[]).filter(a=>a.personId&&!a.cut);
+    if(!tasks.length||dateMs(schedule.weekStart)-ROOM_UTC_OFFSET>now)continue;
+    if(tasks.every(task=>task.completed===true))streak++;
+    else if(now>=dateMs(schedule.weekStart)+7*DAY_MS-ROOM_UTC_OFFSET)streak=0;
+  }
+  return {streak,target:3};
 }
 
 export function petProgress(streak=0){

@@ -1,208 +1,116 @@
-(()=>{
-  const style=document.createElement("link");
-  style.rel="stylesheet";
-  style.href="./mobile-notification-ui.css?v=20260827-2";
-  style.dataset.mobileNotifyUi="1";
-  if(!document.querySelector('link[data-mobile-notify-ui="1"]'))document.head.appendChild(style);
+const NOTICE_TYPES={schedule:"Lịch trực",reminder:"Nhắc việc trực",review:"Duyệt công việc",billing:"Điện nước",stock:"Vật dụng"};
+const noticeInFlight=new Set();
 
-  const AUTO_NOTIFY_KEY="P708_AUTO_NOTIFY_V2";
-  const EVENING_HOUR=19;
-  const notificationInFlight=new Set();
-  let eveningTimer=null;
-
-  const supportsNotifications=()=>"Notification" in window;
-  const permissionState=()=>supportsNotifications()?Notification.permission:"unsupported";
-  const localDateKey=(date=new Date())=>dateValue(date);
-  const notificationUrl=title=>title.includes("điện nước")||title.includes("Kết toán")?"./#billing":title.includes("trực")||title.includes("lịch")?"./#cleaning":"./";
-
-  // Override the base notification helpers with local-date semantics. The old helper
-  // used UTC and marked a notification as delivered before the browser actually
-  // accepted it, which could suppress retries after an OS/browser failure.
-  notificationKey=function(title,scope=""){return `P708_NOTIFY_${localDateKey()}_${title}_${scope}`;};
-  showNotification=async function(title,body,scope=""){
-    if(permissionState()!=="granted")return false;
-    const key=notificationKey(title,scope);
-    if(storageGet(key)||notificationInFlight.has(key))return false;
-    notificationInFlight.add(key);
-    try{
-      const options={body,icon:"./icons/icon-192.png",badge:"./icons/icon-32.png",tag:key,data:{url:notificationUrl(title)}};
-      const reg=await navigator.serviceWorker?.ready;
-      if(reg?.showNotification)await reg.showNotification(title,options);
-      else new Notification(title,options);
-      storageSet(key,"1");
-      return true;
-    }catch(error){
-      console.warn("P708 notification",error);
-      return false;
-    }finally{notificationInFlight.delete(key);}
-  };
-
-  function updateNotificationButton(){
-    const btn=document.querySelector("#notificationButton");
-    if(!btn)return;
-    const permission=permissionState();
-    btn.classList.toggle("notify-enabled",permission==="granted");
-    btn.classList.toggle("notify-blocked",permission==="denied");
-    btn.disabled=permission==="unsupported";
-    if(permission==="granted"){
-      btn.innerHTML='🔔 <span>Nhắc tự động</span>';
-      btn.title="Đã bật: báo lịch trực tuần mới, nhắc T4/T5 lúc 19:00 và kết toán điện nước";
-    }else if(permission==="denied"){
-      btn.innerHTML='🔕 <span>Thông báo bị chặn</span>';
-      btn.title="Thông báo đang bị chặn trong cài đặt trình duyệt";
-    }else if(permission==="unsupported"){
-      btn.innerHTML='🔕 <span>Không hỗ trợ</span>';
-      btn.title="Thiết bị/trình duyệt này chưa hỗ trợ thông báo web";
-    }else{
-      btn.innerHTML='🔔 <span>Bật nhắc việc</span>';
-      btn.title="Bật một lần để nhận lịch trực tuần mới, nhắc tối T4/T5 và kết toán";
-    }
+function noticeStorageKey(){
+  return authSession.status==="active"&&authSession.user?.uid?`P708_NOTICE_V1_${authSession.user.uid}`:null;
+}
+function noticePreferences(key){
+  try{return JSON.parse(storageGet(key)||"null")||{read:[],disabled:[],local:false};}
+  catch{return {read:[],disabled:[],local:false};}
+}
+function roomNotices(){
+  if(authSession.status!=="active")return [];
+  const result=[],memberId=myMemberId(),today=P708BillingCycle.roomDateKey();
+  const current=roomScheduleToday();
+  const upcoming=state.schedules.filter(s=>s.weekStart>today).sort((a,b)=>a.weekStart.localeCompare(b.weekStart))[0];
+  for(const schedule of [current,upcoming].filter(Boolean)){
+    const mine=schedule.assignments.filter(a=>!a.cut&&a.personId===memberId);
+    if(mine.length)result.push({id:`schedule:${schedule.id}`,type:"schedule",title:"Lịch trực",body:mine.map(a=>a.task).join(" · "),page:"cleaning",scheduleId:schedule.id});
   }
-
-  function startOfWeek(date=new Date()){
-    const d=new Date(date);d.setHours(0,0,0,0);
-    const offset=(d.getDay()+6)%7;
-    d.setDate(d.getDate()-offset);
-    return d;
+  const reminder=state.settings?.cleaningReminder;
+  const pending=current?.assignments.filter(a=>!a.cut&&!a.completed&&a.personId===memberId&&submissionFor(current,a)?.status!=="submitted")||[];
+  if(pending.length){
+    const deadline=dateValue(addDays(parseDate(current.weekStart),6));
+    const daysLeft=(Date.parse(deadline)-Date.parse(today))/86400000;
+    if(daysLeft<=2)result.push({id:`deadline:${current.id}:${today}`,type:"reminder",title:"Sắp đến hạn trực",body:pending.map(a=>a.task).join(" · "),page:"cleaning",scheduleId:current.id});
+    if(reminder?.weekStart===current.weekStart&&reminder.memberIds?.includes(memberId))result.push({id:`reminder:${reminder.id}`,type:"reminder",title:"Trưởng phòng nhắc việc",body:pending.map(a=>a.task).join(" · "),page:"cleaning",scheduleId:current.id});
   }
-
-  function scheduleForDate(date=new Date()){
-    const target=new Date(date);target.setHours(0,0,0,0);
-    return (state?.schedules||[]).find(schedule=>{
-      if(!schedule?.weekStart)return false;
-      const start=parseDate(schedule.weekStart);if(Number.isNaN(start.getTime()))return false;
-      start.setHours(0,0,0,0);
-      const end=addDays(start,6);end.setHours(23,59,59,999);
-      return target>=start&&target<=end;
-    })||null;
-  }
-
-  function newestRelevantSchedule(){
-    const monday=startOfWeek();
-    return [...(state?.schedules||[])]
-      .filter(schedule=>schedule?.weekStart&&!Number.isNaN(parseDate(schedule.weekStart).getTime())&&parseDate(schedule.weekStart)>=monday)
-      .sort((a,b)=>String(b.weekStart).localeCompare(String(a.weekStart)))[0]||null;
-  }
-
-  function pendingAssignments(schedule,myId){
-    if(!schedule||!myId)return [];
-    return (schedule.assignments||[]).filter(assignment=>{
-      if(assignment.personId!==myId||assignment.cut||assignment.completed)return false;
-      const submission=submissionFor(schedule,assignment);
-      return submission?.status!=="submitted"&&submission?.status!=="approved";
+  const overdue=state.schedules.filter(s=>dateValue(addDays(parseDate(s.weekStart),6))<today&&s.assignments.some(a=>!a.cut&&!a.completed&&a.personId===memberId)).sort((a,b)=>b.weekStart.localeCompare(a.weekStart))[0];
+  if(overdue)result.push({id:`overdue:${overdue.id}`,type:"reminder",title:"Việc trực quá hạn",body:weekRange(overdue.weekStart),page:"cleaning",scheduleId:overdue.id});
+  for(const item of relevantTaskSubmissions().slice(0,30)){
+    const waiting=isAdmin()&&item.status==="submitted";
+    const own=item.memberId===memberId&&["approved","rejected"].includes(item.status);
+    if(waiting||own)result.push({
+      id:`task:${item.id}:${item.status}:${item.updatedAt?.seconds||0}`,type:"review",title:waiting?"Chờ xác nhận":item.status==="approved"?"Đã xác nhận":"Yêu cầu làm lại",
+      body:item.taskName,page:"cleaning",scheduleId:item.scheduleId
     });
   }
-
-  function allMyAssignments(schedule,myId){
-    if(!schedule||!myId)return [];
-    return (schedule.assignments||[]).filter(assignment=>assignment.personId===myId&&!assignment.cut);
+  const bill=[...state.billing.months].filter(b=>b.closed).sort((a,b)=>b.month.localeCompare(a.month))[0];
+  if(bill&&memberId){
+    const calc=billCalc(bill),person=calc.people.find(p=>p.memberId===memberId);
+    const remaining=person?Math.max(0,(calc.due[person.id]||0)-(Number(person.paidAmount)||0)):0;
+    if(person)result.push({id:`billing:${bill.month}:${remaining}`,type:"billing",title:remaining?"Điện nước cần thanh toán":"Kỳ điện nước đã chốt",body:`${monthLabel(bill.month)} · Còn ${money(remaining)}`,page:"billing",month:bill.month});
   }
-
-  function actorKey(myId){return authSession?.user?.uid||myId||"member";}
-
-  async function notifyNewSchedule(myId){
-    const schedule=newestRelevantSchedule();
-    if(!schedule)return;
-    const mine=allMyAssignments(schedule,myId);
-    if(!mine.length)return;
-    const seenKey=`P708_NEW_CLEAN_SCHEDULE_${actorKey(myId)}_${schedule.weekStart}`;
-    if(storageGet(seenKey)==="1")return;
-    const taskNames=mine.map(item=>item.task).filter(Boolean);
-    const summary=taskNames.length<=2?taskNames.join(" · "):`${taskNames.slice(0,2).join(" · ")} +${taskNames.length-2} việc`;
-    const sent=await showNotification("P708 · Có lịch trực tuần mới",`Tuần ${weekRange(schedule.weekStart)} · Việc của bạn: ${summary||"Mở ứng dụng để xem phân công"}.`);
-    if(sent||storageGet(notificationKey("P708 · Có lịch trực tuần mới")))storageSet(seenKey,"1");
+  const low=Object.values(state.resources?.inventory||{}).filter(item=>item.quantity<=item.threshold);
+  if(low.length)result.push({id:`stock:${low.map(item=>item.id+"-"+item.quantity).sort().join(",")}`,type:"stock",title:"Vật dụng sắp hết",body:low.map(item=>item.name).join(" · "),page:"resources"});
+  return result;
+}
+function renderNotificationCenter(){
+  const key=noticeStorageKey(),prefs=noticePreferences(key);
+  const notices=roomNotices().filter(item=>!prefs.disabled.includes(item.type));
+  const unread=notices.filter(item=>!prefs.read.includes(item.id));
+  $("#noticeCount").textContent=unread.length?String(unread.length):"";
+  $("#notificationButton").setAttribute("aria-label",unread.length?`Thông báo, ${unread.length} chưa đọc`:"Thông báo");
+  $("#noticeMarkAll").disabled=!unread.length;
+  $("#noticeChannels").querySelectorAll("[data-notice-type]").forEach(input=>input.checked=!prefs.disabled.includes(input.dataset.noticeType));
+  $("#noticeLocal").checked=prefs.local;
+  $("#noticeLocal").disabled=!("Notification" in window);
+  if($("#noticeModal").classList.contains("show")){
+    $("#noticeList").innerHTML=notices.length?notices.map((item,index)=>`<button class="history-btn" data-open-notice="${index}" type="button"><b>${prefs.read.includes(item.id)?"":"● "}${esc(item.title)}</b><small>${esc(item.body)}</small></button>`).join(""):'<p class="empty">Chưa có thông báo.</p>';
+    $("#noticeList").onclick=event=>{
+      const button=event.target.closest("[data-open-notice]");
+      if(!button||!key||key!==noticeStorageKey())return;
+      const item=notices[Number(button.dataset.openNotice)];
+      saveNoticePreferences(key,{...prefs,read:[...new Set([...prefs.read,item.id])].slice(-200)});
+      closeModal("noticeModal");
+      if(item.scheduleId)selectSchedule(item.scheduleId);
+      if(item.month)setBillMonth(item.month);
+      showPage(item.page);
+    };
   }
-
-  async function notifyWednesdayThursdayEvening(myId,now=new Date()){
-    const day=now.getDay();
-    if((day!==3&&day!==4)||now.getHours()<EVENING_HOUR)return;
-    const schedule=scheduleForDate(now);if(!schedule)return;
-    const pending=pendingAssignments(schedule,myId);if(!pending.length)return;
-    const dayLabel=day===3?"Thứ 4":"Thứ 5",tasks=pending.map(item=>item.task).filter(Boolean),summary=tasks.length<=2?tasks.join(" · "):`${tasks.slice(0,2).join(" · ")} +${tasks.length-2} việc`;
-    await showNotification(`P708 · Nhắc trực tối ${dayLabel}`,`Bạn còn ${pending.length} việc trực tuần này: ${summary}. Hãy hoàn thành và báo đã làm.`);
+  if(key&&prefs.local&&window.Notification?.permission==="granted"&&syncStatus.mode==="online"){
+    for(const item of unread.slice(0,3))void notifyLocally(key,item);
   }
-
-  async function notifyAdminCleaningReminder(myId){
-    const reminder=state?.settings?.cleaningReminder;
-    if(!reminder?.id||!reminder?.memberIds?.includes(myId))return;
-    const seenKey=`P708_CLEANING_REMINDER_${actorKey(myId)}_${reminder.id}`;
-    if(storageGet(seenKey)==="1")return;
-    const schedule=(state?.schedules||[]).find(item=>item.weekStart===reminder.weekStart);
-    const pending=pendingAssignments(schedule,myId);if(!pending.length)return;
-    const tasks=pending.map(item=>item.task).filter(Boolean);
-    const summary=tasks.length<=2?tasks.join(" · "):`${tasks.slice(0,2).join(" · ")} +${tasks.length-2} việc`;
-    const title="P708 · Trưởng phòng nhắc việc trực";
-    const sent=await showNotification(title,`Bạn còn ${pending.length} việc: ${summary}. Hãy hoàn thành và báo đã làm.`,reminder.id);
-    if(sent||storageGet(notificationKey(title,reminder.id)))storageSet(seenKey,"1");
-  }
-
-  function latestClosedBill(){
-    return [...(state?.billing?.months||[])]
-      .filter(item=>item?.closed&&item?.month)
-      .sort((a,b)=>String(b.month).localeCompare(String(a.month)))[0]||null;
-  }
-
-  async function notifyClosedBill(myId){
-    const bill=latestClosedBill();if(!myId||!bill)return;
-    const calc=billCalc(bill),mine=calc.people.find(person=>person.memberId===myId),due=mine?(calc.due[mine.id]||0):0;
-    if(mine&&due>0&&!isBillPaid(mine,due))await showNotification(`P708 · Kết toán ${monthLabel(bill.month)}`,`Điện nước đã chốt. Số tiền của bạn: ${money(due)}.`);
-  }
-
-  async function runAutomaticReminders(force=false){
-    if(permissionState()!=="granted"||authSession?.status!=="active")return;
-    if(!force&&storageGet(AUTO_NOTIFY_KEY)!=="1")return;
-    const myId=myMemberId?.();if(!myId)return;
-    await notifyAdminCleaningReminder(myId);
-    await notifyNewSchedule(myId);
-    await notifyWednesdayThursdayEvening(myId,new Date());
-    await notifyClosedBill(myId);
-  }
-
-  function nextEveningTarget(from=new Date()){
-    for(let offset=0;offset<=7;offset++){
-      const candidate=new Date(from);candidate.setDate(from.getDate()+offset);candidate.setHours(EVENING_HOUR,0,0,0);
-      if((candidate.getDay()===3||candidate.getDay()===4)&&candidate>from)return candidate;
-    }
-    return null;
-  }
-
-  function armEveningTimer(){
-    if(eveningTimer)clearTimeout(eveningTimer);
-    const target=nextEveningTarget(new Date());if(!target)return;
-    eveningTimer=setTimeout(async()=>{await runAutomaticReminders(false).catch(()=>{});armEveningTimer();},Math.max(1000,target.getTime()-Date.now()+1000));
-  }
-
-  async function enableAutomaticReminders(){
-    if(!supportsNotifications()){
-      toast("Thiết bị này chưa hỗ trợ thông báo web. Trên iPhone hãy dùng PWA đã thêm vào Màn hình chính.",5500);updateNotificationButton();return;
-    }
-    if(Notification.permission==="denied"){
-      toast("Thông báo đang bị chặn. Hãy bật lại quyền Thông báo trong cài đặt trình duyệt/ứng dụng.",5500);updateNotificationButton();return;
-    }
-    const permission=Notification.permission==="granted"?"granted":await Notification.requestPermission();
-    if(permission==="granted"){
-      storageSet(AUTO_NOTIFY_KEY,"1");updateNotificationButton();toast("Đã bật: lịch tuần mới · T4/T5 19:00 · kết toán");armEveningTimer();await runAutomaticReminders(true);
-    }else{updateNotificationButton();toast("Bạn chưa cho phép thông báo");}
-  }
-
-  const oldButton=document.querySelector("#notificationButton");
-  if(oldButton){
-    const newButton=oldButton.cloneNode(true);oldButton.replaceWith(newButton);newButton.addEventListener("click",enableAutomaticReminders);
-  }
-
-  if(permissionState()==="granted")storageSet(AUTO_NOTIFY_KEY,"1");
-  updateNotificationButton();armEveningTimer();
-
-  const previousRenderAll=renderAll;
-  renderAll=function(...args){
-    const result=previousRenderAll(...args);updateNotificationButton();
-    if(permissionState()==="granted")setTimeout(()=>runAutomaticReminders(false).catch(()=>{}),0);
-    return result;
-  };
-
-  document.addEventListener("visibilitychange",()=>{if(!document.hidden){runAutomaticReminders(false).catch(()=>{});armEveningTimer();}});
-  window.addEventListener("online",()=>runAutomaticReminders(false).catch(()=>{}));
-  const periodicTimer=setInterval(()=>runAutomaticReminders(false).catch(()=>{}),15*60*1000);
-  window.addEventListener("pagehide",()=>{if(eveningTimer)clearTimeout(eveningTimer);clearInterval(periodicTimer);},{once:true});
-  setTimeout(()=>runAutomaticReminders(false).catch(()=>{}),1200);
-})();
+}
+function saveNoticePreferences(key,prefs){
+  if(key&&key===noticeStorageKey())storageSet(key,JSON.stringify(prefs));
+  renderNotificationCenter();
+}
+async function notifyLocally(key,item){
+  const tag=`${key}_shown_${item.id}`;
+  if(storageGet(tag)||noticeInFlight.has(tag))return;
+  noticeInFlight.add(tag);
+  try{
+    const registration=await navigator.serviceWorker?.getRegistration();
+    if(key!==noticeStorageKey())return;
+    if(registration?.active)await registration.showNotification("P708 · "+item.title,{body:item.body,tag,icon:"./icons/icon-192.png",data:{url:`./#${item.page}`}});
+    else new Notification("P708 · "+item.title,{body:item.body,tag});
+    storageSet(tag,"1");
+  }catch{}finally{noticeInFlight.delete(tag);}
+}
+function bindNotificationCenter(){
+  $("#noticeChannels").innerHTML=Object.entries(NOTICE_TYPES).map(([key,label])=>`<label><input type="checkbox" data-notice-type="${key}" checked> ${label}</label>`).join("");
+  $("#notificationButton").addEventListener("click",()=>{openModal("noticeModal");renderNotificationCenter();});
+  $("#noticeMarkAll").addEventListener("click",()=>{
+    const key=noticeStorageKey(),prefs=noticePreferences(key);
+    const ids=roomNotices().filter(item=>!prefs.disabled.includes(item.type)).map(item=>item.id);
+    saveNoticePreferences(key,{...prefs,read:[...new Set([...prefs.read,...ids])].slice(-200)});
+  });
+  $("#noticeChannels").addEventListener("change",event=>{
+    const type=event.target.dataset.noticeType;
+    const key=noticeStorageKey(),prefs=noticePreferences(key);
+    if(!type||!key)return;
+    const disabled=new Set(prefs.disabled);
+    if(event.target.checked)disabled.delete(type);else disabled.add(type);
+    saveNoticePreferences(key,{...prefs,disabled:[...disabled]});
+  });
+  $("#noticeLocal").addEventListener("change",async event=>{
+    const key=noticeStorageKey();
+    let enabled=event.target.checked;
+    if(enabled)enabled=await Notification.requestPermission()==="granted";
+    if(key!==noticeStorageKey())return;
+    if(event.target.checked&&!enabled)toast("Trình duyệt chưa cấp quyền thông báo.");
+    saveNoticePreferences(key,{...noticePreferences(key),local:enabled});
+  });
+  document.addEventListener("visibilitychange",()=>{if(!document.hidden)renderNotificationCenter();});
+}

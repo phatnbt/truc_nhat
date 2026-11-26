@@ -1,4 +1,14 @@
 import assert from "node:assert/strict";
+import {petExperience,roomCleaningGoal} from "../src/core/cleaning-streak.js";
+
+const confirmedWeek={weekStart:"2026-09-07",assignments:[
+  {taskId:"lavabo",personId:"m1",completed:true},
+  {taskId:"san",personId:"m1",completed:false},
+  {taskId:"rac",personId:"m1",completed:true,cut:true}
+]};
+assert.deepEqual(petExperience([confirmedWeek,structuredClone(confirmedWeek)],"m1"),{xp:10,level:1,rewards:[]});
+assert.equal(petExperience([confirmedWeek],"m2").xp,0);
+assert.equal(roomCleaningGoal([confirmedWeek],Date.parse("2026-09-20T00:00:00Z")).streak,0);
 import { memberStreak, petStage, petProgress, scheduleOutcome } from "../src/core/cleaning-streak.js";
 
 const A={id:"A",name:"Phát"};

@@ -136,5 +136,5 @@ function renderSync(){
 }
 function renderAll(){
   state=normalizeState(state);ui.selectedMonth=state.billing.selectedMonth;
-  renderPermission();renderAccountButton();renderHome();renderCleaning();renderCleaningRules();renderBilling();renderRoomResources();renderAudit();renderAccessModal();renderSync();saveLocal();scheduleReminderNotifications();
+  renderPermission();renderAccountButton();renderHome();renderCleaning();renderCleaningRules();renderBilling();renderRoomResources();renderAudit();renderAccessModal();renderSync();saveLocal();renderNotificationCenter();
 }
