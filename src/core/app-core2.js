@@ -199,7 +199,10 @@ function renderAccessModal(){
   html+=`<p class="muted">Phiên bản P708 <span id="appVersionText">${esc(globalThis.P708_RELEASE||"chưa rõ")}</span></p>`;
   if(!globalThis.P708Debug)html+='<button class="btn small" id="openPwaDiagnostics" type="button">Mở chẩn đoán</button>';
   if(isAdmin()){
-    html+=`<section class="access-section"><h4>Yêu cầu đang chờ (${accessRequests.length})</h4><div class="access-grid">${accessRequests.length?accessRequests.map(r=>`<div class="access-row"><div><b>${esc(r.displayName||"Chưa đặt tên")}</b><small>${esc(r.email||"")}</small></div><select data-approve-member="${r.uid}">${memberOptions()}</select><select data-approve-role="${r.uid}"><option value="member">Thành viên</option><option value="admin">Quản trị viên</option></select><div class="access-actions"><button class="btn small primary" data-approve="${r.uid}" type="button">Duyệt</button></div></div>`).join(""):'<div class="empty">Không có yêu cầu mới.</div>'}</div></section>`;
+    html+=`<section class="access-section"><h4>Yêu cầu đang chờ (${accessRequests.length})</h4><div class="access-grid">${accessRequests.length?accessRequests.map(r=>`<div class="access-row"><div><b>${esc(r.displayName||"Chưa đặt tên")}</b><small>${esc(r.email||"")}</small></div><select data-approve-member="${esc(r.uid)}">${memberOptions()}</select><select data-approve-role="${esc(r.uid)}"><option value="member">Thành viên</option><option value="admin">Quản trị viên</option></select><div class="access-actions"><button class="btn small primary" data-approve="${esc(r.uid)}" type="button">Duyệt</button><button class="btn small danger" data-dismiss-request="${esc(r.uid)}" type="button">Xóa yêu cầu</button></div></div>`).join(""):'<div class="empty">Không có yêu cầu mới.</div>'}</div></section>`;
+    html+=`<section class="access-section"><h4>Danh sách thành viên (${state.members.length})</h4><div class="access-grid">${state.members.map(member=>
+      `<div class="room-presence"><b>${esc(member.name)}</b><button class="btn small danger" data-roster-remove="${esc(member.id)}" type="button">Xóa thành viên</button></div>`
+    ).join("")}</div></section>`;
     html+=`<section class="access-section"><h4>Tài khoản đã cấp quyền (${accessAccounts.length})</h4><div class="access-grid">${accessAccounts.length?accessAccounts.map(x=>`<div class="access-row"><div><b>${esc(x.displayName||"Thành viên")}${x.uid===u?.uid?" · Bạn":""}</b><small>${esc(x.email||x.uid)} · ${x.active===false?"Đã khóa":"Đang hoạt động"}</small></div><select data-access-member="${x.uid}">${memberOptions(x.memberId||"")}</select><select data-access-role="${x.uid}" ${x.uid===u?.uid?"disabled":""}><option value="member" ${x.role!=="admin"?"selected":""}>Thành viên</option><option value="admin" ${x.role==="admin"?"selected":""}>Quản trị viên</option></select><div class="access-actions"><button class="btn small soft" data-save-access="${x.uid}" type="button">Lưu</button>${x.uid!==u?.uid?`<button class="btn small" data-revoke="${x.uid}" type="button">Khóa</button><button class="btn small danger" data-delete-account="${x.uid}" type="button">Xóa khỏi phòng</button>`:""}</div></div>`).join(""):'<div class="empty">Chưa có tài khoản.</div>'}</div><div class="danger-zone" style="margin-top:12px"><b>Bản Free:</b> “Xóa khỏi phòng” sẽ xóa quyền, email và dữ liệu tài khoản trong Firestore, xóa báo công việc của tài khoản và gỡ email khỏi nhật ký. Tài khoản Firebase Authentication vẫn tồn tại; nếu muốn xóa luôn Auth, thực hiện thủ công trong Firebase Console → Authentication → Users.</div></section>`;
   }
   body.innerHTML=html;
@@ -211,6 +214,8 @@ function renderAccessModal(){
     location.assign(target.href);
   });
   $$('[data-approve]').forEach(btn=>btn.addEventListener("click",()=>approveAccess(btn.dataset.approve)));
+  $$('[data-dismiss-request]').forEach(btn=>btn.addEventListener("click",()=>dismissPendingRequest(btn)));
+  $$('[data-roster-remove]').forEach(btn=>btn.addEventListener("click",()=>removeMember(btn.dataset.rosterRemove)));
   $$('[data-save-access]').forEach(btn=>btn.addEventListener("click",()=>saveAccess(btn.dataset.saveAccess)));
   $$('[data-revoke]').forEach(btn=>btn.addEventListener("click",()=>revokeAccess(btn.dataset.revoke)));
   $$('[data-delete-account]').forEach(btn=>btn.addEventListener("click",()=>removeAccountFromRoom(btn.dataset.deleteAccount)));
@@ -220,6 +225,18 @@ async function secureGoogleLogin(){try{await realtimeEngine?.signInGoogle();}cat
 async function secureSignOut(){try{closeModal("accessModal");await realtimeEngine?.signOut();}catch(e){toast(e?.message||"Không thể đăng xuất");}}
 async function sendAccessRequest(){try{await realtimeEngine?.requestAccess($("#requestDisplayName")?.value?.trim());toast("Đã gửi yêu cầu");}catch(e){toast(e?.message||"Không thể gửi yêu cầu");}}
 async function cancelAccessRequest(){try{await realtimeEngine?.cancelAccessRequest();toast("Đã hủy yêu cầu");}catch(e){toast(e?.message||"Không thể hủy");}}
+async function dismissPendingRequest(button){
+  if(!requireAdmin())return;
+  const request=accessRequests.find(item=>item.uid===button.dataset.dismissRequest);
+  if(!request)return toast("Yêu cầu này không còn tồn tại.");
+  if(!confirm(`Xóa yêu cầu tham gia của ${request.displayName||"tài khoản này"}?`))return;
+  button.disabled=true;
+  try{
+    await realtimeEngine.dismissAccessRequest(request.uid,request.requestedAt);
+    toast("Đã xóa yêu cầu tham gia.");
+  }catch(error){toast(error?.message||"Không thể xóa yêu cầu.");}
+  finally{button.disabled=false;}
+}
 async function approveAccess(targetUid){
   const memberId=$(`[data-approve-member="${CSS.escape(targetUid)}"]`)?.value||"",role=$(`[data-approve-role="${CSS.escape(targetUid)}"]`)?.value||"member",req=accessRequests.find(x=>x.uid===targetUid);
   if(!memberId&&!confirm("Chưa liên kết với thành viên. Vẫn duyệt?"))return;

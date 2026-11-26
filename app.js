@@ -1,4 +1,4 @@
-const BOOT_VERSION = "20261127-11";
+const BOOT_VERSION = "20261127-12";
 globalThis.P708_RELEASE=BOOT_VERSION;
 globalThis.P708Debug?.("release",BOOT_VERSION);
 

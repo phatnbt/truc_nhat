@@ -102,6 +102,7 @@ function bindStaticEvents(){
     swapTask:openTaskSwap,
     reviewApprove:(index,button)=>reviewTask(index,true,button),
     reviewReject:(index,button)=>reviewTask(index,false,button),
+    reopenTask:reopenCompletedTask,
     adminTask:adminCompleteTask
   };
   const cleaningScheduleBox=$("#cleanScheduleBox");

@@ -181,6 +181,7 @@ try{
   const review=status=>({status,reviewedBy:"admin",reviewNote:"Reviewed",reviewedAt:serverTimestamp(),updatedAt:serverTimestamp()});
   await assertSucceeds(updateDoc(adminTask,review("approved")));
   await assertFails(updateDoc(adminTask,review("rejected")));
+  await assertFails(updateDoc(ownTaskRef,{...review("rejected"),reviewedBy:"member1"}));
 
   await assertSucceeds(setDoc(doc(member1,`rooms/${roomId}/auditLogs/member-log`),{
     roomCode:roomId,actorUid:"member1",actorName:"Member One",actorEmail:"m1@example.com",role:"member",

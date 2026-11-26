@@ -129,7 +129,9 @@ service cloud.firestore {
         && assignmentMatches(assignments[index], taskId, memberId);
     }
     function taskIsCurrentlyAssigned(roomId, weekStart, scheduleId, taskId, memberId) {
-      let schedules = get(roomPath(roomId)).data.payload.schedules;
+      return scheduleHasAssignment(get(roomPath(roomId)).data.payload.schedules, weekStart, scheduleId, taskId, memberId);
+    }
+    function scheduleHasAssignment(schedules, weekStart, scheduleId, taskId, memberId) {
       return weekStart in schedules
         && schedules[weekStart].id == scheduleId
         && schedules[weekStart].assignments is list
@@ -250,9 +252,13 @@ service cloud.firestore {
             'weekStart', 'taskId', 'taskName', 'status', 'submittedAt', 'updatedAt', 'checks'
           ]);
         allow update: if (isAdmin(roomId)
-          && resource.data.status == 'submitted'
-          && taskIsCurrentlyAssigned(roomId, resource.data.weekStart, resource.data.scheduleId, resource.data.taskId, resource.data.memberId)
-          && request.resource.data.status in ['approved', 'rejected']
+          && ((resource.data.status == 'submitted'
+              && request.resource.data.status in ['approved', 'rejected']
+              && taskIsCurrentlyAssigned(roomId, resource.data.weekStart, resource.data.scheduleId, resource.data.taskId, resource.data.memberId))
+            || (resource.data.status == 'approved' && request.resource.data.status == 'rejected'
+              && getAfter(roomPath(roomId)).data.revision == get(roomPath(roomId)).data.revision + 1
+              && scheduleHasAssignment(getAfter(roomPath(roomId)).data.payload.schedules,
+                resource.data.weekStart, resource.data.scheduleId, resource.data.taskId, resource.data.memberId)))
           && request.resource.data.reviewNote is string
           && request.resource.data.reviewNote.size() <= 300
           && request.resource.data.reviewedBy == request.auth.uid

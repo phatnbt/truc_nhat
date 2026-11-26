@@ -1,17 +1,17 @@
-import { createP708SecureEngine } from "../core/p708-secure-sync-engine.js?v=20261127-11";
-import * as P708MobileAuth from "../core/mobile-auth-policy.js?v=20261127-11";
-import { createP708AuthoritativeRepair } from "../core/p708-authoritative-repair.js?v=20261127-11";
-import { createP708CanonicalMappingRepair } from "../core/p708-canonical-mapping-repair.js?v=20261127-11";
-import * as P708BillingCycle from "../core/billing-cycle-period.js?v=20261127-11";
-import * as P708CleaningFairness from "../core/cleaning-fairness.js?v=20261127-11";
-import * as P708CleaningStreak from "../core/cleaning-streak.js?v=20261127-11";
-import { splitVnd } from "../core/expense-split.js?v=20261127-11";
-import { deleteScheduleAuthoritatively } from "../core/cleaning-schedule-store.js?v=20261127-11";
+import { createP708SecureEngine } from "../core/p708-secure-sync-engine.js?v=20261127-12";
+import * as P708MobileAuth from "../core/mobile-auth-policy.js?v=20261127-12";
+import { createP708AuthoritativeRepair } from "../core/p708-authoritative-repair.js?v=20261127-12";
+import { createP708CanonicalMappingRepair } from "../core/p708-canonical-mapping-repair.js?v=20261127-12";
+import * as P708BillingCycle from "../core/billing-cycle-period.js?v=20261127-12";
+import * as P708CleaningFairness from "../core/cleaning-fairness.js?v=20261127-12";
+import * as P708CleaningStreak from "../core/cleaning-streak.js?v=20261127-12";
+import { splitVnd } from "../core/expense-split.js?v=20261127-12";
+import { deleteScheduleAuthoritatively } from "../core/cleaning-schedule-store.js?v=20261127-12";
 
 const FIREBASE_RUNTIME_ENDPOINT="/__/firebase/init.json";
 const FIREBASE_RUNTIME_FALLBACK="https://p708-room-manager.web.app/firebase-config.runtime.json";
 const IS_LOCAL=["localhost","127.0.0.1","[::1]"].includes(location.hostname);
-const LOADER_RELEASE="20261127-11";
+const LOADER_RELEASE="20261127-12";
 if(globalThis.P708_RELEASE!==LOADER_RELEASE)throw new Error("release-mismatch");
 globalThis.P708Debug?.("loader",LOADER_RELEASE);
 
@@ -103,29 +103,29 @@ globalThis.splitVnd = splitVnd;
 globalThis.deleteScheduleAuthoritatively = trackExternal(deleteScheduleAuthoritatively);
 
 const parts = [
-  "../core/app-core1.js?v=20261127-11",
-  "../core/app-core2.js?v=20261127-11",
-  "../features/app-actions1.js?v=20261127-11",
-  "../features/app-actions2.js?v=20261127-11",
-  "../features/cleaning-delete-fix.js?v=20261127-11",
-  "../features/app-dashboard.js?v=20261127-11",
-  "../features/app-render.js?v=20261127-11",
-  "../features/cleaning-pet-streak.js?v=20261127-11",
-  "../features/app-integrity-fixes.js?v=20261127-11",
-  "../features/inactive-mapping-dedup-fix.js?v=20261127-11",
-  "../features/canonical-identity-repair.js?v=20261127-11",
-  "../features/billing-membership-exclusion.js?v=20261127-11",
-  "../features/billing-cycle-history.js?v=20261127-11",
-  "../features/billing-canonical-repair.js?v=20261127-11",
-  "../features/home-enhancements.js?v=20261127-11",
-  "../features/home-pet-garden.js?v=20261127-11",
-  "../features/ui-icon-polish.js?v=20261127-11",
-  "../features/today-calendar.js?v=20261127-11",
-  "../features/room-resources.js?v=20261127-11",
-  "../features/notification-enhancements.js?v=20261127-11",
-  "./app-start.js?v=20261127-11",
-  "../features/mobile-install-bridge.js?v=20261127-11",
-  "../features/mobile-install-guide.js?v=20261127-11"
+  "../core/app-core1.js?v=20261127-12",
+  "../core/app-core2.js?v=20261127-12",
+  "../features/app-actions1.js?v=20261127-12",
+  "../features/app-actions2.js?v=20261127-12",
+  "../features/cleaning-delete-fix.js?v=20261127-12",
+  "../features/app-dashboard.js?v=20261127-12",
+  "../features/app-render.js?v=20261127-12",
+  "../features/cleaning-pet-streak.js?v=20261127-12",
+  "../features/app-integrity-fixes.js?v=20261127-12",
+  "../features/inactive-mapping-dedup-fix.js?v=20261127-12",
+  "../features/canonical-identity-repair.js?v=20261127-12",
+  "../features/billing-membership-exclusion.js?v=20261127-12",
+  "../features/billing-cycle-history.js?v=20261127-12",
+  "../features/billing-canonical-repair.js?v=20261127-12",
+  "../features/home-enhancements.js?v=20261127-12",
+  "../features/home-pet-garden.js?v=20261127-12",
+  "../features/ui-icon-polish.js?v=20261127-12",
+  "../features/today-calendar.js?v=20261127-12",
+  "../features/room-resources.js?v=20261127-12",
+  "../features/notification-enhancements.js?v=20261127-12",
+  "./app-start.js?v=20261127-12",
+  "../features/mobile-install-bridge.js?v=20261127-12",
+  "../features/mobile-install-guide.js?v=20261127-12"
 ];
 
 let loadedParts=0;
