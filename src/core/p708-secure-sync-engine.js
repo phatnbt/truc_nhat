@@ -399,17 +399,25 @@ export function createP708SecureEngine({firebaseConfig,roomCode,deviceId,onShape
     const shapeOperations=diffJson(optimisticShape,desired),forbidden=shapeOperations.find(op=>!memberAllowedOperation(op,memberId,optimisticShape,desired));
     if(forbidden)throw new Error("Bạn chỉ được chỉnh trạng thái và ngày ở của chính mình.");
     const previousOwn=extractMemberData(optimisticShape,memberId,memberDataByUid.get(user.uid)),desiredOwn=extractMemberData(desired,memberId,memberDataByUid.get(user.uid)),ownOperations=diffJson(previousOwn,desiredOwn),ownRef=doc(memberDataCollection,user.uid);
+    const billingMonths=[...new Set(ownOperations.filter(operation=>operation.path[0]==="billingMonths").map(operation=>operation.path[1]))];
     const mergedOwn=await runTransaction(db,async tx=>{
-      const snap=await tx.get(ownRef),current=snap.exists()?clone(snap.data())||{}:{memberId},merged=applyJsonOperations(current,ownOperations);merged.memberId=memberId;
-      const changedMonths=[...new Set([...Object.keys(current.billingMonths||{}),...Object.keys(merged.billingMonths||{})])]
-        .filter(month=>!jsonEqual(current.billingMonths?.[month],merged.billingMonths?.[month]));
-      if(changedMonths.length){
-        const room=await tx.get(roomRef),month=changedMonths[0];
-        if(changedMonths.length!==1||!room.data()?.payload?.billingMonths?.[month]||room.data().payload.billingMonths[month].closed){
+      const snap=await tx.get(ownRef),month=billingMonths[0];
+      const current=snap.exists()?clone(snap.data()):{memberId,billingMonths:{}};
+      if(!snap.exists()||billingMonths.length){
+        const room=await tx.get(roomRef),payload=room.data()?.payload;
+        if(!snap.exists())current.presence=payload?.presence?.[memberId]!==false;
+        if(billingMonths.length&&(billingMonths.length!==1||!payload?.billingMonths?.[month]||payload.billingMonths[month].closed)){
           throw new Error("Chỉ có thể chỉnh ngày ở của một kỳ đang mở.");
         }
-        merged.billingPatchMonth=month;
+        if(month){
+          // Preserve existing room days when a member first creates an override for this month.
+          current.billingMonths??={};
+          current.billingMonths[month]??={days:clone(memberPersonEntry(payload,memberId,month)?.[1]?.days||{})};
+        }
       }
+      const merged=applyJsonOperations(current,ownOperations);
+      merged.memberId=memberId;
+      if(month)merged.billingPatchMonth=month;
       tx.set(ownRef,{...merged,updatedBy:user.uid,updatedAt:serverTimestamp()});return merged;
     });
     if(user?.uid!==actor||!hasAccess())return true;

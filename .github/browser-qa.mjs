@@ -16,14 +16,17 @@ const password="local-test-password";
 const auth=process.env.FIREBASE_AUTH_EMULATOR_HOST;
 const testRun=randomUUID();
 
-async function roomPayloadFromServer(){
-  let payload;
+async function dataFromServer(...path){
+  let data;
   await env.withSecurityRulesDisabled(async context=>{
-    const snap=await getDocFromServer(doc(context.firestore(),room));
-    payload=snap.data().payload;
+    const snapshot=await getDocFromServer(doc(context.firestore(),room,...path));
+    data=snapshot.data();
   });
-  return payload;
+  return data;
 }
+
+const roomPayloadFromServer=async()=>(await dataFromServer()).payload;
+const memberDataFromServer=uid=>dataFromServer("memberData",uid);
 
 async function testAccount(kind, browser){
   const email=`${kind}-${browser}-${testRun}@example.test`;
@@ -142,6 +145,33 @@ async function exercise(engine,name,width){
     const manualRow=manager.locator('#cleanScheduleBox tr[data-task-key^="san:"]');
     await clickDuringSync(manualRow.getByRole("button",{name:"Đánh dấu xong"}),hasTouch);
     await expect(manualRow).toContainText("Đã xong");
+
+    // Exercise both first-write paths with accounts that lack a personal data document.
+    assert.equal(await memberDataFromServer(member.uid),undefined);
+    if(hasTouch){
+      const presence=resident.locator('[data-presence="b"]');
+      await expect(resident.locator('[data-presence="a"]')).toBeDisabled();
+      resident.once("dialog",dialog=>dialog.accept());
+      await activate(presence);
+      await expect.poll(async()=>(await memberDataFromServer(member.uid))?.presence).toBe(false);
+      assert.deepEqual((await memberDataFromServer(member.uid)).billingMonths,{});
+      await expect(manager.locator('[data-presence="b"]')).toHaveClass(/off/);
+      await activate(presence);
+      await expect.poll(async()=>(await memberDataFromServer(member.uid))?.presence).toBe(true);
+    }
+
+    await resident.goto(base+"/#billing");
+    await resident.locator("#billMonth").fill(billMonth);
+    await resident.locator("#billMonth").dispatchEvent("change");
+    const memberSecondDay=resident.locator(`[data-billing-date="${billMonth}-02"]`);
+    await expect(memberSecondDay).toBeEnabled();
+    await activate(memberSecondDay);
+    await expect.poll(async()=>(await memberDataFromServer(member.uid))?.billingMonths[billMonth]?.days["2"]).toBe(true);
+    const personalData=await memberDataFromServer(member.uid);
+    assert.equal(personalData.presence,true);
+    assert.equal(personalData.billingMonths[billMonth].days["1"],true,"the pre-existing room day is preserved");
+    await activate(memberSecondDay);
+    await expect.poll(async()=>(await memberDataFromServer(member.uid))?.billingMonths[billMonth]?.days["2"]).toBe(false);
 
     await manager.goto(base+"/#billing");
     await manager.locator("#billMonth").fill(billMonth);
